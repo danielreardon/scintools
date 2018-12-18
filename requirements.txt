@@ -1,0 +1,7 @@
+astropy
+numpy
+scipy
+matplotlib
+libstempo
+
+
