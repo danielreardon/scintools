@@ -174,11 +174,11 @@ class Dynspec:
 
         self.trim_edges()  # remove zeros on band edges
         self.refill()  # refill with linear interpolation
-        self.calc_acf()  # calculate the ACF
         self.correct_band(time=True)  # Correct for bandpass. Optional: in time
+        self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
-        self.calc_sspec()  # Calculate secondary spectrum
+        self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
     def plot_dyn(self, lamsteps=False):
         """
@@ -262,7 +262,7 @@ class Dynspec:
         plt.colorbar()
         plt.show()
 
-    def fit_arc(self, method='gridmax', asymm=True, plot=False, delmax=0.3,
+    def fit_arc(self, method='gridmax', asymm=False, plot=False, delmax=0.3,
                 sqrt_eta_step=1e-3, startbin=9, etamax=0.5, lamsteps=False):
         """
         Find the arc curvature with maximum power along it
@@ -357,13 +357,16 @@ class Dynspec:
         self.eta = eta
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=9,
-                   maxnormfac=2, cutmid=2, lamsteps=False):
+                   maxnormfac=10, cutmid=10, lamsteps=False):
         """
         Normalise fdop axis using arc curvature
         """
+        delmax = np.max(self.tdel) if delmax is None else delmax
+        delmax = delmax*(1400/self.freq)**2
 
         if not hasattr(self, 'eta') and not eta:
-            self.fit_arc(lamsteps=lamsteps)
+            self.fit_arc(lamsteps=lamsteps, delmax=delmax, plot=plot,
+                         startbin=startbin)
         if lamsteps:
             if not hasattr(self, 'lamsspec'):
                 self.calc_sspec(lamsteps=lamsteps)
@@ -374,8 +377,7 @@ class Dynspec:
             sspec = self.sspec
         if not eta:
             eta = self.eta
-        delmax = np.max(self.tdel) if delmax is None else delmax
-        delmax = delmax*(1400/self.freq)**2
+
         ind = np.argmin(abs(self.tdel-delmax))
         sspec = sspec[startbin:ind, :]  # cut first N delay bins and at delmax
         tdel = self.tdel[startbin:ind]
@@ -569,13 +571,18 @@ class Dynspec:
             dyn = self.lamdyn
         else:
             dyn = self.dyn
+        dyn[np.isnan(dyn)] = 0
         self.bandpass = np.mean(dyn, axis=1)
+        # Make sure there are no zeros
+        self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
         dyn = np.divide(dyn, np.reshape(self.bandpass,
                                         [len(self.bandpass), 1]))
         if time:
-            self.bandpass = np.mean(dyn, axis=0)
-            self.dyn = np.divide(dyn, np.reshape(self.bandpass,
-                                                 [1, len(self.bandpass)]))
+            timestructure = np.mean(dyn, axis=0)
+            # Make sure there are no zeros
+            timestructure[timestructure == 0] = np.mean(timestructure)
+            dyn = np.divide(dyn, np.reshape(timestructure,
+                                            [1, len(timestructure)]))
         if lamsteps:
             self.lamdyn = dyn
         else:
@@ -620,9 +627,11 @@ class Dynspec:
             postdark[0, :] = 1
             sec = np.divide(sec, postdark)
         if lamsteps:
-            self.lamsspec = np.log10(sec/np.max(sec))  # normalise and make db
+            # normalise and make db
+            self.lamsspec = np.log10(sec/np.max(sec))
         else:
-            self.sspec = np.log10(sec/np.max(sec))  # normalise and make db
+            # normalise and make db
+            self.sspec = np.log10(sec/np.max(sec))
 
         fdop = np.multiply(fd, 1e3/(ncfft*self.dt))  # in mHz
         tdel = np.divide(td, (nrfft*self.df))  # in us
@@ -681,8 +690,8 @@ class Dynspec:
             arin = self.dyn  # input array
             fbw = self.bw/self.freq  # fractional bandwidth
             nf, nt = np.shape(arin)
-            dfeq = fbw/(nf-1)  # equal steps in fractional bandwidth
-            feq = np.arange(1 - fbw/2, 1 + fbw/2, dfeq)
+            # equal steps in fractional bandwidth
+            feq = np.linspace(1 - fbw/2, 1 + fbw/2, nf)
             # all that matters is the ratio of frequencies
             #   so we normalize for convenience
             feq = feq/feq[0]
