@@ -3,27 +3,14 @@
 """
 scintools.py
 ----------------------------------
-Manage data and launch scintools from command line
+Launch scintools from command line
 """
+
 import argparse
 
+parser = argparse.ArgumentParser(description='Scintools: Scintillation tools')
+parser.add_argument('-f', dest='accumulate', action='store_const',
+                    const=sum, default=max,
+                    help='sum the integers (default: find the max)')
 
-def make_dynspec(archive, template_profile, method, output):
-    """
-    Creates a psrflux-format dynamic spectrum from a psrchive or from
-    """
-    return
-
-
-def sort_dynspec(datadir, tmin=10, fmin=64,):
-    """
-    Automatically sorts dynspec into "good" or "bad" on some conditions
-    """
-    return
-
-
-def clean_archive(archive):
-    """
-    Cleans an archive using coast_guard
-    """
-    return cleaned_archive
+args = parser.parse_args()

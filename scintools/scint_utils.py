@@ -10,6 +10,35 @@ from os.path import split
 import numpy as np
 
 
+def make_dynspec(archive, template):
+    """
+    Creates a psrflux-format dynamic spectrum from a psrchive or from
+    """
+    return
+
+
+def sort_dynspec(datadir, tmin=10, fmin=64):
+    """
+    Automatically sorts dynspec into "good" or "bad" on some conditions
+    """
+    return
+
+
+def clean_archive(archive, template, bandwagon=0.99, channel_threshold=4,
+                  subint_threshold=4):
+    """
+    Cleans an archive using coast_guard
+    """
+    try:
+        from coast_guard import cleaners
+    except ModuleNotFoundError:
+        print('Warning: coast_guard not found. Cannot clean')
+        return
+    # Clean the archive with surgical cleaner
+    print('This does nothing yet')
+    return cleaned_archive
+
+
 def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
              min_freq=0, max_freq=5000, remove_nan_sspec=False, verbose=True,
              max_frac_bw=2):

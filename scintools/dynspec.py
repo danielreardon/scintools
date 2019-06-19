@@ -174,6 +174,7 @@ class Dynspec:
 
         self.trim_edges()  # remove zeros on band edges
         self.refill()  # refill with linear interpolation
+        # self.zap()  # median zapping 5 sigma default
         self.correct_band(time=True)  # Correct for bandpass. Optional: in time
         self.calc_acf()  # calculate the ACF
         if lamsteps:
@@ -219,10 +220,14 @@ class Dynspec:
         wn = arr[0][0] - arr[0][1]  # subtract the white noise spike
         arr[0][0] = arr[0][0] - wn  # Set the noise spike to zero for plotting
         arr = np.fft.fftshift(arr)
+        t_delays = np.linspace(-self.tobs/60, self.tobs/60, np.shape(arr)[1])
+        f_shifts = np.linspace(-self.bw, self.bw, np.shape(arr)[0])
         if contour:
             plt.contourf(arr)
         else:
-            plt.pcolormesh(arr)
+            plt.pcolormesh(t_delays, f_shifts, arr)
+        plt.ylabel('Frequency lag (MHz)')
+        plt.xlabel('Time lag (mins)')
         plt.colorbar()
         plt.show()
 
@@ -262,8 +267,36 @@ class Dynspec:
         plt.colorbar()
         plt.show()
 
+    def plot_all(self, dyn=1, sspec=3, acf=2, norm_sspec=4, colorbar=True,
+                 lamsteps=False):
+        """
+        Plots multiple figures in one
+        """
+        # Dynamic Spectrum
+        plt.subplot(2, 2, dyn)
+        self.plot_dyn(lamsteps=lamsteps)
+        plt.title("Dynamic Spectrum")
+
+        # Autocovariance Function
+        plt.subplot(2, 2, acf)
+        self.plot_acf()
+        plt.title("Autocovariance")
+
+        # Secondary Spectrum
+        plt.subplot(2, 2, sspec)
+        self.plot_sspec(lamsteps=lamsteps)
+        plt.title("Secondary Spectrum")
+
+        # Normalised Secondary Spectrum
+        plt.subplot(2, 2, norm_sspec)
+        self.norm_sspec(plot=True, scrunched=False, lamsteps=lamsteps,
+                        plot_fit=False)
+        plt.title("Normalised fdop secondary spectrum")
+
+        plt.show()
+
     def fit_arc(self, method='gridmax', asymm=False, plot=False, delmax=0.3,
-                sqrt_eta_step=1e-3, startbin=9, etamax=0.5, lamsteps=False):
+                sqrt_eta_step=1e-3, startbin=9, etamax=0.2, lamsteps=False):
         """
         Find the arc curvature with maximum power along it
         """
@@ -330,9 +363,14 @@ class Dynspec:
                                    len(xnewR))]).T
                 znewR = map_coordinates(z, xynewR, order=1, cval=np.nan)
                 sumpowR.append(np.mean(znewR[~np.isnan(znewR)]))
+        elif method == 'norm_sspec':
+            if not hasattr(self, 'normsspecavg'):
+                self.norm_sspec(delmax=delmax, plot=plot, startbin=startbin,
+                                maxnormfac=3, cutmid=2, lamsteps=lamsteps)
+            print('nothing yet')
         else:
             raise ValueError('Unknown arc fitting method. Please choose \
-                             from gidmax or [nothing else yet.. too bad]')
+                             from gidmax or norm_sspec')
         sumpow = np.add(sumpowL, sumpowR)/2  # average
         ind = np.argmax(sumpow[~np.isnan(sumpow)])
         indL = np.argmax(sumpowL)
@@ -357,7 +395,8 @@ class Dynspec:
         self.eta = eta
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=9,
-                   maxnormfac=10, cutmid=10, lamsteps=False):
+                   maxnormfac=2, cutmid=2, lamsteps=False, scrunched=True,
+                   plot_fit=True):
         """
         Normalise fdop axis using arc curvature
         """
@@ -408,21 +447,30 @@ class Dynspec:
         if isspecavg[ind1] < 0:
             isspecavg = isspecavg + 2  # make 1 instead of -1
         if plot:
-            plt.plot(fdopnew, isspecavg)
+            if scrunched:
+                plt.plot(fdopnew, isspecavg)
+                bottom, top = plt.ylim()
+                plt.xlabel("Normalised fdop")
+                plt.ylabel("Normalised log10(Power)")
+                if plot_fit:
+                    plt.plot([1, 1], [bottom, top], 'r', alpha=0.5)
+                    plt.plot([-1, -1], [bottom, top], 'r', alpha=0.5)
+                plt.ylim(bottom, top)
+                plt.xlim(-maxnormfac, maxnormfac)
+                plt.show()
+                return
+            if lamsteps:
+                beta = np.divide(tdel, self.dlam)  # in m^-1
+                plt.pcolormesh(fdopnew, beta, normSspec)
+                plt.ylabel('Beta (m$^{-1}$)')
+            else:
+                plt.pcolormesh(fdopnew, tdel, normSspec)
+                plt.ylabel("tdel (us)")
             bottom, top = plt.ylim()
             plt.xlabel("Normalised fdop")
-            plt.ylabel("Normalised log10(Power)")
-            plt.plot([1, 1], [bottom, top], 'r', alpha=0.5)
-            plt.plot([-1, -1], [bottom, top], 'r', alpha=0.5)
-            plt.ylim(bottom, top)
-            plt.xlim(-maxnormfac, maxnormfac)
-            plt.show()
-            plt.pcolormesh(fdopnew, tdel, normSspec)
-            bottom, top = plt.ylim()
-            plt.xlabel("Normalised fdop")
-            plt.ylabel("tdel (us)")
-            plt.plot([1, 1], [bottom, top], 'r', alpha=0.5)
-            plt.plot([-1, -1], [bottom, top], 'r', alpha=0.5)
+            if plot_fit:
+                plt.plot([1, 1], [bottom, top], 'r', alpha=0.5)
+                plt.plot([-1, -1], [bottom, top], 'r', alpha=0.5)
             plt.ylim(bottom, top)
             plt.colorbar()
             plt.show()
@@ -536,9 +584,24 @@ class Dynspec:
             self.dyn = np.delete(self.dyn, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
             rowsum = sum(abs(self.dyn[-1][:]))
+        # Trim left
+        colsum = sum(abs(self.dyn[:][0]))
+        while colsum == 0:
+            self.dyn = np.delete(self.dyn, (0), axis=1)
+            self.times = np.delete(self.times, (0))
+            colsum = sum(abs(self.dyn[:][0]))
+        colsum = sum(abs(self.dyn[:][-1]))
+        # Trim right
+        while colsum == 0:
+            self.dyn = np.delete(self.dyn, (-1), axis=1)
+            self.times = np.delete(self.times, (-1))
+            colsum = sum(abs(self.dyn[:][-1]))
         self.nchan = len(self.freqs)
         self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
         self.freq = round(np.mean(self.freqs), 2)
+        self.nsub = len(self.times)
+        self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
+        self.mjd = self.mjd + self.times[0]/86400
 
     def refill(self, zeros=True):
         """
@@ -663,9 +726,8 @@ class Dynspec:
 
     def zap(self, method='median', sigma=5, m=7):
         """
-        Basic median zapping of dynspec
+        Basic zapping of dynamic spectrum
         """
-
         if method == 'median':
             d = np.abs(self.dyn - np.median(self.dyn))
             mdev = np.median(d)

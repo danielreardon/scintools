@@ -6,10 +6,13 @@ pulsar.py
 Pulsar class for reading parameters and toas
 """
 
+import libstempo as T
+
 
 class Pulsar:
 
-    def __init__(self):
+    def __init__(self, parfile, timfile):
+        psr = T.tempopulsar(parfile=parfile, timfile=timfile)
         return
 
     def get_ecc_anomaly(self, mjd, barycentric=True):
