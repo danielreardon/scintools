@@ -241,72 +241,72 @@ class ACF():
         |sigma_p| dnu/nu
         """
 
-        spmax = s_max
-        dnumax = dnu_max
-        dsp = 2*(spmax)/(nt-1)
-        ddnun = 2*(dnumax)/(nf-1)
-        Vmag = np.sqrt(Vx**2 + Vy**2)
-        sqrtar = np.sqrt(ar)
-        dnun = np.arange(0, dnumax, ddnun)  # equally spaced dnu array
-        ndnun = len(dnun)
-        sigxn = phasegrad_x
-        sigyn = phasegrad_y
-
-        if sigxn == 0 and sigyn == 0:
-            # calculate only one quadrant tn >= 0
-            print('Calculating ACF... w/ one quad')
-            tn = 0:(dsp./Vmag):(spmax./Vmag)  # equally spaced t array t= tn*S0
-            snx= Vx.*tn
-            sny = Vy.*tn
-            [SNPX,SNPY] = meshgrid(-2*spmax:dsp:2*spmax);
-            gammes=exp(-0.5*((SNPX/sqrtar).^2+(SNPY*sqrtar).^2).^alph2); %ACF of e-field
-            %compute dnun=0 first
-            gammitv(:,1)=exp(-0.5*((snx/sqrtar).^2 + (sny*sqrtar).^2).^alph2);
-            %now do first dnu step with double spatial resolution
-            [SNPX2,SNPY2] = meshgrid(-2*spmax:(dsp/2):2*spmax);
-            gammes2=exp(-0.5*((SNPX2/sqrtar).^2+(SNPY2*sqrtar).^2).^alph2); %ACF of e-field
-            for isn=1:length(snx);
-                ARG=((SNPX2-snx(isn)).^2+(SNPY2-sny(isn)).^2)/(2*dnun(2));
-                temp=gammes2.*exp(1i*ARG);
-                gammitv(isn,2)= -1i*(dsp/2)^2*sum(temp(:))/((2*pi)*dnun(2));
-            %now do remainder of dnu array
-            for idn=3:ndnun
-            %     snx= snx -2*sigxn*dnun(idn);
-            %     sny = sny - 2*sigyn*dnun(idn);
-            for isn=1:length(snx);
-                ARG=((SNPX-snx(isn)).^2+(SNPY-sny(isn)).^2)/(2*dnun(idn));
-                temp=gammes.*exp(1i*ARG);
-                gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
-
-            gammitv=real(gammitv.*conj(gammitv));  %equation A1 convert ACF of E to ACF of I
-            gam2=[fliplr(gammitv(:,2:end)),gammitv];
-            t2=[fliplr(-tn(2:end)),tn];
-            gam3=[flipud(gam2(2:end,:));gam2]';
-            f2=[fliplr(-dnun(2:end)),dnun];
-            s2=t2.*Vmag;
-        else
-            %calculate two quadrants -tmax t < tmax
-            display('Calculating ACF... w/ two quad')
-            tn = -(spmax/Vmag):(dsp/Vmag):(spmax/Vmag);  %equally spaced t array t= tn*S0
-            snx= Vx*tn; sny = Vy*tn;
-            [SNPX,SNPY] = meshgrid(-spmax:dsp:spmax);
-            gammes=exp(-0.5*((SNPX/sqrtar).^2+(SNPY*sqrtar).^2).^alph2); %ACF of e-field
-            %compute dnun=0 first
-            gammitv(:,1)=exp(-0.5*((snx/sqrtar).^2 + (sny*sqrtar).^2).^alph2);
-            for idn=2:ndnun
-                snxt= snx -2*sigxn*dnun(idn);
-                snyt = sny - 2*sigyn*dnun(idn);
-            for isn=1:length(snx);
-                %temp=gammes.*exp(1i*((SNPX-snx(isn)).^2+(SNPY-sny(isn)).^2)/(2*dnun(idn)));
-                %gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
-                temp=gammes.*exp(1i*((SNPX-snxt(isn)).^2+(SNPY-snyt(isn)).^2)/(2*dnun(idn)));
-                gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
-            gammitv=real(gammitv.*conj(gammitv));  %equation A1 convert ACF of E to ACF of I
-            gam3=[fliplr(flipud(gammitv(:,2:end))),gammitv]';
-            f2=[fliplr(-dnun(2:end)),dnun];
-            t2=tn;
-            s2=t2.*Vmag;
-        return
+#        spmax = s_max
+#        dnumax = dnu_max
+#        dsp = 2*(spmax)/(nt-1)
+#        ddnun = 2*(dnumax)/(nf-1)
+#        Vmag = np.sqrt(Vx**2 + Vy**2)
+#        sqrtar = np.sqrt(ar)
+#        dnun = np.arange(0, dnumax, ddnun)  # equally spaced dnu array
+#        ndnun = len(dnun)
+#        sigxn = phasegrad_x
+#        sigyn = phasegrad_y
+#
+#        if sigxn == 0 and sigyn == 0:
+#            # calculate only one quadrant tn >= 0
+#            print('Calculating ACF... w/ one quad')
+#            tn = 0:(dsp./Vmag):(spmax./Vmag)  # equally spaced t array t= tn*S0
+#            snx= Vx.*tn
+#            sny = Vy.*tn
+#            [SNPX,SNPY] = meshgrid(-2*spmax:dsp:2*spmax);
+#            gammes=exp(-0.5*((SNPX/sqrtar).^2+(SNPY*sqrtar).^2).^alph2); %ACF of e-field
+#            %compute dnun=0 first
+#            gammitv(:,1)=exp(-0.5*((snx/sqrtar).^2 + (sny*sqrtar).^2).^alph2);
+#            %now do first dnu step with double spatial resolution
+#            [SNPX2,SNPY2] = meshgrid(-2*spmax:(dsp/2):2*spmax);
+#            gammes2=exp(-0.5*((SNPX2/sqrtar).^2+(SNPY2*sqrtar).^2).^alph2); %ACF of e-field
+#            for isn=1:length(snx);
+#                ARG=((SNPX2-snx(isn)).^2+(SNPY2-sny(isn)).^2)/(2*dnun(2));
+#                temp=gammes2.*exp(1i*ARG);
+#                gammitv(isn,2)= -1i*(dsp/2)^2*sum(temp(:))/((2*pi)*dnun(2));
+#            %now do remainder of dnu array
+#            for idn=3:ndnun
+#            %     snx= snx -2*sigxn*dnun(idn);
+#            %     sny = sny - 2*sigyn*dnun(idn);
+#            for isn=1:length(snx);
+#                ARG=((SNPX-snx(isn)).^2+(SNPY-sny(isn)).^2)/(2*dnun(idn));
+#                temp=gammes.*exp(1i*ARG);
+#                gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
+#
+#            gammitv=real(gammitv.*conj(gammitv));  %equation A1 convert ACF of E to ACF of I
+#            gam2=[fliplr(gammitv(:,2:end)),gammitv];
+#            t2=[fliplr(-tn(2:end)),tn];
+#            gam3=[flipud(gam2(2:end,:));gam2]';
+#            f2=[fliplr(-dnun(2:end)),dnun];
+#            s2=t2.*Vmag;
+#        else
+#            %calculate two quadrants -tmax t < tmax
+#            display('Calculating ACF... w/ two quad')
+#            tn = -(spmax/Vmag):(dsp/Vmag):(spmax/Vmag);  %equally spaced t array t= tn*S0
+#            snx= Vx*tn; sny = Vy*tn;
+#            [SNPX,SNPY] = meshgrid(-spmax:dsp:spmax);
+#            gammes=exp(-0.5*((SNPX/sqrtar).^2+(SNPY*sqrtar).^2).^alph2); %ACF of e-field
+#            %compute dnun=0 first
+#            gammitv(:,1)=exp(-0.5*((snx/sqrtar).^2 + (sny*sqrtar).^2).^alph2);
+#            for idn=2:ndnun
+#                snxt= snx -2*sigxn*dnun(idn);
+#                snyt = sny - 2*sigyn*dnun(idn);
+#            for isn=1:length(snx);
+#                %temp=gammes.*exp(1i*((SNPX-snx(isn)).^2+(SNPY-sny(isn)).^2)/(2*dnun(idn)));
+#                %gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
+#                temp=gammes.*exp(1i*((SNPX-snxt(isn)).^2+(SNPY-snyt(isn)).^2)/(2*dnun(idn)));
+#                gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
+#            gammitv=real(gammitv.*conj(gammitv));  %equation A1 convert ACF of E to ACF of I
+#            gam3=[fliplr(flipud(gammitv(:,2:end))),gammitv]';
+#            f2=[fliplr(-dnun(2:end)),dnun];
+#            t2=tn;
+#            s2=t2.*Vmag;
+#        return
 
     def calc_acf_fourier(self, s_max=5, dnu_max=5, ns=201, nf=101, ar=2,
                          alpha=5/3):

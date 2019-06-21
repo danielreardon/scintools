@@ -12,14 +12,9 @@ import numpy as np
 
 def make_dynspec(archive, template):
     """
-    Creates a psrflux-format dynamic spectrum from a psrchive or from
-    """
-    return
+    Creates a psrflux-format dynamic spectrum from an archive
 
-
-def sort_dynspec(datadir, tmin=10, fmin=64):
-    """
-    Automatically sorts dynspec into "good" or "bad" on some conditions
+    psrflux -s [template] -e dynspec [archive]
     """
     return
 
@@ -117,8 +112,8 @@ def remove_duplicates(dynfiles):
     return dynfiles
 
 
-def make_json(dyn, process=True, sspec=True, acf=True, lamsteps=True):
+def make_pickle(dyn, process=True, sspec=True, acf=True, lamsteps=True):
     """
-    Saves dynamic spectra object into json file
+    Pickles a dynamic spectra object
     """
     return

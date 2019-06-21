@@ -243,8 +243,7 @@ class Dynspec:
             if not hasattr(self, 'sspec'):
                 self.calc_sspec(lamsteps=lamsteps)
             sspec = self.sspec
-        meanval = np.mean(sspec[np.isfinite(sspec.any())
-                                and not np.isnan(sspec.any())])
+        meanval = np.nanmean(sspec[np.isfinite(sspec.any())])
         vmin = meanval-2
         vmax = vmin+6
         if lamsteps:
@@ -296,7 +295,8 @@ class Dynspec:
         plt.show()
 
     def fit_arc(self, method='gridmax', asymm=False, plot=False, delmax=0.3,
-                sqrt_eta_step=1e-3, startbin=9, etamax=0.2, lamsteps=False):
+                sqrt_eta_step=1e-3, startbin=9, etamax=0.2, lamsteps=False,
+                cutmid=9):
         """
         Find the arc curvature with maximum power along it
         """
@@ -304,14 +304,19 @@ class Dynspec:
         if lamsteps:
             if not hasattr(self, 'lamsspec'):
                 self.calc_sspec(lamsteps=lamsteps)
-            sspec = self.lamsspec
+            temp = self.lamsspec
         else:
             if not hasattr(self, 'sspec'):
                 self.calc_sspec()
-            sspec = self.sspec
+            temp = self.sspec
+        sspec = temp
         delmax = delmax*(1400/self.freq)**2
         ind = np.argmin(abs(self.tdel-delmax))
         sspec[0:startbin, :] = np.nan  # mask first N delay bins
+        nr, nc = np.shape(sspec)
+        # mask middle N Doppler bins
+        sspec[:, int(nc/2 - np.floor(cutmid/2)):int(nc/2 +
+              np.floor(cutmid/2))] = np.nan
         sspec = sspec[0:ind, :]  # cut at delmax
         tdel = self.tdel[0:ind]
         fdop = self.fdop
@@ -475,7 +480,7 @@ class Dynspec:
             plt.colorbar()
             plt.show()
         self.normsspecavg = isspecavg
-        self.normsspec = normSspec
+        self.normsspec = np.array(normSspec)
 
     def get_tau(self, method="acf", plot=False, alpha=5/3):
         """
