@@ -46,9 +46,9 @@ def arc_power_curve(x, x_peak, amp, norm=False):
     return y
 
 
-def parabola(x, x_peak, amp, sign=1):
+def fit_parabola(x, x_peak, amp, sign=1):
     """
-    Inverse parabola
+    Fit a parabola
     """
     y = sign*np.power((x_peak - eta), 2) + amp
     return y

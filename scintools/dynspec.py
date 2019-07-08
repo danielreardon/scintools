@@ -8,10 +8,12 @@ Dynamic spectrum class
 
 import time
 import os
+from os.path import split
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
 from models import tauModel, dnuModel
+from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
 from scipy.signal import convolve2d, medfilt
@@ -22,7 +24,7 @@ from scipy.io import loadmat
 class Dynspec:
 
     def __init__(self, filename=None, dyn=None, verbose=True, process=True,
-                 lamsteps=False):
+                 lamsteps=False, backup=True, axes=None):
         """"
         Initialise a dynamic spectrum object by either reading from file
             or from existing object
@@ -30,7 +32,7 @@ class Dynspec:
 
         if filename:
             self.load_file(filename, verbose=verbose, process=process,
-                           lamsteps=lamsteps)
+                           lamsteps=lamsteps, axes=axes)
         elif dyn:
             self.load_dyn_obj(dyn, verbose=verbose, process=process,
                               lamsteps=lamsteps)
@@ -62,6 +64,8 @@ class Dynspec:
         timegap = round((other.mjd - self.mjd)*86400
                         - self.tobs, 2)  # time between two dynspecs
         extratimes = np.arange(self.dt/2, timegap, dt)
+        if timegap < dt:
+            extratimes = [0]
         nextra = len(extratimes)
         dyngap = np.zeros([np.shape(self.dyn)[0], nextra])
 
@@ -81,9 +85,10 @@ class Dynspec:
                           freqs=freqs, nchan=nchan, nsub=nsub, bw=bw,
                           df=df, freq=freq, tobs=tobs, dt=dt, mjd=mjd)
 
-        return Dynspec(dyn=newdyn, verbose=False, process=True)
+        return Dynspec(dyn=newdyn, verbose=False, process=False)
 
-    def load_file(self, filename, verbose=True, process=True, lamsteps=False):
+    def load_file(self, filename, verbose=True, process=True, lamsteps=False,
+                  axes=None):
         """
         Load a dynamic spectrum from psrflux-format file
         """
@@ -181,33 +186,38 @@ class Dynspec:
             self.scale_dyn()
         self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
-    def plot_dyn(self, lamsteps=False):
+    def plot_dyn(self, lamsteps=False, input_dyn=None):
         """
         Plot the dynamic spectrum
         """
 
-        if lamsteps:
-            if not hasattr(self, 'lamdyn'):
-                self.scale_dyn()
-            dyn = self.lamdyn
+        if input_dyn is None:
+            if lamsteps:
+                if not hasattr(self, 'lamdyn'):
+                    self.scale_dyn()
+                dyn = self.lamdyn
+            else:
+                dyn = self.dyn
         else:
-            dyn = self.dyn
-        medval = np.median(dyn[np.isfinite(dyn.any())
-                               and not np.isnan(dyn.any())])
-        std = np.std(dyn[np.isfinite(dyn.any())and not np.isnan(dyn.any())])
+            dyn = input_dyn
+        medval = np.median(dyn[is_valid(dyn)])
+        std = np.std(dyn[is_valid(dyn)])
         vmin = medval-5*std
         vmax = medval+5*std
-        if lamsteps:
-            plt.pcolormesh(self.times/60, self.lam, dyn,
-                           vmin=vmin, vmax=vmax)
-            plt.ylabel('Wavelength (m)')
+        if input_dyn is None:
+            if lamsteps:
+                plt.pcolormesh(self.times/60, self.lam, dyn,
+                               vmin=vmin, vmax=vmax)
+                plt.ylabel('Wavelength (m)')
+            else:
+                plt.pcolormesh(self.times/60, self.freqs, dyn,
+                               vmin=vmin, vmax=vmax)
+                plt.ylabel('Frequency (MHz)')
+            plt.xlabel('Time (mins)')
+            plt.colorbar()
+            plt.show()
         else:
-            plt.pcolormesh(self.times/60, self.freqs, dyn,
-                           vmin=vmin, vmax=vmax)
-            plt.ylabel('Frequency (MHz)')
-        plt.xlabel('Time (mins)')
-        plt.colorbar()
-        plt.show()
+            plt.pcolormesh(dyn, vmin=vmin, vmax=vmax)
 
     def plot_acf(self, contour=False):
         """
@@ -231,40 +241,46 @@ class Dynspec:
         plt.colorbar()
         plt.show()
 
-    def plot_sspec(self, lamsteps=False):
+    def plot_sspec(self, lamsteps=False, input_sspec=None):
         """
         Plot the secondary spectrum
         """
-        if lamsteps:
-            if not hasattr(self, 'lamsspec'):
-                self.calc_sspec(lamsteps=lamsteps)
-            sspec = self.lamsspec
+        if input_sspec is None:
+            if lamsteps:
+                if not hasattr(self, 'lamsspec'):
+                    self.calc_sspec(lamsteps=lamsteps)
+                sspec = self.lamsspec
+            else:
+                if not hasattr(self, 'sspec'):
+                    self.calc_sspec(lamsteps=lamsteps)
+                sspec = self.sspec
         else:
-            if not hasattr(self, 'sspec'):
-                self.calc_sspec(lamsteps=lamsteps)
-            sspec = self.sspec
-        meanval = np.nanmean(sspec[np.isfinite(sspec.any())])
-        vmin = meanval-2
+            sspec = input_sspec
+        medval = np.median(sspec[is_valid(sspec)])
+        vmin = medval-2
         vmax = vmin+6
-        if lamsteps:
-            plt.pcolormesh(self.fdop, self.beta, sspec,
-                           vmin=vmin, vmax=vmax)
-            plt.ylabel('Beta (m$^{-1}$)')
+        if input_sspec is None:
+            if lamsteps:
+                plt.pcolormesh(self.fdop, self.beta, sspec,
+                               vmin=vmin, vmax=vmax)
+                plt.ylabel('Beta (m$^{-1}$)')
+            else:
+                plt.pcolormesh(self.fdop, self.tdel, sspec,
+                               vmin=vmin, vmax=vmax)
+                plt.ylabel('Delay (us)')
+            plt.xlabel('Doppler Frequency (mHz)')
+            bottom, top = plt.ylim()
+            if hasattr(self, 'eta'):
+                eta = self.eta
+                if lamsteps:  # convert eta to beta equivalent
+                    eta = eta
+                plt.plot(self.fdop, eta*np.power(self.fdop, 2),
+                         'r', alpha=0.5)
+            plt.ylim(bottom, top)
+            plt.colorbar()
+            plt.show()
         else:
-            plt.pcolormesh(self.fdop, self.tdel, sspec,
-                           vmin=vmin, vmax=vmax)
-            plt.ylabel('Delay (us)')
-        plt.xlabel('Doppler Frequency (mHz)')
-        bottom, top = plt.ylim()
-        if hasattr(self, 'eta'):
-            eta = self.eta
-            if lamsteps:  # convert eta to beta equivalent
-                eta = eta
-            plt.plot(self.fdop, eta*np.power(self.fdop, 2),
-                     'r', alpha=0.5)
-        plt.ylim(bottom, top)
-        plt.colorbar()
-        plt.show()
+            plt.pcolormesh(sspec, vmin=vmin, vmax=vmax)
 
     def plot_all(self, dyn=1, sspec=3, acf=2, norm_sspec=4, colorbar=True,
                  lamsteps=False):
@@ -445,10 +461,10 @@ class Dynspec:
             isspectot = np.add(isspectot, normline)
         isspecavg = isspectot/len(tdel)  # make average
         ind1 = np.argmin(abs(fdopnew-1)-2)
-        ind2 = np.argmin(abs(fdopnew+1)-2)
-        normfac = (abs(isspecavg[ind1])
-                   + abs(isspecavg[ind2]))/2  # mean power at theoretical arc
-        isspecavg = isspecavg/normfac
+        # ind2 = np.argmin(abs(fdopnew+1)-2)
+        # normfac = (abs(isspecavg[ind1])
+        #           + abs(isspecavg[ind2]))/2  # mean power at theoretical arc
+        isspecavg = isspecavg  # /normfac
         if isspecavg[ind1] < 0:
             isspecavg = isspecavg + 2  # make 1 instead of -1
         if plot:
@@ -553,7 +569,7 @@ class Dynspec:
                                          self.tmodel[2]))
             plt.show()
 
-    def cut_dyn(self, tcuts=1, fcuts=0):
+    def cut_dyn(self, tcuts=1, fcuts=0, plot=False):
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
                 fcuts+1 segments in frequency
@@ -565,12 +581,34 @@ class Dynspec:
         fnum = np.floor(nchan/(fcuts + 1))
         tnum = np.floor(nsub/(tcuts + 1))
         cutdyn = np.empty(shape=(fcuts+1, tcuts+1, int(fnum), int(tnum)))
+        # find the right fft lengths for rows and columns
+        nrfft = int(2**(np.ceil(np.log2(int(fnum)))+1)/2)
+        ncfft = int(2**(np.ceil(np.log2(int(tnum)))+1))
+        cutsspec = np.empty(shape=(fcuts+1, tcuts+1, nrfft, ncfft))
+        plotnum = 1
         for ii in range(0, fcuts+1):
             for jj in range(0, tcuts+1):
                 cutdyn[int(ii)][int(jj)][:][:] =\
                     self.dyn[int(ii*fnum):int((ii+1)*fnum),
                              int(jj*tnum):int((jj+1)*tnum)]
+                cutsspec[int(ii)][int(jj)][:][:] = self.calc_sspec(
+                         input_dyn=cutdyn[int(ii)][int(jj)][:][:])
+                if plot:
+                    plt.figure(1)
+                    plt.subplot(fcuts+1, tcuts+1, plotnum)
+                    self.plot_dyn(input_dyn=cutdyn[int(ii)][int(jj)][:][:])
+                    plt.figure(2)
+                    plt.subplot(fcuts+1, tcuts+1, plotnum)
+                    self.plot_sspec(input_sspec=cutsspec[int(ii)]
+                                                        [int(jj)][:][:])
+                    plotnum += 1
+        if plot:
+            plt.figure(1)
+            plt.show()
+            plt.figure(2)
+            plt.show()
         self.cutdyn = cutdyn
+        self.cutsspec = cutsspec
 
     def trim_edges(self):
         """
@@ -579,25 +617,25 @@ class Dynspec:
 
         rowsum = sum(abs(self.dyn[0][:]))
         # Trim bottom
-        while rowsum == 0:
+        while rowsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (0), axis=0)
             self.freqs = np.delete(self.freqs, (0))
             rowsum = sum(abs(self.dyn[0][:]))
         rowsum = sum(abs(self.dyn[-1][:]))
         # Trim top
-        while rowsum == 0:
+        while rowsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
             rowsum = sum(abs(self.dyn[-1][:]))
         # Trim left
         colsum = sum(abs(self.dyn[:][0]))
-        while colsum == 0:
+        while colsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (0), axis=1)
             self.times = np.delete(self.times, (0))
             colsum = sum(abs(self.dyn[:][0]))
         colsum = sum(abs(self.dyn[:][-1]))
         # Trim right
-        while colsum == 0:
+        while colsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (-1), axis=1)
             self.times = np.delete(self.times, (-1))
             colsum = sum(abs(self.dyn[:][-1]))
@@ -612,7 +650,6 @@ class Dynspec:
         """
         Replaces the nan values in array. Also replaces zeros by default
         """
-
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
         array = self.dyn
@@ -627,6 +664,9 @@ class Dynspec:
         newarr = array[~array.mask]
         self.dyn = griddata((x1, y1), newarr.ravel(), (xx, yy),
                             method='linear')
+        # Fill remainder with the mean
+        meanval = np.mean(self.dyn[is_valid(self.dyn)])
+        self.dyn[np.isnan(self.dyn)] = meanval
 
     def correct_band(self, time=False, lamsteps=False):
         """
@@ -656,17 +696,20 @@ class Dynspec:
         else:
             self.dyn = dyn
 
-    def calc_sspec(self, prewhite=True, plot=False, lamsteps=False):
+    def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
+                   input_dyn=None):
         """
         Calculate secondary spectrum
         """
-
-        if lamsteps:
-            if not self.lamsteps:
-                self.scale_dyn()
-            dyn = self.lamdyn
+        if input_dyn is None:  # use self dynamic spectrum
+            if lamsteps:
+                if not self.lamsteps:
+                    self.scale_dyn()
+                dyn = self.lamdyn
+            else:
+                dyn = self.dyn
         else:
-            dyn = self.dyn
+            dyn = input_dyn  # use imput dynamic spectrum
         nf = np.shape(dyn)[0]
         nt = np.shape(dyn)[1]
         # find the right fft lengths for rows and columns
@@ -694,22 +737,25 @@ class Dynspec:
             postdark[:, int(ncfft/2)] = 1
             postdark[0, :] = 1
             sec = np.divide(sec, postdark)
-        if lamsteps:
-            # normalise and make db
-            self.lamsspec = np.log10(sec/np.max(sec))
-        else:
-            # normalise and make db
-            self.sspec = np.log10(sec/np.max(sec))
+        if input_dyn is None:
+            if lamsteps:
+                # normalise and make db
+                self.lamsspec = np.log10(sec/np.max(sec))
+            else:
+                # normalise and make db
+                self.sspec = np.log10(sec/np.max(sec))
 
-        fdop = np.multiply(fd, 1e3/(ncfft*self.dt))  # in mHz
-        tdel = np.divide(td, (nrfft*self.df))  # in us
-        self.fdop = np.reshape(fdop, [len(fd)])
-        self.tdel = np.reshape(tdel, [len(td)])
-        if lamsteps:
-            beta = np.divide(td, (nrfft*self.dlam))  # in m^-1
-            self.beta = beta
-        if plot:
-            self.plot_sspec(lamsteps=lamsteps)
+            fdop = np.multiply(fd, 1e3/(ncfft*self.dt))  # in mHz
+            tdel = np.divide(td, (nrfft*self.df))  # in us
+            self.fdop = np.reshape(fdop, [len(fd)])
+            self.tdel = np.reshape(tdel, [len(td)])
+            if lamsteps:
+                beta = np.divide(td, (nrfft*self.dlam))  # in m^-1
+                self.beta = beta
+            if plot:
+                self.plot_sspec(lamsteps=lamsteps)
+        else:
+            return np.log10(sec/np.max(sec))
 
     def calc_acf(self, scale=False):
         """
@@ -729,18 +775,31 @@ class Dynspec:
         arr = np.real(arr)  # real component
         self.acf = arr
 
-    def zap(self, method='median', sigma=5, m=7):
+    def crop_dyn(self, fmin=0, fmax=10000):
+        """
+        Crops dynamic spectrum in frequency to be between fmin and fmax
+        """
+        crop_array = np.array((self.freqs > fmin)*(self.freqs < fmax))
+        self.dyn = self.dyn[crop_array, :]
+        self.freqs = self.freqs[crop_array]
+        self.nchan = len(self.freqs)
+        self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
+        self.freq = round(np.mean(self.freqs), 2)
+
+    def zap(self, method='medfilt', sigma=7, m=3):
         """
         Basic zapping of dynamic spectrum
         """
         if method == 'median':
-            d = np.abs(self.dyn - np.median(self.dyn))
-            mdev = np.median(d)
-            s = d/mdev if mdev else 0.
+            d = np.abs(self.dyn - np.median(self.dyn[~np.isnan(self.dyn)]))
+            mdev = np.median(d[~np.isnan(d)])
+            s = d/mdev
+            plt.pcolormesh(s)
+            plt.colorbar()
+            plt.show()
             self.dyn[s > sigma] = np.nan
         elif method == 'medfilt':
             self.dyn = medfilt(self.dyn, kernel_size=m)
-        self.refill()
 
     def scale_dyn(self, scale='lambda', fac=1):
         """
@@ -868,3 +927,65 @@ class MatlabDyn():
         self.tobs = float(self.times[-1] - self.times[0])
         self.mjd = 50000.0  # dummy.. Not needed
         self.dyn = np.transpose(self.dyn)
+
+
+def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
+             min_freq=0, max_freq=5000, remove_nan_sspec=False, verbose=True,
+             max_frac_bw=2):
+    """
+    Sorts dynamic spectra into good and bad files based on some conditions
+    """
+    if verbose:
+        print("Sorting dynspec files in {0}".format(split(dynfiles[0])[0]))
+        n_files = len(dynfiles)
+        file_count = 0
+    if outdir is None:
+        outdir, dummy = split(dynfiles[0])  # path of first dynspec
+    bad_files = open(outdir+'/bad_files.txt', 'w')
+    good_files = open(outdir+'/good_files.txt', 'w')
+    bad_files.write("FILENAME\t REASON\n")
+    for dynfile in dynfiles:
+        if verbose:
+            file_count += 1
+            print("{0}/{1}\t{2}".format(file_count, n_files,
+                  split(dynfile)[1]))
+        # Read in dynamic spectrum
+        dyn = Dynspec(filename=dynfile, verbose=False, process=False)
+        if dyn.freq > max_freq or dyn.freq < min_freq:
+            # outside of frequency range
+            if dyn.freq < min_freq:
+                message = 'freq<{0} '.format(min_freq)
+            elif dyn.freq > max_freq:
+                message = 'freq>{0}'.format(max_freq)
+            bad_files.write("{0}\t{1}\n".format(dynfile, message))
+            continue
+        if dyn.bw/dyn.freq > max_frac_bw:
+            # bandwidth too large
+            bad_files.write("{0}\t frac_bw>{1}\n".format(dynfile, max_frac_bw))
+            continue
+        # Start processing
+        dyn.trim_edges()  # remove band edges
+        if dyn.nchan < min_nchan or dyn.nsub < min_nsub:
+            # skip if not enough channels/subints
+            message = ''
+            if dyn.nchan < min_nchan:
+                message += 'nchan<{0} '.format(min_nchan)
+            if dyn.nsub < min_nsub:
+                message += 'nsub<{0}'.format(min_nsub)
+            bad_files.write("{0}\t {1}\n".format(dynfile, message))
+            continue
+        elif dyn.tobs < 60*min_tsub:
+            # skip if observation too short
+            bad_files.write("{0}\t tobs<{1}\n".format(dynfile, min_tsub))
+            continue
+        dyn.refill()  # linearly interpolate zero values
+        dyn.correct_band(time=True)  # correct for bandpass and gain variation
+        dyn.calc_sspec()  # calculate secondary spectrum
+        if np.isnan(dyn.sspec).all():  # skip if secondary spectrum is all nan
+            bad_files.write("{0}\t sspec_isnan\n".format(dynfile))
+            continue
+        # Passed all tests so far - write to good_files.txt!
+        good_files.write("{0}\n".format(dynfile))
+    bad_files.close()
+    good_files.close()
+    return
