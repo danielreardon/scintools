@@ -12,7 +12,7 @@ from os.path import split
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
-from models import tauModel, dnuModel
+from models import scint_acf_model
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
@@ -180,7 +180,7 @@ class Dynspec:
         self.trim_edges()  # remove zeros on band edges
         self.refill()  # refill with linear interpolation
         # self.zap()  # median zapping 5 sigma default
-        self.correct_band(time=True)  # Correct for bandpass. Optional: in time
+        # self.correct_band(time=True)  # Correct for bandpass
         self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
@@ -222,9 +222,12 @@ class Dynspec:
     def plot_acf(self, contour=False):
         """
         Plot the ACF
+            n_scale: plot the ACF out to n_scale tau and dnu lengths
         """
         if not hasattr(self, 'acf'):
             self.calc_acf()
+        if not hasattr(self, 'tau'):
+            self.get_scint_params()
         arr = self.acf
         arr = np.fft.ifftshift(arr)
         wn = arr[0][0] - arr[0][1]  # subtract the white noise spike
@@ -232,13 +235,24 @@ class Dynspec:
         arr = np.fft.fftshift(arr)
         t_delays = np.linspace(-self.tobs/60, self.tobs/60, np.shape(arr)[1])
         f_shifts = np.linspace(-self.bw, self.bw, np.shape(arr)[0])
+        fig, ax1 = plt.subplots()
         if contour:
-            plt.contourf(arr)
+            im = ax1.contourf(t_delays, f_shifts, arr)
         else:
-            plt.pcolormesh(t_delays, f_shifts, arr)
-        plt.ylabel('Frequency lag (MHz)')
-        plt.xlabel('Time lag (mins)')
-        plt.colorbar()
+            im = ax1.pcolormesh(t_delays, f_shifts, arr)
+        ax1.set_ylabel('Frequency lag (MHz)')
+        ax1.set_xlabel('Time lag (mins)')
+        ax2 = ax1.twinx()
+        miny, maxy = ax1.get_ylim()
+        ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
+        ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.format(round(
+                                                              self.dnu, 2)))
+        ax3 = ax1.twiny()
+        minx, maxx = ax1.get_xlim()
+        ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
+        ax3.set_xlabel('Time lag / (tau_d = {0})'.format(round(
+                                                         self.tau/60, 2)))
+        fig.colorbar(im, orientation='horizontal', pad=0.15)
         plt.show()
 
     def plot_sspec(self, lamsteps=False, input_sspec=None):
@@ -498,7 +512,7 @@ class Dynspec:
         self.normsspecavg = isspecavg
         self.normsspec = np.array(normSspec)
 
-    def get_tau(self, method="acf", plot=False, alpha=5/3):
+    def get_scint_params(self, method="acf", plot=False, alpha=5/3):
         """
         Measure the scintillation timescale
             Method:
@@ -506,67 +520,63 @@ class Dynspec:
                 sspec - measures timescale from the power spectrum
         """
 
-        if not hasattr(self, 'acf'):
+        if method == 'acf' and not hasattr(self, 'acf'):
             self.calc_acf()
-        ydata = self.acf[int(self.nchan), int(self.nsub):]
-        xdata = self.dt*np.linspace(0, len(ydata), len(ydata))
-        p0 = [8000, 200, 1000, 5/3]  # educated guess
-
+        elif method == 'sspec' and not hasattr(self, 'sspec'):
+            self.calc_sspec()
+        y_f_data = self.acf[int(self.nchan):, int(self.nsub)]
+        x_f_data = self.df*np.linspace(0, len(y_f_data), len(y_f_data))
+        y_t_data = self.acf[int(self.nchan), int(self.nsub):]
+        x_t_data = self.dt*np.linspace(0, len(y_t_data), len(y_t_data))
+        nt = len(x_t_data)  # number of t-lag samples
+        xdata = list(x_t_data) + list(x_f_data)  # concatenate x lists
+        ydata = list(y_t_data) + list(y_f_data)  # y lists
+        # Estimate amp and white noise level
+        arr = self.acf
+        arr = np.fft.ifftshift(arr)
+        amp = arr[0][1]
+        wn = arr[0][0] - amp
+        # Estimate tau
+        # estimate dnu
+        # Set initial guess p0 = [tau, dnu, amp, wn, alpha, nt]
+        p0 = [8000, 1000, amp, wn, 5/3, nt]  # educated guess
+        lb = [0, 0, 0, 0, 0, nt]  # lower bounds
+        ub = [np.inf, np.inf, np.inf, np.inf, np.inf, nt]  # upper bounds
         if alpha is None:  # Fit alpha
-            self.tmodel, pcov = curve_fit(tauModel, xdata, ydata, p0=p0)
+            p0 = p0[:-1]
+            lb = lb[:-1]
+            ub = ub[:-1]
+            self.scintmodel, pcov = \
+                curve_fit(lambda x, tau, dnu, amp, wn, alph:
+                          scint_acf_model(x, tau=tau, dnu=dnu, amp=amp, wn=wn,
+                                          alpha=alph, nt=nt),
+                          xdata, ydata, p0=p0, bounds=(lb, ub))
         else:  # Fix alpha. Default 5/3 is for Kolmogorov turbulence
-            p0 = p0[0:3]  # cut alpha off since we are not fitting
-            self.tmodel, pcov = curve_fit(lambda x,
-                                          tau, amp, wn:
-                                              tauModel(x, tau=tau, amp=amp,
-                                                       wn=wn, alpha=alpha),
-                                          xdata, ydata, p0=p0)
-        self.tau = self.tmodel[0]
-        self.tauerr = 1
+            p0 = p0[:-2]
+            lb = lb[:-2]
+            ub = ub[:-2]
+            self.scintmodel, pcov = \
+                curve_fit(lambda x, tau, dnu, amp, wn:
+                          scint_acf_model(x, tau=tau, dnu=dnu, amp=amp, wn=wn,
+                                          alpha=alpha, nt=nt),
+                          xdata, ydata, p0=p0, bounds=(lb, ub))
+        errors = []
+        for i in range(len(self.scintmodel)):  # for each parameter
+            errors.append(np.absolute(pcov[i][i])**0.5)
+        self.scintmodel_errors = np.array(errors)
+        self.tau = self.scintmodel[0]
+        self.tauerr = self.scintmodel_errors[0]
+        self.dnu = self.scintmodel[1]
+        self.dnuerr = self.scintmodel_errors[1]
         if plot:
-            ind = np.argmin(abs(xdata-10*self.tau))  # plot 10-sigma
-            plt.plot(xdata[0:ind], ydata[0:ind])
-            if alpha is None:
-                plt.plot(xdata[0:ind], tauModel(xdata[0:ind], *self.tmodel))
-
-            else:
-                plt.plot(xdata[0:ind], tauModel(xdata[0:ind], *self.tmodel,
-                         alpha=alpha))
-            plt.show()
-
-    def get_dnu(self, method="acf", plot=False, fitWn=False):
-        """
-        Measure the scintillation timescale
-            Method:
-                acf - takes a 1D cut through the centre of the ACF
-                sspec - measures timescale from the power spectrum
-        """
-
-        if not hasattr(self, 'acf'):
-            self.calc_acf()
-        if not hasattr(self, 'tmodel'):
-            self.get_tau()
-        ydata = self.acf[int(self.nchan):, int(self.nsub)]
-        xdata = self.df*np.linspace(0, len(ydata), len(ydata))
-        p0 = [1000, self.tmodel[1], self.tmodel[2]]
-        if fitWn:
-            self.fmodel, pcov = curve_fit(dnuModel, xdata, ydata, p0=p0)
-        else:
-            p0 = p0[0]
-            self.fmodel, pcov = curve_fit(lambda x, dnu:
-                                          dnuModel(x, dnu=dnu,
-                                                   amp=self.tmodel[1],
-                                                   wn=self.tmodel[2]),
-                                          xdata, ydata, p0=p0)
-        self.dnu = self.fmodel[0]
-        self.dnuerr = 1
-        if plot:
-            plt.plot(xdata, ydata)
-            if fitWn:
-                plt.plot(xdata, dnuModel(xdata, *self.fmodel))
-            else:
-                plt.plot(xdata, dnuModel(xdata, self.dnu, self.tmodel[1],
-                                         self.tmodel[2]))
+            plt.subplot(2, 1, 1)
+            plt.plot(x_t_data, y_t_data)
+            # plt.plot(x_t_data, scint_acf_model(x_t_data, self.scintmodel,
+            #                                   nt=nt))
+            plt.xlabel('Time lag (s)')
+            plt.subplot(2, 1, 2)
+            plt.plot(x_f_data, y_f_data)
+            plt.xlabel('Frequency lag (MHz)')
             plt.show()
 
     def cut_dyn(self, tcuts=1, fcuts=0, plot=False):
