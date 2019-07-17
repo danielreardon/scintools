@@ -623,7 +623,7 @@ class Dynspec:
             plt.xlabel('Frequency lag (MHz)')
             plt.show()
 
-    def cut_dyn(self, tcuts=0, fcuts=0, plot=False):
+    def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None):
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
                 fcuts+1 segments in frequency
@@ -681,11 +681,25 @@ class Dynspec:
                     plotnum += 1
         if plot:
             plt.figure(1)
-            plt.show()
+            filename_name = filename.split('.')[0]
+            filename_extension = filename.split('.')[1]
+            if filename is not None:
+                plt.savefig(filename_name + '_dynspec.' + filename_extension,
+                            figsize=(6,10), dpi=150)
+            else:
+                plt.show()
             plt.figure(2)
-            plt.show()
+            if filename is not None:
+                plt.savefig(filename_name + '_acf.' + filename_extension,
+                            figsize=(6,10), dpi=150)
+            else:
+                plt.show()
             plt.figure(3)
-            plt.show()
+            if filename is not None:
+                plt.savefig(filename_name + '_sspec.' + filename_extension,
+                            figsize=(6,10), dpi=150)
+            else:
+                plt.show()
         self.cutdyn = cutdyn
         self.cutsspec = cutsspec
 
