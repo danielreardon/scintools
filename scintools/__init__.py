@@ -5,4 +5,3 @@ from __future__ import (absolute_import, division,
 __author__ = """Daniel John Reardon"""
 __email__ = 'dreardon@swin.edu.au'
 __version__ = '0.1'
-

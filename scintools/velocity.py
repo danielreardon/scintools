@@ -3,8 +3,11 @@
 """
 velocity.py
 ----------------------------------
-Scintillation velocity models
+Scintillation effective velocity models
 """
+
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
 
 def thin_screen(pulsar, mjd, anisotropy=False):
     """
@@ -12,7 +15,6 @@ def thin_screen(pulsar, mjd, anisotropy=False):
     """
     v_eff = []
     return v_eff
-
 
 def arc_curvature(v_eff, lamsteps=False):
     """

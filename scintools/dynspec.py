@@ -6,13 +6,16 @@ dynspec.py
 Dynamic spectrum class
 """
 
+from __future__ import (absolute_import, division,
+                        print_function, unicode_literals)
+
 import time
 import os
 from os.path import split
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
-from models import scint_acf_model
+from models import scint_acf_model, scint_sspec_model
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
@@ -45,7 +48,7 @@ class Dynspec:
             with the gaps filled
         """
 
-        print("Now adding {} and {} ...".format(self.name, other.name))
+        print("Now adding {} ...".format(other.name))
 
         if self.freq != other.freq \
                 or self.bw != other.bw or self.df != other.df:
@@ -179,14 +182,13 @@ class Dynspec:
 
         self.trim_edges()  # remove zeros on band edges
         self.refill()  # refill with linear interpolation
-        # self.zap()  # median zapping 5 sigma default
-        # self.correct_band(time=True)  # Correct for bandpass
         self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
         self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
-    def plot_dyn(self, lamsteps=False, input_dyn=None):
+    def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
+                 input_x=None, input_y=None):
         """
         Plot the dynamic spectrum
         """
@@ -200,8 +202,8 @@ class Dynspec:
                 dyn = self.dyn
         else:
             dyn = input_dyn
-        medval = np.median(dyn[is_valid(dyn)])
-        std = np.std(dyn[is_valid(dyn)])
+        medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(dyn) > 0)])
+        std = np.std(dyn[is_valid(dyn)])  # standard deviation
         vmin = medval-5*std
         vmax = medval+5*std
         if input_dyn is None:
@@ -215,50 +217,71 @@ class Dynspec:
                 plt.ylabel('Frequency (MHz)')
             plt.xlabel('Time (mins)')
             plt.colorbar()
-            plt.show()
         else:
-            plt.pcolormesh(dyn, vmin=vmin, vmax=vmax)
+            plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax)
 
-    def plot_acf(self, contour=False):
+        if filename is not None:
+            plt.savefig(filename, dpi=200, papertype='a4')
+        elif input_dyn is None:
+            plt.show()
+
+    def plot_acf(self, contour=False, filename=None, input_acf=None,
+                 input_t=None, input_f=None):
         """
         Plot the ACF
-            n_scale: plot the ACF out to n_scale tau and dnu lengths
         """
+
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau'):
             self.get_scint_params()
-        arr = self.acf
+        if input_acf is None:
+            arr = self.acf
+            tspan = self.tobs
+            fspan = self.bw
+        else:
+            arr = input_acf
+            tspan = max(input_t) - min(input_t)
+            fspan = max(input_f) - min(input_f)
         arr = np.fft.ifftshift(arr)
         wn = arr[0][0] - arr[0][1]  # subtract the white noise spike
         arr[0][0] = arr[0][0] - wn  # Set the noise spike to zero for plotting
         arr = np.fft.fftshift(arr)
-        t_delays = np.linspace(-self.tobs/60, self.tobs/60, np.shape(arr)[1])
-        f_shifts = np.linspace(-self.bw, self.bw, np.shape(arr)[0])
-        fig, ax1 = plt.subplots()
-        if contour:
-            im = ax1.contourf(t_delays, f_shifts, arr)
-        else:
-            im = ax1.pcolormesh(t_delays, f_shifts, arr)
-        ax1.set_ylabel('Frequency lag (MHz)')
-        ax1.set_xlabel('Time lag (mins)')
-        ax2 = ax1.twinx()
-        miny, maxy = ax1.get_ylim()
-        ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-        ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.format(round(
-                                                              self.dnu, 2)))
-        ax3 = ax1.twiny()
-        minx, maxx = ax1.get_xlim()
-        ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-        ax3.set_xlabel('Time lag / (tau_d = {0})'.format(round(
-                                                         self.tau/60, 2)))
-        fig.colorbar(im, orientation='horizontal', pad=0.15)
-        plt.show()
+        t_delays = np.linspace(-tspan/60, tspan/60, np.shape(arr)[1])
+        f_shifts = np.linspace(-fspan, fspan, np.shape(arr)[0])
 
-    def plot_sspec(self, lamsteps=False, input_sspec=None):
+        plt.pcolormesh(t_delays, f_shifts, arr)
+
+#        fig, ax1 = plt.subplots()
+#        if contour:
+#            im = ax1.contourf(t_delays, f_shifts, arr)
+#        else:
+#            im = ax1.pcolormesh(t_delays, f_shifts, arr)
+#        ax1.set_ylabel('Frequency lag (MHz)')
+#        ax1.set_xlabel('Time lag (mins)')
+#        ax2 = ax1.twinx()
+#        miny, maxy = ax1.get_ylim()
+#        ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
+#        ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.format(round(
+#                                                              self.dnu, 2)))
+#        ax3 = ax1.twiny()
+#        minx, maxx = ax1.get_xlim()
+#        ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
+#        ax3.set_xlabel('Time lag / (tau_d = {0})'.format(round(
+#                                                         self.tau/60, 2)))
+#        fig.colorbar(im, pad=0.15)
+
+        if filename is not None:
+            plt.savefig(filename)
+        elif input_acf is None:
+            plt.show()
+
+    def plot_sspec(self, lamsteps=False, input_sspec=None, filename=None,
+                   input_x=None, input_y=None):
         """
         Plot the secondary spectrum
         """
+
         if input_sspec is None:
             if lamsteps:
                 if not hasattr(self, 'lamsspec'):
@@ -270,9 +293,9 @@ class Dynspec:
                 sspec = self.sspec
         else:
             sspec = input_sspec
-        medval = np.median(sspec[is_valid(sspec)])
-        vmin = medval-2
-        vmax = vmin+6
+        medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        vmin = medval-20
+        vmax = vmin+60
         if input_sspec is None:
             if lamsteps:
                 plt.pcolormesh(self.fdop, self.beta, sspec,
@@ -292,12 +315,17 @@ class Dynspec:
                          'r', alpha=0.5)
             plt.ylim(bottom, top)
             plt.colorbar()
-            plt.show()
         else:
-            plt.pcolormesh(sspec, vmin=vmin, vmax=vmax)
+            plt.pcolormesh(input_x, input_y, sspec, vmin=vmin, vmax=vmax)
+            plt.colorbar()
+
+        if filename is not None:
+            plt.savefig(filename)
+        elif input_sspec is None:
+            plt.show()
 
     def plot_all(self, dyn=1, sspec=3, acf=2, norm_sspec=4, colorbar=True,
-                 lamsteps=False):
+                 lamsteps=False, filename=None):
         """
         Plots multiple figures in one
         """
@@ -322,7 +350,10 @@ class Dynspec:
                         plot_fit=False)
         plt.title("Normalised fdop secondary spectrum")
 
-        plt.show()
+        if filename is not None:
+            plt.savefig(filename)
+        else:
+            plt.show()
 
     def fit_arc(self, method='gridmax', asymm=False, plot=False, delmax=0.3,
                 sqrt_eta_step=1e-3, startbin=9, etamax=0.2, lamsteps=False,
@@ -425,6 +456,7 @@ class Dynspec:
                 plt.plot(np.sqrt(etaArray), sumpow)
                 bottom, top = plt.ylim()
                 plt.plot([np.sqrt(eta), np.sqrt(eta)], [bottom, top], 'b')
+            plt.xlabel('sqrt(eta)')
             plt.show()
         print("Currently takes curvature measurement as maximum -- update")
         self.eta = eta
@@ -435,6 +467,7 @@ class Dynspec:
         """
         Normalise fdop axis using arc curvature
         """
+
         delmax = np.max(self.tdel) if delmax is None else delmax
         delmax = delmax*(1400/self.freq)**2
 
@@ -519,15 +552,26 @@ class Dynspec:
                 acf - takes a 1D cut through the centre of the ACF
                 sspec - measures timescale from the power spectrum
         """
-
-        if method == 'acf' and not hasattr(self, 'acf'):
+        if not hasattr(self, 'acf'):
             self.calc_acf()
-        elif method == 'sspec' and not hasattr(self, 'sspec'):
+        if not hasattr(self, 'sspec'):
             self.calc_sspec()
-        y_f_data = self.acf[int(self.nchan):, int(self.nsub)]
-        x_f_data = self.df*np.linspace(0, len(y_f_data), len(y_f_data))
-        y_t_data = self.acf[int(self.nchan), int(self.nsub):]
-        x_t_data = self.dt*np.linspace(0, len(y_t_data), len(y_t_data))
+
+        if method == 'acf':
+            scint_model = scint_acf_model
+            y_f_data = self.acf[int(self.nchan):, int(self.nsub)]
+            x_f_data = self.df*np.linspace(0, len(y_f_data), len(y_f_data))
+            y_t_data = self.acf[int(self.nchan), int(self.nsub):]
+            x_t_data = self.dt*np.linspace(0, len(y_t_data), len(y_t_data))
+        elif method == 'sspec':
+            scint_model = scint_sspec_model
+            y_f_data = np.sum(self.sspec, axis=0)
+            x_f_data = self.df*np.linspace(0, len(y_f_data), len(y_f_data))
+            y_t_data = np.sum(self.sspec, axis=1)
+            x_t_data = self.dt*np.linspace(0, len(y_t_data), len(y_t_data))
+            plt.plot(x_f_data, y_f_data)
+            plt.show()
+
         nt = len(x_t_data)  # number of t-lag samples
         xdata = list(x_t_data) + list(x_f_data)  # concatenate x lists
         ydata = list(y_t_data) + list(y_f_data)  # y lists
@@ -548,8 +592,8 @@ class Dynspec:
             ub = ub[:-1]
             self.scintmodel, pcov = \
                 curve_fit(lambda x, tau, dnu, amp, wn, alph:
-                          scint_acf_model(x, tau=tau, dnu=dnu, amp=amp, wn=wn,
-                                          alpha=alph, nt=nt),
+                          scint_model(x, tau=tau, dnu=dnu, amp=amp,
+                                      wn=wn, alpha=alph, nt=nt),
                           xdata, ydata, p0=p0, bounds=(lb, ub))
         else:  # Fix alpha. Default 5/3 is for Kolmogorov turbulence
             p0 = p0[:-2]
@@ -557,8 +601,8 @@ class Dynspec:
             ub = ub[:-2]
             self.scintmodel, pcov = \
                 curve_fit(lambda x, tau, dnu, amp, wn:
-                          scint_acf_model(x, tau=tau, dnu=dnu, amp=amp, wn=wn,
-                                          alpha=alpha, nt=nt),
+                          scint_model(x, tau=tau, dnu=dnu, amp=amp,
+                                      wn=wn, alpha=alpha, nt=nt),
                           xdata, ydata, p0=p0, bounds=(lb, ub))
         errors = []
         for i in range(len(self.scintmodel)):  # for each parameter
@@ -579,11 +623,10 @@ class Dynspec:
             plt.xlabel('Frequency lag (MHz)')
             plt.show()
 
-    def cut_dyn(self, tcuts=1, fcuts=0, plot=False):
+    def cut_dyn(self, tcuts=0, fcuts=0, plot=False):
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
                 fcuts+1 segments in frequency
-            Default function is to cut the dynamic spectrum in half in time
         """
 
         nchan = len(self.freqs)  # re-define in case of trimming
@@ -595,27 +638,53 @@ class Dynspec:
         nrfft = int(2**(np.ceil(np.log2(int(fnum)))+1)/2)
         ncfft = int(2**(np.ceil(np.log2(int(tnum)))+1))
         cutsspec = np.empty(shape=(fcuts+1, tcuts+1, nrfft, ncfft))
+        cutacf = np.empty(shape=(fcuts+1, tcuts+1, 2*int(fnum), 2*int(tnum)))
         plotnum = 1
-        for ii in range(0, fcuts+1):
-            for jj in range(0, tcuts+1):
+        for ii in reversed(range(0, fcuts+1)):
+            for jj in reversed(range(0, tcuts+1)):
                 cutdyn[int(ii)][int(jj)][:][:] =\
                     self.dyn[int(ii*fnum):int((ii+1)*fnum),
                              int(jj*tnum):int((jj+1)*tnum)]
-                cutsspec[int(ii)][int(jj)][:][:] = self.calc_sspec(
-                         input_dyn=cutdyn[int(ii)][int(jj)][:][:])
+                input_dyn_x = self.times[int(jj*tnum):int((jj+1)*tnum)]
+                input_dyn_y = self.freqs[int(ii*fnum):int((ii+1)*fnum)]
+                input_sspec_x, input_sspec_y, cutsspec[int(ii)][int(jj)][:][:]\
+                    = self.calc_sspec(input_dyn=cutdyn[int(ii)][int(jj)][:][:])
+                cutacf[int(ii)][int(jj)][:][:] \
+                    = self.calc_acf(input_dyn=cutdyn[int(ii)][int(jj)][:][:])
                 if plot:
+                    # Plot dynamic spectra
                     plt.figure(1)
                     plt.subplot(fcuts+1, tcuts+1, plotnum)
-                    self.plot_dyn(input_dyn=cutdyn[int(ii)][int(jj)][:][:])
+                    self.plot_dyn(input_dyn=cutdyn[int(ii)][int(jj)][:][:],
+                                  input_x=input_dyn_x/60, input_y=input_dyn_y)
+                    plt.xlabel('t (mins)')
+                    plt.ylabel('f (MHz)')
+
+                    # Plot acf
                     plt.figure(2)
                     plt.subplot(fcuts+1, tcuts+1, plotnum)
+                    self.plot_acf(input_acf=cutacf[int(ii)][int(jj)][:][:],
+                                  input_t=input_dyn_x,
+                                  input_f=input_dyn_y)
+                    plt.xlabel('t lag (mins)')
+                    plt.ylabel('f lag (MHz)')
+
+                    # Plot secondary spectra
+                    plt.figure(3)
+                    plt.subplot(fcuts+1, tcuts+1, plotnum)
                     self.plot_sspec(input_sspec=cutsspec[int(ii)]
-                                                        [int(jj)][:][:])
+                                                        [int(jj)][:][:],
+                                    input_x=input_sspec_x,
+                                    input_y=input_sspec_y)
+                    plt.xlabel('fdop (mHz)')
+                    plt.ylabel('tdel (us)')
                     plotnum += 1
         if plot:
             plt.figure(1)
             plt.show()
             plt.figure(2)
+            plt.show()
+            plt.figure(3)
             plt.show()
         self.cutdyn = cutdyn
         self.cutsspec = cutsspec
@@ -656,24 +725,26 @@ class Dynspec:
         self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
         self.mjd = self.mjd + self.times[0]/86400
 
-    def refill(self, zeros=True):
+    def refill(self, linear=True, zeros=True):
         """
         Replaces the nan values in array. Also replaces zeros by default
         """
+
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
         array = self.dyn
         x = np.arange(0, array.shape[1])
         y = np.arange(0, array.shape[0])
-        # mask invalid values
-        array = np.ma.masked_invalid(array)
-        xx, yy = np.meshgrid(x, y)
-        # get only the valid values
-        x1 = xx[~array.mask]
-        y1 = yy[~array.mask]
-        newarr = array[~array.mask]
-        self.dyn = griddata((x1, y1), newarr.ravel(), (xx, yy),
-                            method='linear')
+        if linear:  # do linear interpolation
+            # mask invalid values
+            array = np.ma.masked_invalid(array)
+            xx, yy = np.meshgrid(x, y)
+            # get only the valid values
+            x1 = xx[~array.mask]
+            y1 = yy[~array.mask]
+            newarr = array[~array.mask]
+            self.dyn = griddata((x1, y1), newarr.ravel(), (xx, yy),
+                                method='linear')
         # Fill remainder with the mean
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
@@ -707,10 +778,11 @@ class Dynspec:
             self.dyn = dyn
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
-                   input_dyn=None):
+                   input_dyn=None, input_x=None, input_y=None):
         """
         Calculate secondary spectrum
         """
+
         if input_dyn is None:  # use self dynamic spectrum
             if lamsteps:
                 if not self.lamsteps:
@@ -736,6 +808,10 @@ class Dynspec:
         sec = sec[int(nrfft/2):][:]  # crop
         td = list(range(0, int(nrfft/2)))
         fd = list(range(int(-ncfft/2), int(ncfft/2)))
+        fdop = np.reshape(np.multiply(fd, 1e3/(ncfft*self.dt)),
+                          [len(fd)])  # in mHz
+        tdel = np.reshape(np.divide(td, (nrfft*self.df)),
+                          [len(td)])  # in us
 
         if prewhite:  # Now post-darken
             vec1 = np.reshape(np.power(np.sin(
@@ -750,45 +826,51 @@ class Dynspec:
         if input_dyn is None:
             if lamsteps:
                 # normalise and make db
-                self.lamsspec = np.log10(sec/np.max(sec))
+                self.lamsspec = 10*np.log10(sec)
             else:
                 # normalise and make db
-                self.sspec = np.log10(sec/np.max(sec))
+                self.sspec = 10*np.log10(sec)  # /np.max(sec)
 
-            fdop = np.multiply(fd, 1e3/(ncfft*self.dt))  # in mHz
-            tdel = np.divide(td, (nrfft*self.df))  # in us
-            self.fdop = np.reshape(fdop, [len(fd)])
-            self.tdel = np.reshape(tdel, [len(td)])
+            self.fdop = fdop
+            self.tdel = tdel
             if lamsteps:
                 beta = np.divide(td, (nrfft*self.dlam))  # in m^-1
                 self.beta = beta
             if plot:
                 self.plot_sspec(lamsteps=lamsteps)
         else:
-            return np.log10(sec/np.max(sec))
+            return fdop, tdel, 10*np.log10(sec)
 
-    def calc_acf(self, scale=False):
+    def calc_acf(self, scale=False, input_dyn=None, plot=True):
         """
         Calculate autocovariance function
         """
 
-        if scale:
-            arr = self.scale_dyn(factor=2)
-            arr -= np.mean(arr)  # subtract mean
+        if input_dyn is None:
+            # mean subtracted dynspec
+            arr = self.dyn - np.mean(self.dyn[is_valid(self.dyn)])
+            nf = self.nchan
+            nt = self.nsub
         else:
-            arr = self.dyn - np.mean(self.dyn)  # mean subtracted dynspec
-        arr = np.fft.fft2(arr, s=[2*self.nchan, 2*self.nsub])  # zero-padded
+            arr = input_dyn
+            nf = np.shape(input_dyn)[0]
+            nt = np.shape(input_dyn)[1]
+        arr = np.fft.fft2(arr, s=[2*nf, 2*nt])  # zero-padded
         arr = np.abs(arr)  # absolute value
         arr **= 2  # Squared manitude
         arr = np.fft.ifft2(arr)
         arr = np.fft.fftshift(arr)
-        arr = np.real(arr)  # real component
-        self.acf = arr
+        arr = np.real(arr)  # real component, just in case
+        if input_dyn is None:
+            self.acf = arr
+        else:
+            return arr
 
     def crop_dyn(self, fmin=0, fmax=10000):
         """
         Crops dynamic spectrum in frequency to be between fmin and fmax
         """
+
         crop_array = np.array((self.freqs > fmin)*(self.freqs < fmax))
         self.dyn = self.dyn[crop_array, :]
         self.freqs = self.freqs[crop_array]
@@ -796,22 +878,20 @@ class Dynspec:
         self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
         self.freq = round(np.mean(self.freqs), 2)
 
-    def zap(self, method='medfilt', sigma=7, m=3):
+    def zap(self, method='median', sigma=7, m=3):
         """
         Basic zapping of dynamic spectrum
         """
+
         if method == 'median':
             d = np.abs(self.dyn - np.median(self.dyn[~np.isnan(self.dyn)]))
             mdev = np.median(d[~np.isnan(d)])
             s = d/mdev
-            plt.pcolormesh(s)
-            plt.colorbar()
-            plt.show()
             self.dyn[s > sigma] = np.nan
         elif method == 'medfilt':
             self.dyn = medfilt(self.dyn, kernel_size=m)
 
-    def scale_dyn(self, scale='lambda', fac=1):
+    def scale_dyn(self, scale='lambda', factor=1):
         """
         Scales the dynamic spectrum along the frequency axis,
             with an alpha relationship
@@ -945,6 +1025,7 @@ def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
     """
     Sorts dynamic spectra into good and bad files based on some conditions
     """
+
     if verbose:
         print("Sorting dynspec files in {0}".format(split(dynfiles[0])[0]))
         n_files = len(dynfiles)
