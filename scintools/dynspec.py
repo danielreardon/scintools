@@ -15,7 +15,7 @@ from os.path import split
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
-from models import scint_acf_model, scint_sspec_model
+from scint_models import scint_acf_model, scint_sspec_model
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
@@ -756,8 +756,8 @@ class Dynspec:
             # get only the valid values
             x1 = xx[~array.mask]
             y1 = yy[~array.mask]
-            newarr = array[~array.mask]
-            self.dyn = griddata((x1, y1), newarr.ravel(), (xx, yy),
+            newarr = np.ravel(array[~array.mask])
+            self.dyn = griddata((x1, y1), newarr, (xx, yy),
                                 method='linear')
         # Fill remainder with the mean
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
