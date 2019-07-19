@@ -227,6 +227,7 @@ class Dynspec:
 
         if filename is not None:
             plt.savefig(filename, dpi=200, papertype='a4')
+            plt.close()
         elif input_dyn is None:
             plt.show()
 
@@ -278,6 +279,7 @@ class Dynspec:
 
         if filename is not None:
             plt.savefig(filename)
+            plt.close()
         elif input_acf is None:
             plt.show()
 
@@ -330,6 +332,7 @@ class Dynspec:
 
         if filename is not None:
             plt.savefig(filename)
+            plt.close()
         elif input_sspec is None:
             plt.show()
 
@@ -361,6 +364,7 @@ class Dynspec:
 
         if filename is not None:
             plt.savefig(filename)
+            plt.close()
         else:
             plt.show()
 
@@ -695,18 +699,21 @@ class Dynspec:
                 filename_extension = filename.split('.')[1]
                 plt.savefig(filename_name + '_dynspec.' + filename_extension,
                             figsize=(6, 10), dpi=150)
+                plt.close()
             else:
                 plt.show()
             plt.figure(2)
             if filename is not None:
                 plt.savefig(filename_name + '_acf.' + filename_extension,
                             figsize=(6, 10), dpi=150)
+                plt.close()
             else:
                 plt.show()
             plt.figure(3)
             if filename is not None:
                 plt.savefig(filename_name + '_sspec.' + filename_extension,
                             figsize=(6, 10), dpi=150)
+                plt.close()
             else:
                 plt.show()
         self.cutdyn = cutdyn
