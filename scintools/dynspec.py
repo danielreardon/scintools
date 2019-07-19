@@ -200,7 +200,7 @@ class Dynspec:
                 dyn = self.lamdyn
             elif trap:
                 if not hasattr(self, 'trapdyn'):
-                    self.scale_dyn(scale='trapezium')
+                    self.scale_dyn(scale='trapezoid')
                 dyn = self.trapdyn
             else:
                 dyn = self.dyn
@@ -820,7 +820,7 @@ class Dynspec:
                 dyn = self.lamdyn
             elif trap:
                 if not hasattr(self, 'trap'):
-                    self.scale_dyn(scale='trapezium')
+                    self.scale_dyn(scale='trapezoid')
                 dyn = self.trapdyn
             else:
                 dyn = self.dyn
@@ -969,7 +969,7 @@ class Dynspec:
             # maximum lambda is minimum freq
             self.lam = lam*sc.c/np.min(self.freqs*1e6)
             self.dlam = abs(self.lam[1]-self.lam[0])
-        elif scale == 'trapezium':
+        elif scale == 'trapezoid':
             arin = self.dyn - np.mean(self.dyn)  # input array
             nf, nt = np.shape(arin)
             scalefrac = 1/(max(self.freqs)/min(self.freqs))
