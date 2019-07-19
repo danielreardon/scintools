@@ -15,7 +15,7 @@ from os.path import split
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
-from models import scint_acf_model, scint_sspec_model
+from scint_models import scint_acf_model, scint_sspec_model
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
@@ -26,7 +26,7 @@ from scipy.io import loadmat
 
 class Dynspec:
 
-    def __init__(self, filename=None, dyn=None, verbose=True, process=True,
+    def __init__(self, filename=None, dyn=None, verbose=True, process=False,
                  lamsteps=False, backup=True, axes=None):
         """"
         Initialise a dynamic spectrum object by either reading from file
@@ -188,7 +188,7 @@ class Dynspec:
         self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
-                 input_x=None, input_y=None):
+                 input_x=None, input_y=None, trap=False):
         """
         Plot the dynamic spectrum
         """
@@ -198,11 +198,16 @@ class Dynspec:
                 if not hasattr(self, 'lamdyn'):
                     self.scale_dyn()
                 dyn = self.lamdyn
+            elif trap:
+                if not hasattr(self, 'trapdyn'):
+                    self.scale_dyn(scale='trapezium')
+                dyn = self.trapdyn
             else:
                 dyn = self.dyn
         else:
             dyn = input_dyn
-        medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(dyn) > 0)])
+        medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(
+                                                      is_valid(dyn)) > 0)])
         std = np.std(dyn[is_valid(dyn)])  # standard deviation
         vmin = medval-5*std
         vmax = medval+5*std
@@ -277,7 +282,7 @@ class Dynspec:
             plt.show()
 
     def plot_sspec(self, lamsteps=False, input_sspec=None, filename=None,
-                   input_x=None, input_y=None):
+                   input_x=None, input_y=None, trap=False, prewhite=True):
         """
         Plot the secondary spectrum
         """
@@ -285,11 +290,15 @@ class Dynspec:
         if input_sspec is None:
             if lamsteps:
                 if not hasattr(self, 'lamsspec'):
-                    self.calc_sspec(lamsteps=lamsteps)
+                    self.calc_sspec(lamsteps=lamsteps, prewhite=prewhite)
                 sspec = self.lamsspec
+            elif trap:
+                if not hasattr(self, 'trapsspec'):
+                    self.calc_sspec(trap=trap, prewhite=prewhite)
+                sspec = self.trapsspec
             else:
                 if not hasattr(self, 'sspec'):
-                    self.calc_sspec(lamsteps=lamsteps)
+                    self.calc_sspec(lamsteps=lamsteps, prewhite=prewhite)
                 sspec = self.sspec
         else:
             sspec = input_sspec
@@ -640,8 +649,8 @@ class Dynspec:
         cutsspec = np.empty(shape=(fcuts+1, tcuts+1, nrfft, ncfft))
         cutacf = np.empty(shape=(fcuts+1, tcuts+1, 2*int(fnum), 2*int(tnum)))
         plotnum = 1
-        for ii in reversed(range(0, fcuts+1)):
-            for jj in reversed(range(0, tcuts+1)):
+        for ii in reversed(range(0, fcuts+1)):  # plot from high to low
+            for jj in range(0, tcuts+1):
                 cutdyn[int(ii)][int(jj)][:][:] =\
                     self.dyn[int(ii*fnum):int((ii+1)*fnum),
                              int(jj*tnum):int((jj+1)*tnum)]
@@ -681,23 +690,23 @@ class Dynspec:
                     plotnum += 1
         if plot:
             plt.figure(1)
-            filename_name = filename.split('.')[0]
-            filename_extension = filename.split('.')[1]
             if filename is not None:
+                filename_name = filename.split('.')[0]
+                filename_extension = filename.split('.')[1]
                 plt.savefig(filename_name + '_dynspec.' + filename_extension,
-                            figsize=(6,10), dpi=150)
+                            figsize=(6, 10), dpi=150)
             else:
                 plt.show()
             plt.figure(2)
             if filename is not None:
                 plt.savefig(filename_name + '_acf.' + filename_extension,
-                            figsize=(6,10), dpi=150)
+                            figsize=(6, 10), dpi=150)
             else:
                 plt.show()
             plt.figure(3)
             if filename is not None:
                 plt.savefig(filename_name + '_sspec.' + filename_extension,
-                            figsize=(6,10), dpi=150)
+                            figsize=(6, 10), dpi=150)
             else:
                 plt.show()
         self.cutdyn = cutdyn
@@ -792,7 +801,7 @@ class Dynspec:
             self.dyn = dyn
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
-                   input_dyn=None, input_x=None, input_y=None):
+                   input_dyn=None, input_x=None, input_y=None, trap=False):
         """
         Calculate secondary spectrum
         """
@@ -802,6 +811,10 @@ class Dynspec:
                 if not self.lamsteps:
                     self.scale_dyn()
                 dyn = self.lamdyn
+            elif trap:
+                if not hasattr(self, 'trap'):
+                    self.scale_dyn(scale='trapezium')
+                dyn = self.trapdyn
             else:
                 dyn = self.dyn
         else:
@@ -837,13 +850,16 @@ class Dynspec:
             postdark[:, int(ncfft/2)] = 1
             postdark[0, :] = 1
             sec = np.divide(sec, postdark)
+
+        # Make db
+        sec = 10*np.log10(sec)
         if input_dyn is None:
             if lamsteps:
-                # normalise and make db
-                self.lamsspec = 10*np.log10(sec)
+                self.lamsspec = sec
+            elif trap:
+                self.trapsspec = sec
             else:
-                # normalise and make db
-                self.sspec = 10*np.log10(sec)  # /np.max(sec)
+                self.sspec = sec
 
             self.fdop = fdop
             self.tdel = tdel
@@ -851,9 +867,9 @@ class Dynspec:
                 beta = np.divide(td, (nrfft*self.dlam))  # in m^-1
                 self.beta = beta
             if plot:
-                self.plot_sspec(lamsteps=lamsteps)
+                self.plot_sspec(lamsteps=lamsteps, trap=trap)
         else:
-            return fdop, tdel, 10*np.log10(sec)
+            return fdop, tdel, sec
 
     def calc_acf(self, scale=False, input_dyn=None, plot=True):
         """
@@ -946,6 +962,27 @@ class Dynspec:
             # maximum lambda is minimum freq
             self.lam = lam*sc.c/np.min(self.freqs*1e6)
             self.dlam = abs(self.lam[1]-self.lam[0])
+        elif scale == 'trapezium':
+            arin = self.dyn - np.mean(self.dyn)  # input array
+            nf, nt = np.shape(arin)
+            scalefrac = 1/(max(self.freqs)/min(self.freqs))
+            timestep = max(self.times)*(1 - scalefrac)/(nf + 1)  # time step
+            trapdyn = np.empty(shape=np.shape(arin))
+            for ii in range(0, nf):
+                idyn = arin[ii, :]
+                maxtime = max(self.times)-(nf-(ii+1))*timestep
+                # How many times to resample to, for a given frequency
+                inddata = np.argwhere(self.times <= maxtime)
+                # How many trailing zeros to add
+                indzeros = np.argwhere(self.times > maxtime)
+                # Interpolate line
+                newline = np.interp(
+                          np.linspace(min(self.times), max(self.times),
+                                      len(inddata)), self.times, idyn)
+
+                newline = list(newline) + list(np.zeros(np.shape(indzeros)))
+                trapdyn[ii, :] = newline
+            self.trapdyn = trapdyn
 
     def info(self):
         """
