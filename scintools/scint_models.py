@@ -114,12 +114,43 @@ def arc_power_curve(x, x_peak, amp, norm=False):
     return y
 
 
-def fit_parabola(x, x_peak, amp, const, sign=-1):
+def fit_parabola(x, y):
     """
-    Fit a parabola
-        y = amp*(x - x_peak)**2 + const
-        Default is an inverted (sign=-1) parabola.
+    Fit a parabola and return the value and error for the peak
     """
 
-    y = sign*amp*np.power((x - x_peak), 2) + const
-    return y
+    # Do the fit
+    params, pcov = np.polyfit(x, y, 2, cov=True)
+    yfit = params[0]*np.power(x, 2) + params[1]*x + params[2]  # y values
+
+    # Get parameter errors
+    errors = []
+    for i in range(len(params)):  # for each parameter
+        errors.append(np.absolute(pcov[i][i])**0.5)
+
+    # Get parabola peak and error
+    peak = -params[1]/(2*params[0])  # Parabola max (or min)
+    peak_error = np.sqrt((errors[1]**2)*((1/(2*params[0]))**2) +
+                         (errors[0]**2)*((params[1]/2)**2))  # Error on peak
+
+    return yfit, peak, peak_error
+
+
+def thin_screen(pulsar, mjd, anisotropy=False):
+    """
+    Thin screen effective velocity
+    """
+
+    v_eff = []
+    return v_eff
+
+
+def arc_curvature(v_eff, lamsteps=False):
+    """
+    arc curvature model
+    """
+
+    curvature = []
+    return curvature
+
+
