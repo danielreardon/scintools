@@ -314,6 +314,7 @@ class Dynspec:
             xplot = cp(self.fdop)
         else:
             sspec = input_sspec
+            xplot = input_x
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         vmin = medval-20
         vmax = vmin+60
@@ -742,6 +743,8 @@ class Dynspec:
                 fcuts+1 segments in frequency
         """
 
+        if filename is not None:
+            plt.ioff()  # turn off interactive plotting
         nchan = len(self.freqs)  # re-define in case of trimming
         nsub = len(self.times)
         fnum = np.floor(nchan/(fcuts + 1))
