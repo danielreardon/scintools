@@ -12,6 +12,7 @@ from __future__ import (absolute_import, division,
 import numpy as np
 import os
 import csv
+from decimal import Decimal, InvalidOperation
 
 
 def make_dynspec(archive, template):
@@ -28,17 +29,9 @@ def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
     Cleans an archive using coast_guard
     """
 
-    # Try importing necessary modules
-    try:
-        import psrchive as ps
-    except ModuleNotFoundError:
-        print('Psrchive not found. Cannot load archives. Returning')
-        return
-    try:
-        from coast_guard import cleaners
-    except ModuleNotFoundError:
-        print('Coast_guard not found. Cannot clean. Returning')
-        return
+    # import necessary modules
+    import psrchive as ps
+    from coast_guard import cleaners
 
     # Load the archive
     archive = ps.Archive_load(str(archive))
@@ -145,31 +138,168 @@ def float_array_from_dict(dictionary, key):
     return np.array(list(map(float, dictionary[key])))
 
 
-def get_ssb_delay(mjd_array, raj, decj):
+def get_ssb_delay(mjds, raj, decj):
     """
     Get Romer delay to Solar System Barycentre (SSB) for correction of site
     arrival times to barycentric.
     """
-    try:
-        from astropy.time import Time
-        from astropy.coordinates import get_body_barycentric, SkyCoord
-        from astropy import units as u
-        from astropy.constants import au, c
-    except ModuleNotFoundError:
-        print('Astropy not found')
-        return
+
+    from astropy.time import Time
+    from astropy.coordinates import get_body_barycentric, SkyCoord
+    from astropy import units as u
+    from astropy.constants import au, c
 
     coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
     psr_xyz = coord.cartesian.xyz.value
 
     t = []
-    for mjd in mjd_array:
+    for mjd in mjds:
         time = Time(mjd, format='mjd')
         earth_xyz = get_body_barycentric('earth', time)
         e_dot_p = np.dot(earth_xyz.xyz.value, psr_xyz)
         t.append(e_dot_p*au.value/c.value)
 
+    print('WARNING! Understand sign of SSB correction before applying to MJDs')
+
     return t
+
+
+def get_earth_velocity(mjds, raj, decj):
+    """
+    Calculates the component of Earth's velocity transverse to the line of
+    sight
+    """
+
+    from astropy.time import Time
+    from astropy.coordinates import get_body_barycentric_posvel, SkyCoord
+    from astropy import units as u
+
+    coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
+    psr_xyz = coord.cartesian.xyz.value
+
+    vearth_ra = []
+    vearth_dec = []
+    for mjd in mjds:
+        time = Time(mjd, format='mjd')
+        pos_xyz, vel_xyz = get_body_barycentric_posvel('earth', time)
+        e_cross_p = np.cross(vel_xyz.xyz.value, psr_xyz)
+        coord = SkyCoord(x=e_cross_p[0], y=e_cross_p[1], z=e_cross_p[2],
+                         representation_type='cartesian')
+
+    return coord
+
+
+def read_par(parfile):
+    """
+    Reads a par file and return a dictionary of parameter names and values
+    """
+
+    par = {}
+    ignore = ['DMMODEL', 'DMOFF', "DM_", "CM_", 'CONSTRAIN', 'JUMP', 'NITS',
+              'NTOA', 'CORRECT_TROPOSPHERE', 'PLANET_SHAPIRO', 'DILATEFREQ',
+              'TIMEEPH', 'MODE', 'TZRMJD', 'TZRSITE', 'TZRFRQ', 'EPHVER',
+              'T2CMETHOD']
+
+    file = open(parfile, 'r')
+    for line in file.readlines():
+        err = None
+        p_type = None
+        sline = line.split()
+        if len(sline) == 0 or line[0] == "#" or line[0:1] == "C " \
+           or sline[0] in ignore:
+            continue
+
+        param = sline[0]
+        if param == "E":
+            param = "ECC"
+
+        val = sline[1]
+        if len(sline) == 3 and sline[2] not in ['0', '1']:
+            err = sline[2].replace('D', 'E')
+        elif len(sline) == 4:
+            err = sline[3].replace('D', 'E')
+
+        try:
+            val = int(val)
+            p_type = 'd'
+        except ValueError:
+            try:
+                val = float(Decimal(val.replace('D', 'E')))
+                if 'e' in sline[1] or 'E' in sline[1].replace('D', 'E'):
+                    p_type = 'e'
+                else:
+                    p_type = 'f'
+            except InvalidOperation:
+                p_type = 's'
+
+        par[param] = val
+        if err:
+            par[param+"_ERR"] = float(err)
+
+        if p_type:
+            par[param+"_TYPE"] = p_type
+
+    file.close()
+
+    return par
+
+
+def pars_to_params(pars, params=None):
+    """
+    Converts a dictionary of par file parameters from read_par() to an
+    lmfit Parameters() class to use in models
+
+    By default, parameters are not varied
+    """
+
+    from lmfit import Parameters
+    from astropy.coordinates import SkyCoord
+    from astropy import units as u
+
+    if params is None:  # start new class, otherwise append to existing
+        params = Parameters()
+
+    for key, value in pars.items():
+        if key in ['RAJ', 'RA']:  # convert position string to radians
+            coord = SkyCoord('{0} {1}'.format(pars['RAJ'], pars['DECJ']),
+                             unit=(u.hourangle, u.deg))
+            params.add('RAJ', value=coord.ra.value*np.pi/180, vary=False)
+            params.add('DECJ', value=coord.dec.value*np.pi/180, vary=False)
+        try:
+            params.add(key, value=value, vary=False)
+        except TypeError:  # Don't add strings
+            continue
+
+    return params
+
+
+def get_true_anomaly(mjds, pars):
+    """
+    Calculates true anomalies for an array of barycentric MJDs and a parameter
+    dictionary
+    """
+
+    from scipy.optimize import fsolve
+
+    PB = pars['PB']
+    T0 = pars['T0']
+    ECC = pars['ECC']
+    PBDOT = 0 if 'PBDOT' not in pars.keys() else pars['PBDOT']
+
+    nb = 2*np.pi/PB
+
+    # mean anomaly
+    M = nb*((mjds - T0) - 0.5*(PBDOT/PB) * (mjds - T0)**2)
+
+    # eccentric anomaly
+    E = fsolve(lambda E: E - ECC*np.sin(E) - M, M)
+
+    # true anomaly
+    U = 2*np.arctan2(np.sqrt(1 + ECC) * np.sin(E/2),
+                     np.sqrt(1 - ECC) * np.cos(E/2))  # true anomaly
+    U[np.argwhere(U < 0)] = U[np.argwhere(U < 0)] + 2*np.pi
+
+    return U
 
 
 # Potential future functions
@@ -184,6 +314,6 @@ def remove_duplicates(dyn_files):
 
 def make_pickle(dyn, process=True, sspec=True, acf=True, lamsteps=True):
     """
-    Pickles a dynamic spectra object
+    Pickles a dynamic spectrum object
     """
     return

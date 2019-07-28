@@ -16,12 +16,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
-from scint_models import scint_acf_model, scint_sspec_model, fit_parabola
+from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
+                         dnu_acf_model, tau_sspec_model, dnu_sspec_model,\
+                         fit_parabola
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
 from scipy.signal import convolve2d, medfilt, savgol_filter
-from scipy.optimize import curve_fit
+from lmfit import Minimizer, Parameters
 from scipy.io import loadmat
 
 
@@ -658,81 +660,95 @@ class Dynspec:
         self.normsspecavg = isspecavg
         self.normsspec = np.array(normSspec)
 
-    def get_scint_params(self, method="acf", plot=False, alpha=5/3):
+    def get_scint_params(self, method="acf1d", plot=False, alpha=5/3):
         """
         Measure the scintillation timescale
             Method:
-                acf - takes a 1D cut through the centre of the ACF
+                acf1d - takes a 1D cut through the centre of the ACF for
                 sspec - measures timescale from the power spectrum
+                acf2d - uses an analytic approximation to the ACF including
+                    phase gradient
         """
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'sspec'):
             self.calc_sspec()
 
-        if method == 'acf':
+        if method == 'acf1d':
             scint_model = scint_acf_model
-            y_f_data = self.acf[int(self.nchan):, int(self.nsub)]
-            x_f_data = self.df*np.linspace(0, len(y_f_data), len(y_f_data))
-            y_t_data = self.acf[int(self.nchan), int(self.nsub):]
-            x_t_data = self.dt*np.linspace(0, len(y_t_data), len(y_t_data))
+            ydata_f = self.acf[int(self.nchan):, int(self.nsub)]
+            xdata_f = self.df*np.linspace(0, len(ydata_f), len(ydata_f))
+            ydata_t = self.acf[int(self.nchan), int(self.nsub):]
+            xdata_t = self.dt*np.linspace(0, len(ydata_t), len(ydata_t))
         elif method == 'sspec':
             scint_model = scint_sspec_model
-            y_f_data = np.sum(self.sspec, axis=0)
-            x_f_data = self.df*np.linspace(0, len(y_f_data), len(y_f_data))
-            y_t_data = np.sum(self.sspec, axis=1)
-            x_t_data = self.dt*np.linspace(0, len(y_t_data), len(y_t_data))
-            plt.plot(x_f_data, y_f_data)
+            arr = cp(self.acf)
+            arr = np.fft.ifftshift(arr)
+            sspec = np.fft.fft2(arr)
+            plt.pcolormesh(sspec)
             plt.show()
+            return
 
-        nt = len(x_t_data)  # number of t-lag samples
-        xdata = list(x_t_data) + list(x_f_data)  # concatenate x lists
-        ydata = list(y_t_data) + list(y_f_data)  # y lists
+        # concatenate x and y arrays
+        xdata = np.array(np.concatenate((xdata_t, xdata_f)))
+        ydata = np.array(np.concatenate((ydata_t, ydata_f)))
+        weights = np.ones(np.shape(ydata))
+
+        # Get initial parameter values
+        nt = len(xdata_t)  # number of t-lag samples
         # Estimate amp and white noise level
-        arr = cp(self.acf)
-        arr = np.fft.ifftshift(arr)
-        amp = arr[0][1]
-        wn = arr[0][0] - amp
-        # Estimate tau
-        # estimate dnu
-        # Set initial guess p0 = [tau, dnu, amp, wn, alpha, nt]
-        p0 = [8000, 1000, amp, wn, 5/3, nt]  # educated guess
-        lb = [0, 0, 0, 0, 0, nt]  # lower bounds
-        ub = [np.inf, np.inf, np.inf, np.inf, np.inf, nt]  # upper bounds
-        if alpha is None:  # Fit alpha
-            p0 = p0[:-1]
-            lb = lb[:-1]
-            ub = ub[:-1]
-            self.scintmodel, pcov = \
-                curve_fit(lambda x, tau, dnu, amp, wn, alph:
-                          scint_model(x, tau=tau, dnu=dnu, amp=amp,
-                                      wn=wn, alpha=alph, nt=nt),
-                          xdata, ydata, p0=p0, bounds=(lb, ub))
-        else:  # Fix alpha. Default 5/3 is for Kolmogorov turbulence
-            p0 = p0[:-2]
-            lb = lb[:-2]
-            ub = ub[:-2]
-            self.scintmodel, pcov = \
-                curve_fit(lambda x, tau, dnu, amp, wn:
-                          scint_model(x, tau=tau, dnu=dnu, amp=amp,
-                                      wn=wn, alpha=alpha, nt=nt),
-                          xdata, ydata, p0=p0, bounds=(lb, ub))
-        errors = []
-        for i in range(len(self.scintmodel)):  # for each parameter
-            errors.append(np.absolute(pcov[i][i])**0.5)
-        self.scintmodel_errors = np.array(errors)
-        self.tau = self.scintmodel[0]
-        self.tauerr = self.scintmodel_errors[0]
-        self.dnu = self.scintmodel[1]
-        self.dnuerr = self.scintmodel_errors[1]
+        wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
+        amp = max([ydata_f[1], ydata_t[1]])
+        # Estimate tau for initial guess. Closest index to 1/e power
+        tau = xdata_t[np.argmin(abs(ydata_t - amp/np.e))]
+        # Estimate dnu for initial guess. Closest index to 1/2 power
+        dnu = xdata_f[np.argmin(abs(ydata_f - amp/2))]
+
+        # Define fit parameters
+        params = Parameters()
+        params.add('tau', value=tau, min=0.0, max=np.inf)
+        params.add('dnu', value=dnu, min=0.0, max=np.inf)
+        params.add('amp', value=amp, min=0.0, max=np.inf)
+        params.add('wn', value=wn, min=0.0, max=np.inf)
+        params.add('nt', value=nt, vary=False)
+        if alpha is None:
+            params.add('alpha', value=5/3, min=0, max=8)
+        else:
+            params.add('alpha', value=alpha, vary=False)
+
+        # Do fit
+        func = Minimizer(scint_model, params, fcn_args=(xdata, ydata, weights))
+        results = func.minimize()
+
+        if results.success:
+            self.tau = results.params['tau'].value
+            self.tauerr = results.params['tau'].stderr
+            self.dnu = results.params['dnu'].value
+            self.dnuerr = results.params['dnu'].stderr
+            self.talpha = results.params['alpha'].value
+            if alpha is None:
+                self.talphaerr = results.params['alpha'].stderr
+        else:
+            print('Warning: Could not find solution')
+
+        if method == 'acf1d':
+            # Get tau model
+            tmodel_res = tau_acf_model(results.params, xdata_t, ydata_t,
+                                       weights[:nt])
+            tmodel = ydata_t - tmodel_res/weights[:nt]
+            # Get dnu model
+            fmodel_res = dnu_acf_model(results.params, xdata_f, ydata_f,
+                                       weights[nt:])
+            fmodel = ydata_f - fmodel_res/weights[nt:]
+
         if plot:
             plt.subplot(2, 1, 1)
-            plt.plot(x_t_data, y_t_data)
-            # plt.plot(x_t_data, scint_acf_model(x_t_data, self.scintmodel,
-            #                                   nt=nt))
+            plt.plot(xdata_t, ydata_t)
+            plt.plot(xdata_t, tmodel)
             plt.xlabel('Time lag (s)')
             plt.subplot(2, 1, 2)
-            plt.plot(x_f_data, y_f_data)
+            plt.plot(xdata_f, ydata_f)
+            plt.plot(xdata_f, fmodel)
             plt.xlabel('Frequency lag (MHz)')
             plt.show()
 
