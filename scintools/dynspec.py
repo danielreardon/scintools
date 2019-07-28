@@ -25,6 +25,7 @@ from scipy.interpolate import griddata
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from lmfit import Minimizer, Parameters
 from scipy.io import loadmat
+import corner
 
 
 class Dynspec:
@@ -660,7 +661,8 @@ class Dynspec:
         self.normsspecavg = isspecavg
         self.normsspec = np.array(normSspec)
 
-    def get_scint_params(self, method="acf1d", plot=False, alpha=5/3):
+    def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
+                         mcmc=False):
         """
         Measure the scintillation timescale
             Method:
@@ -685,9 +687,6 @@ class Dynspec:
             arr = cp(self.acf)
             arr = np.fft.ifftshift(arr)
             sspec = np.fft.fft2(arr)
-            plt.pcolormesh(sspec)
-            plt.show()
-            return
 
         # concatenate x and y arrays
         xdata = np.array(np.concatenate((xdata_t, xdata_f)))
@@ -719,17 +718,18 @@ class Dynspec:
         # Do fit
         func = Minimizer(scint_model, params, fcn_args=(xdata, ydata, weights))
         results = func.minimize()
+        if mcmc:
+            print('Doing mcmc posterior sample')
+            mcmc_results = func.emcee()
+            results = mcmc_results
 
-        if results.success:
-            self.tau = results.params['tau'].value
-            self.tauerr = results.params['tau'].stderr
-            self.dnu = results.params['dnu'].value
-            self.dnuerr = results.params['dnu'].stderr
-            self.talpha = results.params['alpha'].value
-            if alpha is None:
-                self.talphaerr = results.params['alpha'].stderr
-        else:
-            print('Warning: Could not find solution')
+        self.tau = results.params['tau'].value
+        self.tauerr = results.params['tau'].stderr
+        self.dnu = results.params['dnu'].value
+        self.dnuerr = results.params['dnu'].stderr
+        self.talpha = results.params['alpha'].value
+        if alpha is None:
+            self.talphaerr = results.params['alpha'].stderr
 
         if method == 'acf1d':
             # Get tau model
@@ -751,6 +751,14 @@ class Dynspec:
             plt.plot(xdata_f, fmodel)
             plt.xlabel('Frequency lag (MHz)')
             plt.show()
+            if mcmc:
+                corner.corner(mcmc_results.flatchain,
+                              labels=mcmc_results.var_names,
+                              truths=list(mcmc_results.params.
+                                          valuesdict().values()))
+                plt.show()
+
+        return
 
     def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None,
                 lamsteps=False):
