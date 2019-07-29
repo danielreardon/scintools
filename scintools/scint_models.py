@@ -222,7 +222,6 @@ def fit_parabola(x, y):
         errors.append(np.absolute(pcov[i][i])**0.5)
 
     # Get parabola peak and error
-    #   y = a(x – h)**2 + k
     peak = -params[1]/(2*params[0])  # Parabola max (or min)
     peak_error = np.sqrt((errors[1]**2)*((1/(2*params[0]))**2) +
                          (errors[0]**2)*((params[1]/2)**2))  # Error on peak
