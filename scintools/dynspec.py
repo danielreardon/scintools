@@ -24,8 +24,6 @@ from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
-import corner
-
 
 class Dynspec:
 
@@ -672,6 +670,7 @@ class Dynspec:
         """
 
         from lmfit import Minimizer, Parameters
+        import corner
 
         if not hasattr(self, 'acf'):
             self.calc_acf()
