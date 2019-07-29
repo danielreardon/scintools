@@ -148,35 +148,38 @@ def dnu_sspec_model(params, xdata, ydata, weights):
         dnu = bandwidth at 1/2 power
         wn = white noise spike in ACF cut
     """
-
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
-
-    y = dnu_acf_model(xdata, ydata, weights, params)
-    # From ACF model, construct Fourier-domain model
-    y_flipped = y[::-1]
-    y = list(y) + list(y_flipped)  # concatenate
-    y = y[0:2*len(f)-1]
-    # Get Fourier model
-    yf = np.fft(y)
-    yf = np.real(yf)
-    yf = yf[0:len(f)]
-    return (data - model) * weights
+#
+#    if weights is None:
+#        weights = np.ones(np.shape(ydata))
+#
+#    y = dnu_acf_model(xdata, ydata, weights, params)
+#    # From ACF model, construct Fourier-domain model
+#    y_flipped = y[::-1]
+#    y = list(y) + list(y_flipped)  # concatenate
+#    y = y[0:2*len(f)-1]
+#    # Get Fourier model
+#    yf = np.fft(y)
+#    yf = np.real(yf)
+#    yf = yf[0:len(f)]
+#    return (data - model) * weights
+    return
 
 
 def scint_sspec_model(params, xdata, ydata, weights):
     """
     Fit both tau (tau_acf_model) and dnu (dnu_acf_model) simultaneously
     """
+#
+#    if weights is None:
+#        weights = np.ones(np.shape(ydata))
+#
+#    y_t = tau_sspec_model(t=t, tau=tau, amp=amp, wn=wn, alpha=alpha)
+#    y_f = dnu_sspec_model(f=f, dnu=dnu, amp=amp, wn=wn)
+#    # return list(y_t) + list(y_f)  # concatenate t and f models
+#
+#    return (ydata - model) * weights
 
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
-
-    y_t = tau_sspec_model(t=t, tau=tau, amp=amp, wn=wn, alpha=alpha)
-    y_f = dnu_sspec_model(f=f, dnu=dnu, amp=amp, wn=wn)
-    # return list(y_t) + list(y_f)  # concatenate t and f models
-
-    return (ydata - model) * weights
+    return
 
 
 def arc_power_curve(params, xdata, ydata, weights):
@@ -204,8 +207,31 @@ def thin_screen(params, xdata, ydata, weights):
     return (ydata - model) * weights
 
 
+def fit_parabola(x, y):
+    """
+    Fit a parabola and return the value and error for the peak
+    """
 
-#def arc_curvature(params, xdata, ydata, weights, freqs, true_anomaly,
+    # Do the fit
+    params, pcov = np.polyfit(x, y, 2, cov=True)
+    yfit = params[0]*np.power(x, 2) + params[1]*x + params[2]  # y values
+
+    # Get parameter errors
+    errors = []
+    for i in range(len(params)):  # for each parameter
+        errors.append(np.absolute(pcov[i][i])**0.5)
+
+    # Get parabola peak and error
+    #   y = a(x – h)**2 + k
+    peak = -params[1]/(2*params[0])  # Parabola max (or min)
+    peak_error = np.sqrt((errors[1]**2)*((1/(2*params[0]))**2) +
+                         (errors[0]**2)*((params[1]/2)**2))  # Error on peak
+
+    return yfit, peak, peak_error
+#
+#
+#
+# def arc_curvature(params, xdata, ydata, weights, freqs, true_anomaly,
 #                  vearth_ra, vearth_dec):
 #    """
 #    arc curvature model
@@ -256,12 +282,12 @@ def thin_screen(params, xdata, ydata, weights):
 #    return (ydata - model) * weights
 #
 #
-#"""
-#Below: Models that do not return residuals for a fitter
-#"""
+# """
+# Below: Models that do not return residuals for a fitter
+# """
 #
 #
-#def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
+# def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
 #    """
 #    Effective velocity with annual and pulsar terms
 #        Note: Does NOT include IISM velocity, but returns veff in IISM frame
@@ -309,26 +335,3 @@ def thin_screen(params, xdata, ydata, weights):
 #    veff_dec = s * vearth_dec + (1 - s) * (vp_dec + pmdec_v)
 #
 #    return veff_ra, veff_dec
-
-
-def fit_parabola(x, y):
-    """
-    Fit a parabola and return the value and error for the peak
-    """
-
-    # Do the fit
-    params, pcov = np.polyfit(x, y, 2, cov=True)
-    yfit = params[0]*np.power(x, 2) + params[1]*x + params[2]  # y values
-
-    # Get parameter errors
-    errors = []
-    for i in range(len(params)):  # for each parameter
-        errors.append(np.absolute(pcov[i][i])**0.5)
-
-    # Get parabola peak and error
-    #   y = a(x – h)**2 + k
-    peak = -params[1]/(2*params[0])  # Parabola max (or min)
-    peak_error = np.sqrt((errors[1]**2)*((1/(2*params[0]))**2) +
-                         (errors[0]**2)*((params[1]/2)**2))  # Error on peak
-
-    return yfit, peak, peak_error
