@@ -23,7 +23,6 @@ from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
 from scipy.signal import convolve2d, medfilt, savgol_filter
-from lmfit import Minimizer, Parameters
 from scipy.io import loadmat
 import corner
 
@@ -671,6 +670,9 @@ class Dynspec:
                 acf2d - uses an analytic approximation to the ACF including
                     phase gradient
         """
+
+        from lmfit import Minimizer, Parameters
+
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'sspec'):
@@ -731,17 +733,18 @@ class Dynspec:
         if alpha is None:
             self.talphaerr = results.params['alpha'].stderr
 
-        if method == 'acf1d':
-            # Get tau model
-            tmodel_res = tau_acf_model(results.params, xdata_t, ydata_t,
-                                       weights[:nt])
-            tmodel = ydata_t - tmodel_res/weights[:nt]
-            # Get dnu model
-            fmodel_res = dnu_acf_model(results.params, xdata_f, ydata_f,
-                                       weights[nt:])
-            fmodel = ydata_f - fmodel_res/weights[nt:]
-
         if plot:
+            # get models:
+            if method == 'acf1d':
+                # Get tau model
+                tmodel_res = tau_acf_model(results.params, xdata_t, ydata_t,
+                                           weights[:nt])
+                tmodel = ydata_t - tmodel_res/weights[:nt]
+                # Get dnu model
+                fmodel_res = dnu_acf_model(results.params, xdata_f, ydata_f,
+                                           weights[nt:])
+                fmodel = ydata_f - fmodel_res/weights[nt:]
+
             plt.subplot(2, 1, 1)
             plt.plot(xdata_t, ydata_t)
             plt.plot(xdata_t, tmodel)
@@ -751,6 +754,7 @@ class Dynspec:
             plt.plot(xdata_f, fmodel)
             plt.xlabel('Frequency lag (MHz)')
             plt.show()
+
             if mcmc:
                 corner.corner(mcmc_results.flatchain,
                               labels=mcmc_results.var_names,

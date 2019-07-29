@@ -183,8 +183,12 @@ def get_earth_velocity(mjds, raj, decj):
         time = Time(mjd, format='mjd')
         pos_xyz, vel_xyz = get_body_barycentric_posvel('earth', time)
         e_cross_p = np.cross(vel_xyz.xyz.value, psr_xyz)
-        coord = SkyCoord(x=e_cross_p[0], y=e_cross_p[1], z=e_cross_p[2],
-                         representation_type='cartesian')
+        #coord = SkyCoord(x=e_cross_p[0], y=e_cross_p[1], z=e_cross_p[2],
+        #                 representation_type='cartesian')
+
+        #vra = - Vx*sin(rarad) + Vy*cos(rarad);
+        #vdec = - Vx*sin(decrad)*cos(rarad) - \
+        #    Vy*sin(decrad)*sin(rarad) + Vz*cos(decrad)
 
     return coord
 
