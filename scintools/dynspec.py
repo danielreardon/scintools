@@ -240,7 +240,7 @@ class Dynspec:
 
         if not hasattr(self, 'acf'):
             self.calc_acf()
-        if not hasattr(self, 'tau'):
+        if not hasattr(self, 'tau') and input_acf is None:
             self.get_scint_params()
         if input_acf is None:
             arr = self.acf
