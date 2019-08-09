@@ -18,7 +18,7 @@ import scipy.constants as sc
 from copy import deepcopy as cp
 from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
                          dnu_acf_model, tau_sspec_model, dnu_sspec_model,\
-                         fit_parabola
+                         fit_parabola, fit_log_parabola
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata
@@ -66,21 +66,25 @@ class Dynspec:
 
         # Calculate properties for the gap
         timegap = round((other.mjd - self.mjd)*86400
-                        - self.tobs, 2)  # time between two dynspecs
+                        - self.tobs, 1)  # time between two dynspecs
         extratimes = np.arange(self.dt/2, timegap, dt)
         if timegap < dt:
             extratimes = [0]
-        nextra = len(extratimes)
+            nextra = 0
+        else:
+            nextra = len(extratimes)
         dyngap = np.zeros([np.shape(self.dyn)[0], nextra])
 
         # Set changed properties
         name = self.name.split('.')[0] + "+" + other.name.split('.')[0] \
             + ".dynspec"
         header = self.header + other.header
-        times = np.concatenate((self.times, self.times[-1] + extratimes,
-                                self.times[-1] + extratimes[-1] + other.times))
+        # times = np.concatenate((self.times, self.times[-1] + extratimes,
+        #                       self.times[-1] + extratimes[-1] + other.times))
         nsub = self.nsub + nextra + other.nsub
         tobs = self.tobs + timegap + other.tobs
+        print('Note: need to check "times" attribute for added dynspec')
+        times = np.linspace(0, tobs, nsub)
         mjd = np.min([self.mjd, other.mjd])  # mjd for earliest dynspec
         newdyn = np.concatenate((self.dyn, dyngap, other.dyn), axis=1)
 
@@ -326,12 +330,12 @@ class Dynspec:
             if lamsteps:
                 plt.pcolormesh(xplot, self.beta, sspec,
                                vmin=vmin, vmax=vmax)
-                plt.ylabel('Beta (m$^{-1}$)')
+                plt.ylabel(r'$f_\nu$ (m$^{-1}$)')
             else:
                 plt.pcolormesh(xplot, self.tdel, sspec,
                                vmin=vmin, vmax=vmax)
-                plt.ylabel('Delay (us)')
-            plt.xlabel('Doppler Frequency (mHz)')
+                plt.ylabel(r'$f_\nu$ ($\mu$s)')
+            plt.xlabel(r'$f_t$ (mHz)')
             bottom, top = plt.ylim()
             if plotarc:
                 if lamsteps:
@@ -384,12 +388,15 @@ class Dynspec:
         else:
             plt.show()
 
-    def fit_arc(self, method='gridmax', asymm=False, plot=False, delmax=None,
+    def fit_arc(self, method='norm_sspec', asymm=False, plot=False, delmax=None,
                 numsteps=1e3, startbin=9, cutmid=9, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
-                high_power_diff=-1.5, ref_freq=1400):
+                high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf]):
         """
         Find the arc curvature with maximum power along it
+
+            constraint: Only search for peaks between constraint[0] and
+                constraint[1]
         """
 
         if not hasattr(self, 'tdel'):
@@ -423,6 +430,8 @@ class Dynspec:
             etamax = etamax*beta_to_eta
             etamin = etamin/(self.freq/ref_freq)**2
             etamin = etamin*beta_to_eta
+            constraint = constraint/(self.freq/ref_freq)**2
+            constraint = constraint*beta_to_eta
 
         # Adjust secondary spectrum
         ind = np.argmin(abs(self.tdel-delmax))
@@ -439,16 +448,16 @@ class Dynspec:
         # Create an array with equal steps in sqrt(curvature)
         sqrt_eta = np.linspace(min_sqrt_eta, max_sqrt_eta, numsteps)
 
+        # Define data
         x = self.fdop
         y = yaxis
         z = sspec
+        # initiate arrays
+        sumpowL = []
+        sumpowR = []
+        etaArray = []
 
         if method == 'gridmax':
-            # initiate arrays
-            sumpowL = []
-            sumpowR = []
-            etaArray = []
-            etaArray = []
             for ii in range(0, len(sqrt_eta)):
                 ieta = sqrt_eta[ii]**2
                 etaArray.append(ieta)
@@ -496,9 +505,14 @@ class Dynspec:
             sumpowL_filt = savgol_filter(sumpowL, 2*round(numsteps/100)+1, 1)
             sumpowR_filt = savgol_filter(sumpowR, 2*round(numsteps/100)+1, 1)
 
-            ind = np.argmax(sumpow_filt)
-            indL = np.argmax(sumpowL_filt)
-            indR = np.argmax(sumpowR_filt)
+            indrange = np.argwhere((etaArray > constraint[0]) *
+                                   (etaArray < constraint[1]))
+            sumpow_inrange = sumpow_filt[indrange]
+            sumpowL_inrange = sumpow_filt[indrange]
+            sumpowR_inrange = sumpow_filt[indrange]
+            ind = np.argmin(np.abs(sumpow_filt - np.max(sumpow_inrange)))
+            indL = np.argmin(np.abs(sumpow_filt - np.max(sumpowL_inrange)))
+            indR = np.argmin(np.abs(sumpow_filt - np.max(sumpowR_inrange)))
             eta = etaArray[ind]
             etaL = etaArray[indL]
             etaR = etaArray[indR]
@@ -508,59 +522,138 @@ class Dynspec:
             max_power = sumpow_filt[ind]
             power = max_power
             ind1 = 1
-            while power > max_power + low_power_diff:  # -3db, or half power
-                power = sumpow_filt[ind - ind1]
+            while (power > max_power + low_power_diff and
+                   ind + ind1 < len(sumpow_filt)-1):  # -3db, or half power
                 ind1 += 1
+                power = sumpow_filt[ind - ind1]
             power = max_power
             ind2 = 1
-            while power > max_power + high_power_diff:  # -1db power
-                power = sumpow_filt[ind + ind2]
+            while (power > max_power + high_power_diff and
+                   ind + ind2 < len(sumpow_filt)-1):  # -1db power
                 ind2 += 1
+                power = sumpow_filt[ind + ind2]
             # Now select this region of data for fitting
-            xdata = etaArray[ind-ind1:ind+ind2]
-            ydata = sumpow[ind-ind1:ind+ind2]
+            xdata = etaArray[int(ind-ind1):int(ind+ind2)]
+            ydata = sumpow[int(ind-ind1):int(ind+ind2)]
+
             # Do the fit
-            sqrt_eta_step = sqrt_eta[1] - sqrt_eta[0]
-            yfit, eta, etaerr = fit_parabola(xdata/sqrt_eta_step, ydata)
-            eta = eta*sqrt_eta_step
-            etaerr = etaerr*sqrt_eta_step
+            # yfit, eta, etaerr = fit_parabola(xdata, ydata)
+            yfit, eta, etaerr = fit_log_parabola(xdata, ydata)
+            eta = eta
+            etaerr = etaerr
+
+            # Now plot
+            if plot:
+                if asymm:
+                    plt.subplot(2, 1, 1)
+                    plt.plot(etaArray, sumpowL)
+                    plt.plot(etaArray, sumpowL_filt)
+                    bottom, top = plt.ylim()
+                    plt.plot([etaL, etaL], [bottom, top])
+                    plt.ylabel('mean power (db)')
+                    plt.subplot(2, 1, 2)
+                    plt.plot(etaArray, sumpowR)
+                    plt.plot(etaArray, sumpowR_filt)
+                    bottom, top = plt.ylim()
+                    plt.plot([etaR, etaR], [bottom, top])
+                else:
+                    plt.plot(etaArray, sumpow)
+                    plt.plot(etaArray, sumpow_filt)
+                    plt.plot(xdata, yfit)
+                    bottom, top = plt.ylim()
+                    plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
+                                facecolor='g', alpha=0.5)
+                if lamsteps:
+                    plt.xlabel('eta (beta)')
+                else:
+                    plt.xlabel('eta (tdel)')
+                plt.ylabel('mean power (db)')
+                plt.xscale('log')
+                plt.show()
 
         elif method == 'norm_sspec':
-            if not hasattr(self, 'normsspecavg'):
-                self.norm_sspec(delmax=delmax, plot=plot, startbin=startbin,
-                                maxnormfac=3, cutmid=2, lamsteps=lamsteps)
-            print('Does nothing yet')
+            # Get the normalised secondary spectrum, set for minimum eta as
+            #   normalisation. Then calculate peak as
+            norm_sspec = \
+                self.norm_sspec(eta=etamin, delmax=delmax, plot=False,
+                                startbin=startbin, maxnormfac=1, cutmid=cutmid,
+                                lamsteps=lamsteps, scrunched=True,
+                                plot_fit=False, numsteps=numsteps)
+            norm_sspec = norm_sspec.squeeze()
+            etafrac_array = np.linspace(-1, 1, len(norm_sspec))
+            ind1 = np.argwhere(etafrac_array > 1/(2*len(norm_sspec)))
+            ind2 = np.argwhere(etafrac_array < -1/(2*len(norm_sspec)))
+
+            norm_sspec_avg = np.add(norm_sspec[ind1],
+                                    np.flip(norm_sspec[ind2], axis=0))/2
+            norm_sspec_avg = norm_sspec_avg.squeeze()
+            etafrac_array_avg = 1/etafrac_array[ind1].squeeze()
+            # Make sure is valid
+            filt_ind = is_valid(norm_sspec_avg)
+            norm_sspec_avg = np.flip(norm_sspec_avg[filt_ind], axis=0)
+            etafrac_array_avg = np.flip(etafrac_array_avg[filt_ind], axis=0)
+
+            # Form eta array and cut at maximum
+            etaArray = etamin*etafrac_array_avg**2
+            ind = np.argwhere(etaArray < etamax)
+            etaArray = etaArray[ind].squeeze()
+            norm_sspec_avg = norm_sspec_avg[ind].squeeze()
+
+            # Smooth data
+            window = 2*round(len(norm_sspec_avg)/200)+3
+            norm_sspec_avg_filt = \
+                savgol_filter(norm_sspec_avg, window, 1)
+
+            # search for peaks within constraint range
+            indrange = np.argwhere((etaArray > constraint[0]) *
+                                   (etaArray < constraint[1]))
+
+            sumpow_inrange = norm_sspec_avg_filt[indrange]
+            ind = np.argmin(np.abs(norm_sspec_avg_filt -
+                                   np.max(sumpow_inrange)))
+
+            # Now find eta and estimate error by fitting parabola
+            #   Data from -3db on low curvature side to -1.5db on high side
+            max_power = norm_sspec_avg_filt[ind]
+            power = max_power
+            ind1 = 1
+            while (power > max_power + low_power_diff and
+                   ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
+                ind1 += 1
+                power = norm_sspec_avg_filt[ind - ind1]
+            power = max_power
+            ind2 = 1
+            while (power > max_power + high_power_diff and
+                   ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
+                ind2 += 1
+                power = norm_sspec_avg_filt[ind + ind2]
+            # Now select this region of data for fitting
+            xdata = etaArray[int(ind-ind1):int(ind+ind2)]
+            ydata = norm_sspec_avg[int(ind-ind1):int(ind+ind2)]
+
+            # Do the fit
+            # yfit, eta, etaerr = fit_parabola(xdata, ydata)
+            yfit, eta, etaerr = fit_parabola(xdata, ydata)
+            eta = eta
+            etaerr = etaerr
+
+            if plot:
+                plt.plot(etaArray, norm_sspec_avg)
+                plt.plot(etaArray, norm_sspec_avg_filt)
+                plt.plot(xdata, yfit)
+                plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
+                            facecolor='g', alpha=0.5)
+                plt.xscale('log')
+                plt.show()
+                if lamsteps:
+                    plt.xlabel('eta (beta)')
+                else:
+                    plt.xlabel('eta (tdel)')
+                plt.ylabel('Mean power (dB)')
         else:
             raise ValueError('Unknown arc fitting method. Please choose \
                              from gidmax or norm_sspec')
 
-        # Now plot
-        if plot:
-            if asymm:
-                plt.subplot(2, 1, 1)
-                plt.plot(np.sqrt(etaArray), sumpowL)
-                plt.plot(np.sqrt(etaArray), sumpowL_filt)
-                bottom, top = plt.ylim()
-                plt.plot([np.sqrt(etaL), np.sqrt(etaL)], [bottom, top])
-                plt.ylabel('mean power (db)')
-                plt.subplot(2, 1, 2)
-                plt.plot(np.sqrt(etaArray), sumpowR)
-                plt.plot(np.sqrt(etaArray), sumpowR_filt)
-                bottom, top = plt.ylim()
-                plt.plot([np.sqrt(etaR), np.sqrt(etaR)], [bottom, top])
-            else:
-                plt.plot(np.sqrt(etaArray), sumpow)
-                plt.plot(np.sqrt(etaArray), sumpow_filt)
-                plt.plot(np.sqrt(xdata), yfit)
-                bottom, top = plt.ylim()
-                plt.axvspan(xmin=np.sqrt(eta-etaerr), xmax=np.sqrt(eta+etaerr),
-                            facecolor='g', alpha=0.5)
-            if lamsteps:
-                plt.xlabel('sqrt(eta) (beta)')
-            else:
-                plt.xlabel('sqrt(eta) (tdel)')
-            plt.ylabel('mean power (db)')
-            plt.show()
         if lamsteps:
             self.betaeta = eta
             self.betaetaerr = etaerr
@@ -570,11 +663,12 @@ class Dynspec:
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=9,
                    maxnormfac=2, cutmid=2, lamsteps=False, scrunched=True,
-                   plot_fit=True, ref_freq=1400):
+                   plot_fit=True, ref_freq=1400, numsteps=None):
         """
         Normalise fdop axis using arc curvature
         """
 
+        # Maximum value delay axis (us @ ref_freq)
         delmax = np.max(self.tdel) if delmax is None else delmax
         delmax = delmax*(ref_freq/self.freq)**2
 
@@ -602,13 +696,20 @@ class Dynspec:
 
         ind = np.argmin(abs(self.tdel-delmax))
         sspec = sspec[startbin:ind, :]  # cut first N delay bins and at delmax
+        nr, nc = np.shape(sspec)
+        # mask out centre bins
+        sspec[:, int(nc/2 - np.floor(cutmid/2)):int(nc/2 +
+              np.floor(cutmid/2))] = np.nan
         tdel = yaxis[startbin:ind]
         fdop = self.fdop
         maxfdop = maxnormfac*np.sqrt(tdel[-1]/eta)  # Maximum fdop for plot
         if maxfdop > max(fdop):
             maxfdop = max(fdop)
-        nfdop = len(fdop[abs(fdop) <= maxfdop])  # Number of fdop bins to use
-        fdopnew = np.linspace(-maxnormfac, maxnormfac, nfdop)  # norm fdop
+        # Number of fdop bins to use. Oversample by factor of 2
+        nfdop = 2*len(fdop[abs(fdop) <=
+                           maxfdop]) if numsteps is None else numsteps
+        fdopnew = np.linspace(-maxnormfac, maxnormfac,
+                              nfdop)  # norm fdop
         normSspec = []
         isspectot = np.zeros(np.shape(fdopnew))
         for ii in range(0, len(tdel)):
@@ -618,9 +719,7 @@ class Dynspec:
             isspec = sspec[ii, abs(fdop) <= imaxfdop]  # take the iith row
             ind = np.argmin(abs(fdopnew))
             normline = np.interp(fdopnew, ifdop, isspec)
-            normline[ind-cutmid:ind+cutmid+1] = np.nan  # ignore centre bins
             normSspec.append(normline)
-            # normline[np.isnan(normline)] = 0
             isspectot = np.add(isspectot, normline)
         isspecavg = isspectot/len(tdel)  # make average
         ind1 = np.argmin(abs(fdopnew-1)-2)
@@ -657,6 +756,7 @@ class Dynspec:
             plt.show()
         self.normsspecavg = isspecavg
         self.normsspec = np.array(normSspec)
+        return isspecavg
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False):
@@ -913,7 +1013,7 @@ class Dynspec:
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
 
-    def correct_band(self, time=False, lamsteps=False):
+    def correct_band(self, frequency=True, time=False, lamsteps=False):
         """
         Correct for the bandpass
         """
@@ -925,17 +1025,21 @@ class Dynspec:
         else:
             dyn = self.dyn
         dyn[np.isnan(dyn)] = 0
-        self.bandpass = np.mean(dyn, axis=1)
-        # Make sure there are no zeros
-        self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
-        dyn = np.divide(dyn, np.reshape(self.bandpass,
-                                        [len(self.bandpass), 1]))
+
+        if frequency:
+            self.bandpass = np.mean(dyn, axis=1)
+            # Make sure there are no zeros
+            self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
+            dyn = np.divide(dyn, np.reshape(self.bandpass,
+                                            [len(self.bandpass), 1]))
+
         if time:
             timestructure = np.mean(dyn, axis=0)
             # Make sure there are no zeros
             timestructure[timestructure == 0] = np.mean(timestructure)
             dyn = np.divide(dyn, np.reshape(timestructure,
                                             [1, len(timestructure)]))
+
         if lamsteps:
             self.lamdyn = dyn
         else:
@@ -960,26 +1064,31 @@ class Dynspec:
                 dyn = cp(self.dyn)
         else:
             dyn = input_dyn  # use imput dynamic spectrum
+
         nf = np.shape(dyn)[0]
         nt = np.shape(dyn)[1]
         # find the right fft lengths for rows and columns
         nrfft = int(2**(np.ceil(np.log2(nf))+1))
         ncfft = int(2**(np.ceil(np.log2(nt))+1))
+
+        dyn = dyn - np.mean(dyn)  # subtract mean
         if prewhite:
             simpw = convolve2d([[1, -1], [-1, 1]], dyn, mode='valid')
         else:
             simpw = dyn
-        simpw = simpw - np.mean(simpw)
-        simf = np.abs(np.fft.fft2(simpw, s=[nrfft, ncfft]))
-        simf = np.multiply(simf, np.conj(simf))
-        sec = np.fft.fftshift(simf[:])  # fftshift
+
+        simf = np.fft.fft2(simpw, s=[nrfft, ncfft])
+        simf = np.real(np.multiply(simf, np.conj(simf)))  # is real
+        sec = np.fft.fftshift(simf)  # fftshift
         sec = sec[int(nrfft/2):][:]  # crop
-        td = list(range(0, int(nrfft/2)))
-        fd = list(range(int(-ncfft/2), int(ncfft/2)))
+
+        td = np.array(list(range(0, int(nrfft/2))))
+        fd = np.array(list(range(int(-ncfft/2), int(ncfft/2))))
         fdop = np.reshape(np.multiply(fd, 1e3/(ncfft*self.dt)),
                           [len(fd)])  # in mHz
         tdel = np.reshape(np.divide(td, (nrfft*self.df)),
                           [len(td)])  # in us
+
         if lamsteps:
             beta = np.divide(td, (nrfft*self.dlam))  # in m^-1
 
@@ -996,8 +1105,7 @@ class Dynspec:
 
         # Make db
         sec = 10*np.log10(sec)
-        if lamsteps:
-            sec = np.fliplr(sec)
+
         if input_dyn is None:
             if lamsteps:
                 self.lamsspec = sec
@@ -1122,9 +1230,9 @@ class Dynspec:
             else:
                 raise ValueError('for fbw > 0.33 need lsq interpolation')
                 return
-            self.lamdyn = arout
+            self.lamdyn = np.flipud(arout)
             # maximum lambda is minimum freq
-            self.lam = lam*sc.c/np.min(self.freqs*1e6)
+            self.lam = np.flip(lam*sc.c/np.min(self.freqs*1e6), axis=0)
             self.dlam = abs(self.lam[1]-self.lam[0])
         elif scale == 'trapezoid':
             arin = cp(self.dyn) - np.mean(self.dyn)  # input array

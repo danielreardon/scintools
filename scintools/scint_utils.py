@@ -13,6 +13,7 @@ import numpy as np
 import os
 import csv
 from decimal import Decimal, InvalidOperation
+from scipy.optimize import fsolve
 
 
 def make_dynspec(archive, template):
@@ -167,30 +168,38 @@ def get_ssb_delay(mjds, raj, decj):
 def get_earth_velocity(mjds, raj, decj):
     """
     Calculates the component of Earth's velocity transverse to the line of
-    sight
+    sight, in RA and DEC
     """
 
     from astropy.time import Time
     from astropy.coordinates import get_body_barycentric_posvel, SkyCoord
     from astropy import units as u
+    from astropy.constants import au
 
     coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
-    psr_xyz = coord.cartesian.xyz.value
+    rarad = coord.ra.value * np.pi/180
+    decrad = coord.dec.value * np.pi/180
 
     vearth_ra = []
     vearth_dec = []
     for mjd in mjds:
         time = Time(mjd, format='mjd')
         pos_xyz, vel_xyz = get_body_barycentric_posvel('earth', time)
-        e_cross_p = np.cross(vel_xyz.xyz.value, psr_xyz)
-        #coord = SkyCoord(x=e_cross_p[0], y=e_cross_p[1], z=e_cross_p[2],
-        #                 representation_type='cartesian')
 
-        #vra = - Vx*sin(rarad) + Vy*cos(rarad);
-        #vdec = - Vx*sin(decrad)*cos(rarad) - \
-        #    Vy*sin(decrad)*sin(rarad) + Vz*cos(decrad)
+        vx = vel_xyz.x.value
+        vy = vel_xyz.y.value
+        vz = vel_xyz.z.value
 
-    return coord
+        vearth_ra.append(- vx * np.sin(rarad) + vy * np.cos(rarad))
+        vearth_dec.append(- vx * np.sin(decrad) * np.cos(rarad) -
+                          vy * np.sin(decrad) * np.sin(rarad) +
+                          vz * np.cos(decrad))
+
+    # Convert from AU/d to km/s
+    vearth_ra = vearth_ra * au/1e3/86400
+    vearth_dec = vearth_dec * au/1e3/86400
+
+    return vearth_ra.value.squeeze(), vearth_dec.value.squeeze()
 
 
 def read_par(parfile):
@@ -283,8 +292,6 @@ def get_true_anomaly(mjds, pars):
     dictionary
     """
 
-    from scipy.optimize import fsolve
-
     PB = pars['PB']
     T0 = pars['T0']
     ECC = pars['ECC']
@@ -294,16 +301,21 @@ def get_true_anomaly(mjds, pars):
 
     # mean anomaly
     M = nb*((mjds - T0) - 0.5*(PBDOT/PB) * (mjds - T0)**2)
+    M = M.squeeze()
 
     # eccentric anomaly
-    E = fsolve(lambda E: E - ECC*np.sin(E) - M, M)
+    if ECC < 1e-4:
+        print('Assuming circular orbit for true anomaly calculation')
+        E = M
+    else:
+        E = fsolve(lambda E: E - ECC*np.sin(E) - M, M)
 
     # true anomaly
     U = 2*np.arctan2(np.sqrt(1 + ECC) * np.sin(E/2),
                      np.sqrt(1 - ECC) * np.cos(E/2))  # true anomaly
     U[np.argwhere(U < 0)] = U[np.argwhere(U < 0)] + 2*np.pi
 
-    return U
+    return U.squeeze()
 
 
 # Potential future functions

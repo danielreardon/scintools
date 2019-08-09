@@ -23,6 +23,7 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 
 import numpy as np
+from decimal import Decimal
 
 
 def tau_acf_model(params, xdata, ydata, weights):
@@ -212,6 +213,10 @@ def fit_parabola(x, y):
     Fit a parabola and return the value and error for the peak
     """
 
+    # increase range to help fitter
+    ptp = np.ptp(x)
+    x = x*(1000/ptp)
+
     # Do the fit
     params, pcov = np.polyfit(x, y, 2, cov=True)
     yfit = params[0]*np.power(x, 2) + params[1]*x + params[2]  # y values
@@ -226,111 +231,167 @@ def fit_parabola(x, y):
     peak_error = np.sqrt((errors[1]**2)*((1/(2*params[0]))**2) +
                          (errors[0]**2)*((params[1]/2)**2))  # Error on peak
 
+    peak = peak*(ptp/1000)
+    peak_error = peak_error*(ptp/1000)
+
     return yfit, peak, peak_error
-#
-#
-#
-# def arc_curvature(params, xdata, ydata, weights, freqs, true_anomaly,
-#                  vearth_ra, vearth_dec):
-#    """
-#    arc curvature model
-#
-#        xdata: MJDs at barycentre
-#        ydata: arc curvature
-#    """
-#
-#    # Other parameters in lower-case
-#    d = params['d']  # pulsar distance in kpc
-#    s = params['s']  # fractional screen distance
-#    vism_ra = params['vism_ra']  # ism velocity in RA
-#    vism_dec = params['vism_dec']  # ism velocity in DEC
-#
-#    veff_ra, veff_dec = effective_velocity_annual(params, true_anomaly,
-#                                                  vearth_ra, vearth_dec)
-#
-#
-#    if 'vism_ra' in params.keys():
-#        vism_ra = params['vism_ra']
-#        vism_dec = params['vism_dec']
-#    else:
-#        vism_ra = 0
-#        vism_dec = 0
-#
-#    if 'psi' in params.keys():
-#        psi = params['psi']  # anisotropy angle
-#        vism_psi = params['vism_psi']  # anisotropy angle
-#        veff_ra = veff_ra - vism_psi * np.sin(psi)
-#        veff_dec = veff_dec - vism_psi * np.cos(psi)
-#        # angle between scattered image and velocity vector
-#        cosa = np.cos(psi - np.arctan2(veff_ra, veff_ dec)))
-#    else:
-#        veff_ra = veff_ra - vism_ra
-#        veff_dec = veff_dec - vism_dec
-#        cosa = 1
-#
-#    #Now calculate veff
-#    veff = np.sqrt(veffra**2 + veffdec**2)
-#
-#    # Calculate eta
-#    etamodel= D*x(1)*(1-x(1)).*lambda.^2./(2*v_c*veff**2 * cosa**2)
-#
-#    if weights is None:
-#        weights = np.ones(np.shape(ydata))
-#
-#    model = []
-#    return (ydata - model) * weights
-#
-#
-# """
-# Below: Models that do not return residuals for a fitter
-# """
-#
-#
-# def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
-#    """
-#    Effective velocity with annual and pulsar terms
-#        Note: Does NOT include IISM velocity, but returns veff in IISM frame
-#    """
-#
-#    # Define some constants
-#    v_c = 299792.458  # km/s
-#    kmpkpc = 3.085677581e16
-#    secperyr = 86400*365.2425
-#    masrad = np.pi/(3600*180*1000)
-#
-#    # tempo2 parameters from par file in capitals
-#    if 'PB' in params.keys():
-#        A1 = params['A1']  # projected semi-major axis in lt-s
-#        PB = params['PB']  # orbital period in days
-#        ECC = params['ECC']  # orbital eccentricity
-#        OM = params['OM']*np.pi/180  # longitude of periastron rad
-#        # Note: fifth Keplerian param T0 used in true anomaly calculation
-#
-#        # Calculate pulsar velocity aligned with the line of nodes (Vx) and
-#        #   perpendicular in the plane (Vy)
-#        vp_0 = (2 * np.pi * A1 * v_c) / (np.sin(KIN) * PB * 86400 *
-#                                         np.sqrt(1 - ECC**2))
-#        vp_x = -vp_0 * (ECC * np.sin(OM) + np.sin(true_anomaly + OM))
-#        vp_y = vp_0 * cos(KIN) * (ECC * cos(OM) + np.cos(true_anomaly + OM))
-#    else:
-#        vp_x = 0
-#        vp_y = 0
-#
-#    PMRA = params['PMRA']  # orbital eccentricity
-#    PMDEC = params['PMDEC']  # longitude of periastron
-#    # other parameters in lower-case
-#    s = params['s']  # fractional screen distance
-#    d = params['d']  # pulsar distance in kpc
-#    d = d * kmpkpc  # distance in km
-#    pmra_v = PMRA * masrad * d / secperyr
-#    pmdec_v = PMDEC * masrad * d / secperyr
-#
-#    # Rotate pulsar velocity into RA/DEC
-#    vp_ra = np.sin(KOM) * vp_x + np.cos(KOM) * vp_y
-#    vp_dec = np.cos(KOM) * vp_x - np.sin(KOM) * vp_y
-#
-#    # find total effective velocity in RA and DEC
-#    veff_ra = s * vearth_ra + (1 - s) * (vp_ra + pmra_v)
-#    veff_dec = s * vearth_dec + (1 - s) * (vp_dec + pmdec_v)
-#
-#    return veff_ra, veff_dec
+
+
+def fit_log_parabola(x, y):
+    """
+    Fit a log-parabola and return the value and error for the peak
+    """
+
+    # Take the log of x
+    logx = np.log(x)
+    ptp = np.ptp(logx)
+    x = logx*(1000/ptp)  # increase range to help fitter
+
+    # Do the fit
+    yfit, peak, peak_error = fit_parabola(x, y)
+    frac_error = peak_error/peak
+
+    peak = np.e**(peak*ptp/1000)
+    # Average the error asymmetries
+    peak_error = frac_error*peak
+
+    return yfit, peak, peak_error
+
+
+def arc_curvature(params, ydata, weights, true_anomaly,
+                  vearth_ra, vearth_dec):
+    """
+    arc curvature model
+
+        ydata: arc curvature
+    """
+
+    # ensure dimensionality of arrays makes sense
+    ydata = ydata.squeeze()
+    weights = weights.squeeze()
+    true_anomaly = true_anomaly.squeeze()
+    vearth_ra = vearth_ra.squeeze()
+    vearth_dec = vearth_dec.squeeze()
+
+    kmpkpc = 3.085677581e16
+
+    # Other parameters in lower-case
+    d = params['d']  # pulsar distance in kpc
+    d = d * kmpkpc  # kms
+    s = params['s']  # fractional screen distance
+    efac = params['efac']
+    equad = params['equad']
+
+    veff_ra, veff_dec = effective_velocity_annual(params, true_anomaly,
+                                                  vearth_ra, vearth_dec)
+
+    if 'vism_ra' in params.keys():
+        vism_ra = params['vism_ra']
+        vism_dec = params['vism_dec']
+    else:
+        vism_ra = 0
+        vism_dec = 0
+
+    if 'psi' in params.keys():
+        psi = params['psi']*np.pi/180  # anisotropy angle
+        vism_psi = params['vism_psi']  # anisotropy angle
+        veff_ra = veff_ra - vism_psi * np.sin(psi)
+        veff_dec = veff_dec - vism_psi * np.cos(psi)
+        # angle between scattered image and velocity vector
+        cosa = np.cos(psi - np.arctan2(veff_ra, veff_dec))
+    else:
+        veff_ra = veff_ra - vism_ra
+        veff_dec = veff_dec - vism_dec
+        cosa = 1
+
+    # Now calculate veff
+    veff = np.sqrt(veff_ra**2 + veff_dec**2)
+
+    # print(vism_ra, vism_dec)
+
+    # Calculate curvature model
+    model = d * s * (1 - s)/(2 * veff**2 * cosa**2)  # in 1/(km * Hz**2)
+    # Convert to 1/(m * mHz**2) for beta in 1/m and fdop in mHz
+    model = model/1e9
+
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+
+    # add efacs and equads
+    error = 1/weights
+    error = np.sqrt((efac*error)**2 + equad**2)
+    weights = 1/error
+
+    if efac.vary or equad.vary:
+        # Force reduced chi-squared value = 1
+        resid = (ydata - model) * weights
+        chisqr = np.sum(resid**2)
+        red_chisqr = chisqr/(len(ydata) - 4)
+        resid = abs(red_chisqr - 1) + 1
+    else:
+        resid = (ydata - model) * weights
+
+    return resid
+
+
+"""
+Below: Models that do not return residuals for a fitter
+"""
+
+
+def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
+    """
+    Effective velocity with annual and pulsar terms
+        Note: Does NOT include IISM velocity, but returns veff in IISM frame
+    """
+    # Define some constants
+    v_c = 299792.458  # km/s
+    kmpkpc = 3.085677581e16
+    secperyr = 86400*365.2425
+    masrad = np.pi/(3600*180*1000)
+
+    # tempo2 parameters from par file in capitals
+    if 'PB' in params.keys():
+        A1 = params['A1']  # projected semi-major axis in lt-s
+        PB = params['PB']  # orbital period in days
+        ECC = params['ECC']  # orbital eccentricity
+        OM = params['OM']*np.pi/180  # longitude of periastron rad
+        # Note: fifth Keplerian param T0 used in true anomaly calculation
+        KIN = params['KIN']*np.pi/180  # inclination
+        KOM = params['KOM']*np.pi/180  # longitude ascending node
+
+        # Calculate pulsar velocity aligned with the line of nodes (Vx) and
+        #   perpendicular in the plane (Vy)
+        vp_0 = (2 * np.pi * A1 * v_c) / (np.sin(KIN) * PB * 86400 *
+                                         np.sqrt(1 - ECC**2))
+        vp_x = -vp_0 * (ECC * np.sin(OM) + np.sin(true_anomaly + OM))
+        vp_y = vp_0 * np.cos(KIN) * (ECC * np.cos(OM) + np.cos(true_anomaly
+                                                               + OM))
+    else:
+        vp_x = 0
+        vp_y = 0
+
+    if 'PMRA' in params.keys():
+        PMRA = params['PMRA']  # proper motion in RA
+        PMDEC = params['PMDEC']  # proper motion in DEC
+    else:
+        PMRA = 0
+        PMDEC = 0
+
+    # other parameters in lower-case
+    s = params['s']  # fractional screen distance
+    d = params['d']  # pulsar distance in kpc
+    d = d * kmpkpc  # distance in km
+
+    pmra_v = PMRA * masrad * d / secperyr
+    pmdec_v = PMDEC * masrad * d / secperyr
+
+    # Rotate pulsar velocity into RA/DEC
+    vp_ra = np.sin(KOM) * vp_x + np.cos(KOM) * vp_y
+    vp_dec = np.cos(KOM) * vp_x - np.sin(KOM) * vp_y
+
+    # find total effective velocity in RA and DEC
+    veff_ra = s * vearth_ra + (1 - s) * (vp_ra + pmra_v)
+    veff_dec = s * vearth_dec + (1 - s) * (vp_dec + pmdec_v)
+
+    return veff_ra, veff_dec
