@@ -279,8 +279,6 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     d = params['d']  # pulsar distance in kpc
     d = d * kmpkpc  # kms
     s = params['s']  # fractional screen distance
-    efac = params['efac']
-    equad = params['equad']
 
     veff_ra, veff_dec = effective_velocity_annual(params, true_anomaly,
                                                   vearth_ra, vearth_dec)
@@ -317,21 +315,7 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     if weights is None:
         weights = np.ones(np.shape(ydata))
 
-    # add efacs and equads
-    error = 1/weights
-    error = np.sqrt((efac*error)**2 + equad**2)
-    weights = 1/error
-
-    if efac.vary or equad.vary:
-        # Force reduced chi-squared value = 1
-        resid = (ydata - model) * weights
-        chisqr = np.sum(resid**2)
-        red_chisqr = chisqr/(len(ydata) - 4)
-        resid = abs(red_chisqr - 1) + 1
-    else:
-        resid = (ydata - model) * weights
-
-    return resid
+    return (ydata - model) * weights
 
 
 """

@@ -25,10 +25,11 @@ from scipy.interpolate import griddata
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
 
+
 class Dynspec:
 
     def __init__(self, filename=None, dyn=None, verbose=True, process=True,
-                 lamsteps=False, backup=True, axes=None):
+                 lamsteps=False):
         """"
         Initialise a dynamic spectrum object by either reading from file
             or from existing object
@@ -36,7 +37,7 @@ class Dynspec:
 
         if filename:
             self.load_file(filename, verbose=verbose, process=process,
-                           lamsteps=lamsteps, axes=axes)
+                           lamsteps=lamsteps)
         elif dyn:
             self.load_dyn_obj(dyn, verbose=verbose, process=process,
                               lamsteps=lamsteps)
@@ -95,8 +96,7 @@ class Dynspec:
 
         return Dynspec(dyn=newdyn, verbose=False, process=False)
 
-    def load_file(self, filename, verbose=True, process=True, lamsteps=False,
-                  axes=None):
+    def load_file(self, filename, verbose=True, process=True, lamsteps=False):
         """
         Load a dynamic spectrum from psrflux-format file
         """
@@ -361,6 +361,7 @@ class Dynspec:
         """
         Plots multiple figures in one
         """
+
         # Dynamic Spectrum
         plt.subplot(2, 2, dyn)
         self.plot_dyn(lamsteps=lamsteps)
@@ -368,7 +369,7 @@ class Dynspec:
 
         # Autocovariance Function
         plt.subplot(2, 2, acf)
-        self.plot_acf()
+        self.plot_acf(subplot=True)
         plt.title("Autocovariance")
 
         # Secondary Spectrum
@@ -388,8 +389,8 @@ class Dynspec:
         else:
             plt.show()
 
-    def fit_arc(self, method='norm_sspec', asymm=False, plot=False, delmax=None,
-                numsteps=1e3, startbin=9, cutmid=9, lamsteps=True,
+    def fit_arc(self, method='norm_sspec', asymm=False, plot=False,
+                delmax=None, numsteps=1e3, startbin=1, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
                 high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf]):
         """
@@ -501,9 +502,9 @@ class Dynspec:
             sumpow = np.array(sumpow)[indicies]
             sumpowL = np.array(sumpowL)[indicies]
             sumpowR = np.array(sumpowR)[indicies]
-            sumpow_filt = savgol_filter(sumpow, 2*round(numsteps/100)+1, 1)
-            sumpowL_filt = savgol_filter(sumpowL, 2*round(numsteps/100)+1, 1)
-            sumpowR_filt = savgol_filter(sumpowR, 2*round(numsteps/100)+1, 1)
+            sumpow_filt = savgol_filter(sumpow, 2*round(numsteps/20)+1, 1)
+            sumpowL_filt = savgol_filter(sumpowL, 2*round(numsteps/20)+1, 1)
+            sumpowR_filt = savgol_filter(sumpowR, 2*round(numsteps/20)+1, 1)
 
             indrange = np.argwhere((etaArray > constraint[0]) *
                                    (etaArray < constraint[1]))
@@ -574,12 +575,11 @@ class Dynspec:
         elif method == 'norm_sspec':
             # Get the normalised secondary spectrum, set for minimum eta as
             #   normalisation. Then calculate peak as
-            norm_sspec = \
-                self.norm_sspec(eta=etamin, delmax=delmax, plot=False,
-                                startbin=startbin, maxnormfac=1, cutmid=cutmid,
-                                lamsteps=lamsteps, scrunched=True,
-                                plot_fit=False, numsteps=numsteps)
-            norm_sspec = norm_sspec.squeeze()
+            self.norm_sspec(eta=etamin, delmax=delmax, plot=False,
+                            startbin=startbin, maxnormfac=1, cutmid=cutmid,
+                            lamsteps=lamsteps, scrunched=True,
+                            plot_fit=False, numsteps=numsteps)
+            norm_sspec = self.normsspecavg.squeeze()
             etafrac_array = np.linspace(-1, 1, len(norm_sspec))
             ind1 = np.argwhere(etafrac_array > 1/(2*len(norm_sspec)))
             ind2 = np.argwhere(etafrac_array < -1/(2*len(norm_sspec)))
@@ -661,8 +661,8 @@ class Dynspec:
             self.eta = eta
             self.etaerr = etaerr
 
-    def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=9,
-                   maxnormfac=2, cutmid=2, lamsteps=False, scrunched=True,
+    def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
+                   maxnormfac=2, cutmid=3, lamsteps=False, scrunched=True,
                    plot_fit=True, ref_freq=1400, numsteps=None):
         """
         Normalise fdop axis using arc curvature
@@ -741,6 +741,7 @@ class Dynspec:
                 plt.xlim(-maxnormfac, maxnormfac)
                 plt.show()
 
+            plt.figure()
             plt.pcolormesh(fdopnew, tdel, normSspec)
             if lamsteps:
                 plt.ylabel('Beta (m$^{-1}$)')
@@ -754,9 +755,10 @@ class Dynspec:
             plt.ylim(bottom, top)
             plt.colorbar()
             plt.show()
+
         self.normsspecavg = isspecavg
         self.normsspec = np.array(normSspec)
-        return isspecavg
+        return
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False):
@@ -787,7 +789,7 @@ class Dynspec:
             scint_model = scint_sspec_model
             arr = cp(self.acf)
             arr = np.fft.ifftshift(arr)
-            sspec = np.fft.fft2(arr)
+            # sspec = np.fft.fft2(arr)
 
         # concatenate x and y arrays
         xdata = np.array(np.concatenate((xdata_t, xdata_f)))
@@ -1046,7 +1048,8 @@ class Dynspec:
             self.dyn = dyn
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
-                   input_dyn=None, input_x=None, input_y=None, trap=False):
+                   input_dyn=None, input_x=None, input_y=None, trap=False,
+                   window='hamming', trapwindow=False):
         """
         Calculate secondary spectrum
         """
@@ -1067,11 +1070,32 @@ class Dynspec:
 
         nf = np.shape(dyn)[0]
         nt = np.shape(dyn)[1]
+        dyn = dyn - np.mean(dyn)  # subtract mean
+
+        if window is not None:
+            # Window the dynamic spectrum
+            if window == 'hanning':
+                chan_window = np.hanning(nt)
+                subint_window = np.hanning(nf)
+            elif window == 'hamming':
+                chan_window = np.hamming(nt)
+                subint_window = np.hamming(nf)
+            elif window == 'blackman':
+                chan_window = np.blackman(nt)
+                subint_window = np.blackman(nf)
+            elif window == 'bartlett':
+                chan_window = np.bartlett(nt)
+                subint_window = np.bartlett(nf)
+            else:
+                print('Window unknown.. Please add it!')
+            dyn = np.multiply(chan_window, dyn)
+            dyn = np.transpose(np.multiply(subint_window,
+                                           np.transpose(dyn)))
+
         # find the right fft lengths for rows and columns
         nrfft = int(2**(np.ceil(np.log2(nf))+1))
         ncfft = int(2**(np.ceil(np.log2(nt))+1))
 
-        dyn = dyn - np.mean(dyn)  # subtract mean
         if prewhite:
             simpw = convolve2d([[1, -1], [-1, 1]], dyn, mode='valid')
         else:
@@ -1306,8 +1330,7 @@ class BasicDyn():
 
 class MatlabDyn():
     """
-    Imports dynamic spectra in Bill Coles format, including simulated
-        dynamic spectra produced with code from Coles et al. (2010)
+    Imports simulated dynamic spectra from Matlab code by Coles et al. (2010)
     """
 
     def __init__(self, matfilename):
@@ -1340,6 +1363,42 @@ class MatlabDyn():
         self.tobs = float(self.times[-1] - self.times[0])
         self.mjd = 50000.0  # dummy.. Not needed
         self.dyn = np.transpose(self.dyn)
+
+        return Dynspec(dyn=self)
+
+
+class SimDyn():
+    """
+    Imports Simulation() object from scint_sim to Dynspec class
+    """
+
+    def __init__(self, sim, freq=1400, dt=0.5, mjd=50000):
+
+        self.name =\
+            'sim:mb2={0},ar={1},psi={2},dlam={3}'.format(sim.mb2, sim.ar,
+                                                         sim.psi, sim.dlam)
+        if sim.lamsteps:
+            self.name += ',lamsteps'
+
+        self.header = self.name
+        self.dyn = sim.spi
+        dlam = sim.dlam
+
+        self.dt = dt
+        self.freq = freq
+        self.nsub = int(np.shape(self.dyn)[0])
+        self.nchan = int(np.shape(self.dyn)[1])
+        lams = np.linspace(1, 1+dlam, self.nchan)
+        freqs = np.divide(1, lams)
+        self.freqs = self.freq*np.linspace(np.min(freqs), np.max(freqs),
+                                           self.nchan)
+        self.bw = max(self.freqs) - min(self.freqs)
+        self.times = self.dt*np.arange(0, self.nsub)
+        self.df = self.bw/self.nchan
+        self.tobs = float(self.times[-1] - self.times[0])
+        self.mjd = mjd
+        self.dyn = np.transpose(self.dyn)
+        return
 
 
 def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
