@@ -214,8 +214,8 @@ class Dynspec:
         medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(
                                                       is_valid(dyn)) > 0)])
         std = np.std(dyn[is_valid(dyn)])  # standard deviation
-        vmin = medval-5*std
-        vmax = medval+5*std
+        vmin = medval-4*std
+        vmax = medval+4*std
         if input_dyn is None:
             if lamsteps:
                 plt.pcolormesh(self.times/60, self.lam, dyn,
@@ -392,7 +392,8 @@ class Dynspec:
     def fit_arc(self, method='norm_sspec', asymm=False, plot=False,
                 delmax=None, numsteps=1e3, startbin=1, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
-                high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf]):
+                high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
+                nsmooth=15):
         """
         Find the arc curvature with maximum power along it
 
@@ -502,9 +503,9 @@ class Dynspec:
             sumpow = np.array(sumpow)[indicies]
             sumpowL = np.array(sumpowL)[indicies]
             sumpowR = np.array(sumpowR)[indicies]
-            sumpow_filt = savgol_filter(sumpow, 2*round(numsteps/20)+1, 1)
-            sumpowL_filt = savgol_filter(sumpowL, 2*round(numsteps/20)+1, 1)
-            sumpowR_filt = savgol_filter(sumpowR, 2*round(numsteps/20)+1, 1)
+            sumpow_filt = savgol_filter(sumpow, nsmooth, 1)
+            sumpowL_filt = savgol_filter(sumpowL, nsmooth, 1)
+            sumpowR_filt = savgol_filter(sumpowR, nsmooth, 1)
 
             indrange = np.argwhere((etaArray > constraint[0]) *
                                    (etaArray < constraint[1]))
@@ -540,6 +541,8 @@ class Dynspec:
             # Do the fit
             # yfit, eta, etaerr = fit_parabola(xdata, ydata)
             yfit, eta, etaerr = fit_log_parabola(xdata, ydata)
+            if np.mean(np.gradient(np.diff(yfit))) > 0:
+                raise ValueError('Fit returned a forward parabola.')
             eta = eta
             etaerr = etaerr
 
@@ -600,9 +603,8 @@ class Dynspec:
             norm_sspec_avg = norm_sspec_avg[ind].squeeze()
 
             # Smooth data
-            window = 2*round(len(norm_sspec_avg)/200)+3
             norm_sspec_avg_filt = \
-                savgol_filter(norm_sspec_avg, window, 1)
+                savgol_filter(norm_sspec_avg, nsmooth, 1)
 
             # search for peaks within constraint range
             indrange = np.argwhere((etaArray > constraint[0]) *
@@ -634,6 +636,8 @@ class Dynspec:
             # Do the fit
             # yfit, eta, etaerr = fit_parabola(xdata, ydata)
             yfit, eta, etaerr = fit_parabola(xdata, ydata)
+            if np.mean(np.gradient(np.diff(yfit))) > 0:
+                raise ValueError('Fit returned a forward parabola.')
             eta = eta
             etaerr = etaerr
 
@@ -644,12 +648,12 @@ class Dynspec:
                 plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                             facecolor='g', alpha=0.5)
                 plt.xscale('log')
-                plt.show()
                 if lamsteps:
                     plt.xlabel('eta (beta)')
                 else:
                     plt.xlabel('eta (tdel)')
                 plt.ylabel('Mean power (dB)')
+                plt.show()
         else:
             raise ValueError('Unknown arc fitting method. Please choose \
                              from gidmax or norm_sspec')
@@ -693,6 +697,12 @@ class Dynspec:
                 eta = self.betaeta
             else:
                 eta = self.eta
+        else:  # convert to beta
+            if not lamsteps:
+                c = 299792458.0  # m/s
+                beta_to_eta = c*1e6/((ref_freq*10**6)**2)
+                eta = eta/(self.freq/ref_freq)**2  # correct for frequency
+                eta = eta*beta_to_eta
 
         ind = np.argmin(abs(self.tdel-delmax))
         sspec = sspec[startbin:ind, :]  # cut first N delay bins and at delmax
@@ -1049,7 +1059,7 @@ class Dynspec:
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
                    input_dyn=None, input_x=None, input_y=None, trap=False,
-                   window='hamming', trapwindow=False):
+                   window='hamming', window_frac=0.2):
         """
         Calculate secondary spectrum
         """
@@ -1075,19 +1085,23 @@ class Dynspec:
         if window is not None:
             # Window the dynamic spectrum
             if window == 'hanning':
-                chan_window = np.hanning(nt)
-                subint_window = np.hanning(nf)
+                cw = np.hanning(np.floor(window_frac*nt))
+                sw = np.hanning(np.floor(window_frac*nf))
             elif window == 'hamming':
-                chan_window = np.hamming(nt)
-                subint_window = np.hamming(nf)
+                cw = np.hamming(np.floor(window_frac*nt))
+                sw = np.hamming(np.floor(window_frac*nf))
             elif window == 'blackman':
-                chan_window = np.blackman(nt)
-                subint_window = np.blackman(nf)
+                cw = np.blackman(np.floor(window_frac*nt))
+                sw = np.blackman(np.floor(window_frac*nf))
             elif window == 'bartlett':
-                chan_window = np.bartlett(nt)
-                subint_window = np.bartlett(nf)
+                cw = np.bartlett(np.floor(window_frac*nt))
+                sw = np.bartlett(np.floor(window_frac*nf))
             else:
                 print('Window unknown.. Please add it!')
+            chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
+                                    np.ones([nt-len(cw)]))
+            subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
+                                      np.ones([nf-len(sw)]))
             dyn = np.multiply(chan_window, dyn)
             dyn = np.transpose(np.multiply(subint_window,
                                            np.transpose(dyn)))
@@ -1095,7 +1109,7 @@ class Dynspec:
         # find the right fft lengths for rows and columns
         nrfft = int(2**(np.ceil(np.log2(nf))+1))
         ncfft = int(2**(np.ceil(np.log2(nt))+1))
-
+        dyn = dyn - np.mean(dyn)  # subtract mean
         if prewhite:
             simpw = convolve2d([[1, -1], [-1, 1]], dyn, mode='valid')
         else:
@@ -1454,6 +1468,7 @@ def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
         dyn.refill()  # linearly interpolate zero values
         dyn.correct_band(time=True)  # correct for bandpass and gain variation
         dyn.calc_sspec()  # calculate secondary spectrum
+        # report error and proceed
         if np.isnan(dyn.sspec).all():  # skip if secondary spectrum is all nan
             bad_files.write("{0}\t sspec_isnan\n".format(dynfile))
             continue
