@@ -267,11 +267,12 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     """
 
     # ensure dimensionality of arrays makes sense
-    ydata = ydata.squeeze()
-    weights = weights.squeeze()
-    true_anomaly = true_anomaly.squeeze()
-    vearth_ra = vearth_ra.squeeze()
-    vearth_dec = vearth_dec.squeeze()
+    if hasattr(ydata,  "__len__"):
+        ydata = ydata.squeeze()
+        weights = weights.squeeze()
+        true_anomaly = true_anomaly.squeeze()
+        vearth_ra = vearth_ra.squeeze()
+        vearth_dec = vearth_dec.squeeze()
 
     kmpkpc = 3.085677581e16
 
@@ -292,23 +293,26 @@ def arc_curvature(params, ydata, weights, true_anomaly,
 
     if 'psi' in params.keys():
         psi = params['psi']*np.pi/180  # anisotropy angle
-        vism_psi = params['vism_psi']  # anisotropy angle
+        vism_psi = params['vism_psi']  # vism in direction of anisotropy
         veff_ra = veff_ra - vism_psi * np.sin(psi)
         veff_dec = veff_dec - vism_psi * np.cos(psi)
-        # angle between scattered image and velocity vector
-        cosa = np.cos(psi - np.arctan2(veff_ra, veff_dec))
+        # squared angle between scattered image and velocity vector
+        cosa2 = np.cos(psi - np.arctan2(veff_ra, veff_dec))**2
     else:
         veff_ra = veff_ra - vism_ra
         veff_dec = veff_dec - vism_dec
-        cosa = 1
+        cosa2 = 1
 
     # Now calculate veff
     veff = np.sqrt(veff_ra**2 + veff_dec**2)
 
-    # print(vism_ra, vism_dec)
+    if 'scale' in params.keys():
+        scale = params['scale']
+    else:
+        scale = 1
 
     # Calculate curvature model
-    model = d * s * (1 - s)/(2 * veff**2 * cosa**2)  # in 1/(km * Hz**2)
+    model = scale * d * s * (1 - s)/(2 * veff**2 * cosa2)  # in 1/(km * Hz**2)
     # Convert to 1/(m * mHz**2) for beta in 1/m and fdop in mHz
     model = model/1e9
 

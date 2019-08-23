@@ -313,9 +313,13 @@ def get_true_anomaly(mjds, pars):
     # true anomaly
     U = 2*np.arctan2(np.sqrt(1 + ECC) * np.sin(E/2),
                      np.sqrt(1 - ECC) * np.cos(E/2))  # true anomaly
-    U[np.argwhere(U < 0)] = U[np.argwhere(U < 0)] + 2*np.pi
+    if hasattr(U,  "__len__"):
+        U[np.argwhere(U < 0)] = U[np.argwhere(U < 0)] + 2*np.pi
+        U = U.squeeze()
+    elif U < 0:
+        U += 2*np.pi
 
-    return U.squeeze()
+    return U
 
 
 # Potential future functions

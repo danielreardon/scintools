@@ -126,7 +126,7 @@ class Dynspec:
         self.bw = round(self.bw + self.df, 2)  # correct bw
         self.nchan += 1  # correct nchan
         self.nsub = int(np.unique(rawdata[0])[-1]) + 1
-        self.tobs = self.times[-1]  # initial estimate of tobs
+        self.tobs = self.times[-1]+self.times[0]  # initial estimate of tobs
         self.dt = round(self.tobs/self.nsub)
         self.tobs = self.dt * self.nsub  # recalculated tobs
         # Now reshape flux arrays into a 2D matrix
@@ -393,7 +393,7 @@ class Dynspec:
                 delmax=None, numsteps=1e3, startbin=1, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
                 high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
-                nsmooth=15):
+                nsmooth=15, filename=None):
         """
         Find the arc curvature with maximum power along it
 
@@ -409,14 +409,14 @@ class Dynspec:
         if lamsteps:
             if not hasattr(self, 'lamsspec'):
                 self.calc_sspec(lamsteps=lamsteps)
-            sspec = cp(self.lamsspec)
+            sspec = np.array(cp(self.lamsspec))
             yaxis = cp(self.beta)
             ind = np.argmin(abs(self.tdel-delmax))
             ymax = self.beta[ind]  # cut beta at equivalent value to delmax
         else:
             if not hasattr(self, 'sspec'):
                 self.calc_sspec()
-            sspec = cp(self.sspec)
+            sspec = np.array(cp(self.sspec))
             yaxis = cp(self.tdel)
             ymax = delmax
 
@@ -435,13 +435,19 @@ class Dynspec:
             constraint = constraint/(self.freq/ref_freq)**2
             constraint = constraint*beta_to_eta
 
+        nr, nc = np.shape(sspec)
+        # Estimate noise in secondary spectrum
+        a = np.array(sspec[int(nr/2):,
+                           int(nc/2 + np.ceil(cutmid/2)):].ravel())
+        b = np.array(sspec[int(nr/2):,0:int(nc/2 - np.floor(cutmid/2))].ravel())
+        noise = np.std(np.concatenate((a, b)))
+
         # Adjust secondary spectrum
         ind = np.argmin(abs(self.tdel-delmax))
         sspec[0:startbin, :] = np.nan  # mask first N delay bins
-        nr, nc = np.shape(sspec)
         # mask middle N Doppler bins
         sspec[:, int(nc/2 - np.floor(cutmid/2)):int(nc/2 +
-              np.floor(cutmid/2))] = np.nan
+              np.ceil(cutmid/2))] = np.nan
         sspec = sspec[0:ind, :]  # cut at delmax
         yaxis = yaxis[0:ind]
         # At 1mHz for 1400MHz obs, the maximum arc terminates at delmax
@@ -458,6 +464,9 @@ class Dynspec:
         sumpowL = []
         sumpowR = []
         etaArray = []
+
+        # noise of mean out to delmax
+        noise = np.sqrt(np.sum(np.power(noise, 2)))/len(y[startbin:])
 
         if method == 'gridmax':
             for ii in range(0, len(sqrt_eta)):
@@ -544,7 +553,23 @@ class Dynspec:
             if np.mean(np.gradient(np.diff(yfit))) > 0:
                 raise ValueError('Fit returned a forward parabola.')
             eta = eta
-            etaerr = etaerr
+            etaerr2 = etaerr
+
+            # Now get error from the noise in secondary spectra instead
+            power = max_power
+            ind1 = 1
+            while (power > max_power - noise and
+                   ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
+                ind1 += 1
+                power = norm_sspec_avg_filt[ind - ind1]
+            power = max_power
+            ind2 = 1
+            while (power > max_power - noise and
+                   ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
+                ind2 += 1
+                power = norm_sspec_avg_filt[ind + ind2]
+
+            etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
             # Now plot
             if plot:
@@ -555,6 +580,7 @@ class Dynspec:
                     bottom, top = plt.ylim()
                     plt.plot([etaL, etaL], [bottom, top])
                     plt.ylabel('mean power (db)')
+                    plt.xscale('log')
                     plt.subplot(2, 1, 2)
                     plt.plot(etaArray, sumpowR)
                     plt.plot(etaArray, sumpowR_filt)
@@ -639,7 +665,23 @@ class Dynspec:
             if np.mean(np.gradient(np.diff(yfit))) > 0:
                 raise ValueError('Fit returned a forward parabola.')
             eta = eta
-            etaerr = etaerr
+            etaerr2 = etaerr  # error from parabola fit
+
+            # Now get error from the noise in secondary spectra instead
+            power = max_power
+            ind1 = 1
+            while (power > max_power - noise and
+                   ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
+                ind1 += 1
+                power = norm_sspec_avg_filt[ind - ind1]
+            power = max_power
+            ind2 = 1
+            while (power > max_power - noise and
+                   ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
+                ind2 += 1
+                power = norm_sspec_avg_filt[ind + ind2]
+
+            etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
             if plot:
                 plt.plot(etaArray, norm_sspec_avg)
@@ -653,7 +695,10 @@ class Dynspec:
                 else:
                     plt.xlabel('eta (tdel)')
                 plt.ylabel('Mean power (dB)')
+                if filename is not None:
+                    plt.savefig(filename, figsize=(6, 6), dpi=150)
                 plt.show()
+                plt.close()
         else:
             raise ValueError('Unknown arc fitting method. Please choose \
                              from gidmax or norm_sspec')
@@ -661,9 +706,11 @@ class Dynspec:
         if lamsteps:
             self.betaeta = eta
             self.betaetaerr = etaerr
+            self.betaetaerr2 = etaerr2
         else:
             self.eta = eta
             self.etaerr = etaerr
+            self.etaerr2 = etaerr2
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=2, cutmid=3, lamsteps=False, scrunched=True,
