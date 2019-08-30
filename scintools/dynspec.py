@@ -197,7 +197,7 @@ class Dynspec:
         """
         Plot the dynamic spectrum
         """
-
+        plt.figure(1, figsize=(12, 6))
         if input_dyn is None:
             if lamsteps:
                 if not hasattr(self, 'lamdyn'):
@@ -347,7 +347,7 @@ class Dynspec:
             plt.ylim(bottom, top)
             plt.colorbar()
         else:
-            plt.pcolormesh(input_x, input_y, sspec, vmin=vmin, vmax=vmax)
+            plt.pcolormesh(xplot, input_y, sspec, vmin=vmin, vmax=vmax)
             plt.colorbar()
 
         if filename is not None:
@@ -559,15 +559,15 @@ class Dynspec:
             power = max_power
             ind1 = 1
             while (power > max_power - noise and
-                   ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
+                   ind + ind1 < len(sumpow_filt)-1):  # -3db
                 ind1 += 1
-                power = norm_sspec_avg_filt[ind - ind1]
+                power = sumpow_filt[ind - ind1]
             power = max_power
             ind2 = 1
             while (power > max_power - noise and
-                   ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
+                   ind + ind2 < len(sumpow_filt)-1):  # -1db power
                 ind2 += 1
-                power = norm_sspec_avg_filt[ind + ind2]
+                power = sumpow_filt[ind + ind2]
 
             etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
@@ -658,6 +658,7 @@ class Dynspec:
             # Now select this region of data for fitting
             xdata = etaArray[int(ind-ind1):int(ind+ind2)]
             ydata = norm_sspec_avg[int(ind-ind1):int(ind+ind2)]
+
 
             # Do the fit
             # yfit, eta, etaerr = fit_parabola(xdata, ydata)
@@ -923,7 +924,7 @@ class Dynspec:
         return
 
     def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None,
-                lamsteps=False):
+                lamsteps=False, maxfdop=np.inf, figsize=(8, 13)):
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
                 fcuts+1 segments in frequency
@@ -956,7 +957,7 @@ class Dynspec:
                     = self.calc_acf(input_dyn=cutdyn[int(ii)][int(jj)][:][:])
                 if plot:
                     # Plot dynamic spectra
-                    plt.figure(1)
+                    plt.figure(1, figsize=figsize)
                     plt.subplot(fcuts+1, tcuts+1, plotnum)
                     self.plot_dyn(input_dyn=cutdyn[int(ii)][int(jj)][:][:],
                                   input_x=input_dyn_x/60, input_y=input_dyn_y)
@@ -964,7 +965,7 @@ class Dynspec:
                     plt.ylabel('f (MHz)')
 
                     # Plot acf
-                    plt.figure(2)
+                    plt.figure(2, figsize=figsize)
                     plt.subplot(fcuts+1, tcuts+1, plotnum)
                     self.plot_acf(input_acf=cutacf[int(ii)][int(jj)][:][:],
                                   input_t=input_dyn_x,
@@ -973,17 +974,18 @@ class Dynspec:
                     plt.ylabel('f lag ')
 
                     # Plot secondary spectra
-                    plt.figure(3)
+                    plt.figure(3, figsize=figsize)
                     plt.subplot(fcuts+1, tcuts+1, plotnum)
                     self.plot_sspec(input_sspec=cutsspec[int(ii)]
                                                         [int(jj)][:][:],
                                     input_x=input_sspec_x,
-                                    input_y=input_sspec_y, lamsteps=lamsteps)
-                    plt.xlabel('fdop (mHz)')
+                                    input_y=input_sspec_y, lamsteps=lamsteps,
+                                    maxfdop=maxfdop)
+                    plt.xlabel(r'$f_t$ (mHz)')
                     if lamsteps:
-                        plt.ylabel('beta')
+                        plt.ylabel(r'$f_\nu$ (m$^{-1}$)')
                     else:
-                        plt.ylabel('tdel (us)')
+                        plt.ylabel(r'$f_\nu$ ($\mu$s)')
                     plotnum += 1
         if plot:
             plt.figure(1)
@@ -1309,16 +1311,17 @@ class Dynspec:
             flam = np.divide(1, lam)  # full array of equal frequency samples
             # we can use linear interpolation provided fbw < 33%
             arout = np.zeros([len(lam), int(nt)])
-            if fbw <= 1/3:
-                for it in range(0, nt):
-                    arout[:, it] = np.interp(flam, feq, arin[:, it])
-            else:
-                raise ValueError('for fbw > 0.33 need lsq interpolation')
-                return
-            self.lamdyn = np.flipud(arout)
             # maximum lambda is minimum freq
             self.lam = np.flip(lam*sc.c/np.min(self.freqs*1e6), axis=0)
             self.dlam = abs(self.lam[1]-self.lam[0])
+            if fbw <= 1/3:
+                for it in range(0, nt):
+                    arout[:, it] = np.interp(flam, feq, arin[:, it])
+                self.lamdyn = np.flipud(arout)
+            else:
+                print('for fbw > 0.33 need lsq interpolation')
+                return
+            return
         elif scale == 'trapezoid':
             arin = cp(self.dyn) - np.mean(self.dyn)  # input array
             nf, nt = np.shape(arin)
@@ -1425,7 +1428,7 @@ class MatlabDyn():
         self.mjd = 50000.0  # dummy.. Not needed
         self.dyn = np.transpose(self.dyn)
 
-        return Dynspec(dyn=self)
+        return
 
 
 class SimDyn():
