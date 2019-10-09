@@ -291,28 +291,15 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         vism_ra = 0
         vism_dec = 0
 
-    if 'psi' in params.keys():
+    if 'psi' in params.keys():  # anisotropic case
         psi = params['psi']*np.pi/180  # anisotropy angle
         vism_psi = params['vism_psi']  # vism in direction of anisotropy
-        veff_ra = veff_ra - vism_psi * np.sin(psi)
-        veff_dec = veff_dec - vism_psi * np.cos(psi)
-        # squared angle between scattered image and velocity vector
-        cosa2 = np.cos(psi - np.arctan2(veff_ra, veff_dec))**2
-    else:
-        veff_ra = veff_ra - vism_ra
-        veff_dec = veff_dec - vism_dec
-        cosa2 = 1
-
-    # Now calculate veff
-    veff = np.sqrt(veff_ra**2 + veff_dec**2)
-
-    if 'scale' in params.keys():
-        scale = params['scale']
-    else:
-        scale = 1
+        veff2 = (veff_ra*np.sin(psi) + veff_dec*np.cos(psi) - vism_psi)**2
+    else:  # isotropic
+        veff2 = (veff_ra - vism_ra)**2 + (veff_dec - vism_dec)**2
 
     # Calculate curvature model
-    model = scale * d * s * (1 - s)/(2 * veff**2 * cosa2)  # in 1/(km * Hz**2)
+    model = d * s * (1 - s)/(2 * veff2)  # in 1/(km * Hz**2)
     # Convert to 1/(m * mHz**2) for beta in 1/m and fdop in mHz
     model = model/1e9
 

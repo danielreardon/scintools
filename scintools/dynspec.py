@@ -230,7 +230,7 @@ class Dynspec:
                                vmin=vmin, vmax=vmax)
                 plt.ylabel('Frequency (MHz)')
             plt.xlabel('Time (mins)')
-            plt.colorbar()
+            # plt.colorbar()  # arbitrary units
         else:
             plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax)
 
@@ -397,7 +397,7 @@ class Dynspec:
                 delmax=None, numsteps=1e3, startbin=1, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
                 high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
-                nsmooth=15, filename=None):
+                nsmooth=15, filename=None, noise_error=True):
         """
         Find the arc curvature with maximum power along it
 
@@ -443,7 +443,8 @@ class Dynspec:
         # Estimate noise in secondary spectrum
         a = np.array(sspec[int(nr/2):,
                            int(nc/2 + np.ceil(cutmid/2)):].ravel())
-        b = np.array(sspec[int(nr/2):,0:int(nc/2 - np.floor(cutmid/2))].ravel())
+        b = np.array(sspec[int(nr/2):, 0:int(nc/2 -
+                                             np.floor(cutmid/2))].ravel())
         noise = np.std(np.concatenate((a, b)))
 
         # Adjust secondary spectrum
@@ -557,23 +558,24 @@ class Dynspec:
             if np.mean(np.gradient(np.diff(yfit))) > 0:
                 raise ValueError('Fit returned a forward parabola.')
             eta = eta
-            etaerr2 = etaerr
 
-            # Now get error from the noise in secondary spectra instead
-            power = max_power
-            ind1 = 1
-            while (power > max_power - noise and
-                   ind + ind1 < len(sumpow_filt)-1):  # -3db
-                ind1 += 1
-                power = sumpow_filt[ind - ind1]
-            power = max_power
-            ind2 = 1
-            while (power > max_power - noise and
-                   ind + ind2 < len(sumpow_filt)-1):  # -1db power
-                ind2 += 1
-                power = sumpow_filt[ind + ind2]
+            if noise_error:
+                # Now get error from the noise in secondary spectra instead
+                etaerr2 = etaerr
+                power = max_power
+                ind1 = 1
+                while (power > max_power - noise and
+                       ind + ind1 < len(sumpow_filt)-1):  # -3db
+                    ind1 += 1
+                    power = sumpow_filt[ind - ind1]
+                power = max_power
+                ind2 = 1
+                while (power > max_power - noise and
+                       ind + ind2 < len(sumpow_filt)-1):  # -1db power
+                    ind2 += 1
+                    power = sumpow_filt[ind + ind2]
 
-            etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
+                etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
             # Now plot
             if plot:
@@ -663,30 +665,30 @@ class Dynspec:
             xdata = etaArray[int(ind-ind1):int(ind+ind2)]
             ydata = norm_sspec_avg[int(ind-ind1):int(ind+ind2)]
 
-
             # Do the fit
             # yfit, eta, etaerr = fit_parabola(xdata, ydata)
             yfit, eta, etaerr = fit_parabola(xdata, ydata)
             if np.mean(np.gradient(np.diff(yfit))) > 0:
                 raise ValueError('Fit returned a forward parabola.')
             eta = eta
-            etaerr2 = etaerr  # error from parabola fit
 
-            # Now get error from the noise in secondary spectra instead
-            power = max_power
-            ind1 = 1
-            while (power > max_power - noise and
-                   ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
-                ind1 += 1
-                power = norm_sspec_avg_filt[ind - ind1]
-            power = max_power
-            ind2 = 1
-            while (power > max_power - noise and
-                   ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
-                ind2 += 1
-                power = norm_sspec_avg_filt[ind + ind2]
+            if noise_error:
+                # Now get error from the noise in secondary spectra instead
+                etaerr2 = etaerr  # error from parabola fit
+                power = max_power
+                ind1 = 1
+                while (power > max_power - noise and
+                       ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
+                    ind1 += 1
+                    power = norm_sspec_avg_filt[ind - ind1]
+                power = max_power
+                ind2 = 1
+                while (power > max_power - noise and
+                       ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
+                    ind2 += 1
+                    power = norm_sspec_avg_filt[ind + ind2]
 
-            etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
+                etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
             if plot:
                 plt.plot(etaArray, norm_sspec_avg)
@@ -1116,7 +1118,7 @@ class Dynspec:
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
                    input_dyn=None, input_x=None, input_y=None, trap=False,
-                   window='hamming', window_frac=0.2):
+                   window='hamming', window_frac=0.1):
         """
         Calculate secondary spectrum
         """
