@@ -127,7 +127,11 @@ class Dynspec:
         self.nchan += 1  # correct nchan
         self.nsub = int(np.unique(rawdata[0])[-1]) + 1
         self.tobs = self.times[-1]+self.times[0]  # initial estimate of tobs
-        self.dt = round(self.tobs/self.nsub)
+        self.dt = self.tobs/self.nsub
+        if self.dt > 1:
+            self.dt = round(self.dt, 1)
+        else:
+            self.times = np.linspace(self.times[0], self.times[-1], self.nsub)
         self.tobs = self.dt * self.nsub  # recalculated tobs
         # Now reshape flux arrays into a 2D matrix
         self.freqs = np.unique(self.freqs)
@@ -237,14 +241,14 @@ class Dynspec:
             plt.show()
 
     def plot_acf(self, contour=False, filename=None, input_acf=None,
-                 input_t=None, input_f=None):
+                 input_t=None, input_f=None, fit=True):
         """
         Plot the ACF
         """
 
         if not hasattr(self, 'acf'):
             self.calc_acf()
-        if not hasattr(self, 'tau') and input_acf is None:
+        if not hasattr(self, 'tau') and input_acf is None and fit:
             self.get_scint_params()
         if input_acf is None:
             arr = self.acf
@@ -269,16 +273,17 @@ class Dynspec:
                 im = ax1.pcolormesh(t_delays, f_shifts, arr)
             ax1.set_ylabel('Frequency lag (MHz)')
             ax1.set_xlabel('Time lag (mins)')
-            ax2 = ax1.twinx()
             miny, maxy = ax1.get_ylim()
-            ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-            ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.
-                           format(round(self.dnu, 2)))
-            ax3 = ax1.twiny()
-            minx, maxx = ax1.get_xlim()
-            ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-            ax3.set_xlabel('Time lag / (tau_d = {0})'.format(round(
-                                                             self.tau/60, 2)))
+            if fit:
+                ax2 = ax1.twinx()
+                ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
+                ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.
+                               format(round(self.dnu, 2)))
+                ax3 = ax1.twiny()
+                minx, maxx = ax1.get_xlim()
+                ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
+                ax3.set_xlabel('Time lag / (tau_d = {0})'.format(round(
+                                                                 self.tau/60, 2)))
             fig.colorbar(im, pad=0.15)
             plt.show()
         else:  # just plot acf without scales
