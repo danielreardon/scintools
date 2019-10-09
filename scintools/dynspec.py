@@ -129,7 +129,7 @@ class Dynspec:
         self.tobs = self.times[-1]+self.times[0]  # initial estimate of tobs
         self.dt = self.tobs/self.nsub
         if self.dt > 1:
-            self.dt = round(self.dt, 1)
+            self.dt = round(self.dt)
         else:
             self.times = np.linspace(self.times[0], self.times[-1], self.nsub)
         self.tobs = self.dt * self.nsub  # recalculated tobs
@@ -285,7 +285,6 @@ class Dynspec:
                 ax3.set_xlabel('Time lag / (tau_d = {0})'.format(round(
                                                                  self.tau/60, 2)))
             fig.colorbar(im, pad=0.15)
-            plt.show()
         else:  # just plot acf without scales
             if contour:
                 plt.contourf(t_delays, f_shifts, arr)
@@ -1079,7 +1078,7 @@ class Dynspec:
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
 
-    def correct_band(self, frequency=True, time=False, lamsteps=False):
+    def correct_band(self, frequency=True, time=False, lamsteps=False, nsmooth=None):
         """
         Correct for the bandpass
         """
@@ -1096,8 +1095,12 @@ class Dynspec:
             self.bandpass = np.mean(dyn, axis=1)
             # Make sure there are no zeros
             self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
-            dyn = np.divide(dyn, np.reshape(self.bandpass,
-                                            [len(self.bandpass), 1]))
+            if nsmooth is not None:
+                bandpass = savgol_filter(self.bandpass, nsmooth, 1)
+            else:
+                bandpass = self.bandpass
+            dyn = np.divide(dyn, np.reshape(bandpass,
+                                            [len(bandpass), 1]))
 
         if time:
             timestructure = np.mean(dyn, axis=0)
