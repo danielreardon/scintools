@@ -21,9 +21,7 @@ A library of scintillation models to use with lmfit
 
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
-
 import numpy as np
-from decimal import Decimal
 
 
 def tau_acf_model(params, xdata, ydata, weights):
@@ -281,8 +279,9 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     d = d * kmpkpc  # kms
     s = params['s']  # fractional screen distance
 
-    veff_ra, veff_dec = effective_velocity_annual(params, true_anomaly,
-                                                  vearth_ra, vearth_dec)
+    veff_ra, veff_dec, vp_ra, vp_dec = \
+        effective_velocity_annual(params, true_anomaly,
+                                  vearth_ra, vearth_dec)
 
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
@@ -369,4 +368,4 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
     veff_ra = s * vearth_ra + (1 - s) * (vp_ra + pmra_v)
     veff_dec = s * vearth_dec + (1 - s) * (vp_dec + pmdec_v)
 
-    return veff_ra, veff_dec
+    return veff_ra, veff_dec, vp_ra, vp_dec
