@@ -460,9 +460,14 @@ class Dynspec:
         if etamin is None:
             etamin = (yaxis[1]-yaxis[0])*startbin/(max(self.fdop))**2
 
-        # Force to be arrays for iteration
-        etamin_array = np.array([etamin])
-        etamax_array = np.array([etamax])
+        try:
+            len(etamin)
+            etamin_array = np.array(etamin).squeeze()
+            etamax_array = np.array(etamax).squeeze()
+        except TypeError:
+            # Force to be arrays for iteration
+            etamin_array = np.array([etamin])
+            etamax_array = np.array([etamax])
 
         # At 1mHz for 1400MHz obs, the maximum arc terminates at delmax
         max_sqrt_eta = np.sqrt(np.max(etamax_array))
@@ -472,8 +477,8 @@ class Dynspec:
 
         for iarc in range(0, len(etamin_array)):
             if len(etamin_array) == 1:
-                etamin = etamin_array.squeeze()
-                etamax = etamax_array.squeeze()
+                etamin = etamin
+                etamax = etamax
             else:
                 etamin = etamin_array.squeeze()[iarc]
                 etamax = etamax_array.squeeze()[iarc]
