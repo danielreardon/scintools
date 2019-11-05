@@ -298,7 +298,7 @@ class Dynspec:
         if filename is not None:
             plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
             plt.close()
-        elif input_acf is None and siaply:
+        elif input_acf is None and display:
             plt.show()
 
     def plot_sspec(self, lamsteps=False, input_sspec=None, filename=None,
@@ -461,8 +461,8 @@ class Dynspec:
             etamin = (yaxis[1]-yaxis[0])*startbin/(max(self.fdop))**2
 
         # Force to be arrays for iteration
-        etamin_array = np.array([etamin]).squeeze()
-        etamax_array = np.array([etamax]).squeeze()
+        etamin_array = np.array([etamin])
+        etamax_array = np.array([etamax])
 
         # At 1mHz for 1400MHz obs, the maximum arc terminates at delmax
         max_sqrt_eta = np.sqrt(np.max(etamax_array))
@@ -471,8 +471,12 @@ class Dynspec:
         sqrt_eta_all = np.linspace(min_sqrt_eta, max_sqrt_eta, numsteps)
 
         for iarc in range(0, len(etamin_array)):
-            etamin = etamin_array[iarc]
-            etamax = etamax_array[iarc]
+            if len(etamin_array) == 1:
+                etamin = etamin_array.squeeze()
+                etamax = etamax_array.squeeze()
+            else:
+                etamin = etamin_array.squeeze()[iarc]
+                etamax = etamax_array.squeeze()[iarc]
 
             if not lamsteps:
                 c = 299792458.0  # m/s

@@ -1,4 +1,5 @@
 scintools/.DS_Store
+scintools/*.pyc
 scintools/__pycache__/*
 scintools/__pycache__
 scintools/examples/.ipynb_checkpoints/*
