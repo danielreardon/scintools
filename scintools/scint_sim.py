@@ -20,7 +20,7 @@ from numpy.fft import fft2, ifft2, fftshift, ifftshift
 class Simulation():
 
     def __init__(self, mb2=2, rf=1, ds=0.01, alpha=5/3, ar=1, psi=0,
-                 inner=0.001, ns=256, nf=256, dlam=0.3, lamsteps=False,
+                 inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
                  seed=None, nx=None, ny=None, dx=None, dy=None, plot=False,
                  verbose=False, freq=1400, dt=30, mjd=50000, nsub=None):
         """

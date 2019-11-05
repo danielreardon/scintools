@@ -345,7 +345,7 @@ class Dynspec:
             if lamsteps:
                 plt.pcolormesh(xplot, self.beta[:ind], sspec[:ind, :],
                                vmin=vmin, vmax=vmax)
-                plt.ylabel(r'$f_\nu$ (m$^{-1}$)')
+                plt.ylabel(r'$f_\lambda$ (m$^{-1}$)')
             else:
                 plt.pcolormesh(xplot, self.tdel[:ind], sspec[:ind, :],
                                vmin=vmin, vmax=vmax)
@@ -405,7 +405,7 @@ class Dynspec:
             plt.show()
 
     def fit_arc(self, method='norm_sspec', asymm=False, plot=False,
-                delmax=None, numsteps=1e3, startbin=1, cutmid=3, lamsteps=True,
+                delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
                 high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
                 nsmooth=15, filename=None, noise_error=True, display=True):
@@ -461,8 +461,8 @@ class Dynspec:
             etamin = (yaxis[1]-yaxis[0])*startbin/(max(self.fdop))**2
 
         # Force to be arrays for iteration
-        etamin_array = np.array([etamin])
-        etamax_array = np.array([etamax])
+        etamin_array = np.array([etamin]).squeeze()
+        etamax_array = np.array([etamax]).squeeze()
 
         # At 1mHz for 1400MHz obs, the maximum arc terminates at delmax
         max_sqrt_eta = np.sqrt(np.max(etamax_array))
@@ -602,7 +602,7 @@ class Dynspec:
                     etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
                 # Now plot
-                if plot and iarc==0:
+                if plot and iarc == 0:
                     if asymm:
                         plt.subplot(2, 1, 1)
                         plt.plot(etaArray, sumpowL)
@@ -624,7 +624,8 @@ class Dynspec:
                     plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                                 facecolor='C2', alpha=0.5)
                     if lamsteps:
-                        plt.xlabel(r'Arc curvature, $\eta$ (${\rm m}^{-1}\,{\rm mHz}^{-2}$)')
+                        plt.xlabel(r'Arc curvature, $\eta$ (${\rm m}^{-1}\,'
+                                   '{\rm mHz}^{-2}$)')
                     else:
                         plt.xlabel('eta (tdel)')
                     plt.ylabel('mean power (dB)')
@@ -633,7 +634,7 @@ class Dynspec:
                     plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                                 facecolor='C{0}'.format(str(int(3+iarc))),
                                 alpha=0.3)
-                if plot and iarc==len(etamin_array)-1:
+                if plot and iarc == len(etamin_array) - 1:
                     if filename is not None:
                         plt.savefig(filename, figsize=(6, 6), dpi=150,
                                     bbox_inches='tight', pad_inches=0.1)
@@ -660,7 +661,8 @@ class Dynspec:
                 # Make sure is valid
                 filt_ind = is_valid(norm_sspec_avg)
                 norm_sspec_avg = np.flip(norm_sspec_avg[filt_ind], axis=0)
-                etafrac_array_avg = np.flip(etafrac_array_avg[filt_ind], axis=0)
+                etafrac_array_avg = np.flip(etafrac_array_avg[filt_ind],
+                                            axis=0)
 
                 # Form eta array and cut at maximum
                 etaArray = etamin*etafrac_array_avg**2
@@ -718,7 +720,8 @@ class Dynspec:
                     power = max_power
                     ind2 = 1
                     while (power > max_power - noise and
-                           ind + ind2 < len(norm_sspec_avg_filt)-1):  # -1db power
+                           # -1db power
+                           ind + ind2 < len(norm_sspec_avg_filt)-1):
                         ind2 += 1
                         power = norm_sspec_avg_filt[ind + ind2]
 
@@ -767,7 +770,7 @@ class Dynspec:
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=2, cutmid=3, lamsteps=False, scrunched=True,
                    plot_fit=True, ref_freq=1400, numsteps=None, filename=None,
-                   display=True):
+                   display=True, unscrunched=True):
         """
         Normalise fdop axis using arc curvature
         """
@@ -853,7 +856,7 @@ class Dynspec:
                 if plot_fit:
                     plt.plot([1, 1], [bottom*0.9, top*1.1], 'r--', alpha=0.5)
                     plt.plot([-1, -1], [bottom*0.9, top*1.1], 'r--', alpha=0.5)
-                plt.ylim(bottom*0.9, top*1.1)
+                plt.ylim(bottom*0.9, top*1.1)  # always plot from zero!
                 plt.xlim(-maxnormfac, maxnormfac)
                 if filename is not None:
                     filename_name = filename.split('.')[0]
@@ -863,12 +866,12 @@ class Dynspec:
                     plt.close()
                 elif display:
                     plt.show()
-            else:
+            if unscrunched:
                 plt.pcolormesh(fdopnew, tdel, normSspec, vmin=vmin, vmax=vmax)
                 if lamsteps:
-                    plt.ylabel(r'$f_\nu$ (m$^{-1}$)')
+                    plt.ylabel(r'$f_\lambda$ (m$^{-1}$)')
                 else:
-                    plt.ylabel("tdel (us)")
+                    plt.ylabel(r'$f_\nu$ ($\mu$s)')
                 bottom, top = plt.ylim()
                 plt.xlabel("Normalised $f_t$")
                 if plot_fit:
@@ -1053,7 +1056,7 @@ class Dynspec:
                                     maxfdop=maxfdop)
                     plt.xlabel(r'$f_t$ (mHz)')
                     if lamsteps:
-                        plt.ylabel(r'$f_\nu$ (m$^{-1}$)')
+                        plt.ylabel(r'$f_\lambda$ (m$^{-1}$)')
                     else:
                         plt.ylabel(r'$f_\nu$ ($\mu$s)')
                     plotnum += 1
