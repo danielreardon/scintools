@@ -218,9 +218,15 @@ class Dynspec:
             dyn = input_dyn
         medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(
                                                       is_valid(dyn)) > 0)])
-        std = np.std(dyn[is_valid(dyn)])  # standard deviation
-        vmin = medval-4*std
-        vmax = medval+4*std
+        minval = np.min(dyn[is_valid(dyn)*np.array(np.abs(
+                                                   is_valid(dyn)) > 0)])
+        maxval = np.max(dyn[is_valid(dyn)*np.array(np.abs(
+                                                   is_valid(dyn)) > 0)])
+        # standard deviation
+        std = np.std(dyn[is_valid(dyn)*np.array(np.abs(
+                                                is_valid(dyn)) > 0)])
+        vmin = medval-5*std
+        vmax = medval+5*std
         if input_dyn is None:
             if lamsteps:
                 plt.pcolormesh(self.times/60, self.lam, dyn,
@@ -327,8 +333,11 @@ class Dynspec:
             sspec = input_sspec
             xplot = input_x
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        vmin = medval-20
-        vmax = vmin+60
+        std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        vmin = medval - std
+        vmax = maxval - 3
+
         # Get fdop plotting range
         indicies = np.argwhere(np.abs(xplot) < maxfdop)
         xplot = xplot[indicies].squeeze()
@@ -817,8 +826,10 @@ class Dynspec:
                 eta = eta*beta_to_eta
 
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        vmin = medval-20
-        vmax = vmin+60
+        std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        vmin = medval - std
+        vmax = maxval - 3
 
         ind = np.argmin(abs(self.tdel-delmax))
         sspec = sspec[startbin:ind, :]  # cut first N delay bins and at delmax
