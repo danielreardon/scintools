@@ -22,7 +22,8 @@ class Simulation():
     def __init__(self, mb2=2, rf=1, ds=0.01, alpha=5/3, ar=1, psi=0,
                  inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
                  seed=None, nx=None, ny=None, dx=None, dy=None, plot=False,
-                 verbose=False, freq=1400, dt=30, mjd=50000, nsub=None):
+                 verbose=False, freq=1400, dt=30, mjd=50000, nsub=None,
+                 efield=False):
         """
         Electromagnetic simulator based on original code by Coles et al. (2010)
 
@@ -78,7 +79,10 @@ class Simulation():
             self.name += ',lamsteps'
 
         self.header = self.name
-        dyn = self.spi
+        if efield:
+            dyn = np.real(self.spe)
+        else:
+            dyn = self.spi
         dlam = self.dlam
 
         self.dt = dt
@@ -88,7 +92,7 @@ class Simulation():
         lams = np.linspace(1, 1+self.dlam, self.nchan)
         freqs = np.divide(1, lams)
         freqs = np.linspace(np.min(freqs), np.max(freqs), self.nchan)
-        self.freqs = freqs*(self.freq/np.mean(freqs))
+        self.freqs = freqs*self.freq/np.mean(freqs)
         self.bw = max(self.freqs) - min(self.freqs)
         self.times = self.dt*np.arange(0, self.nsub)
         self.df = self.bw/self.nchan
@@ -97,6 +101,11 @@ class Simulation():
         if nsub is not None:
             dyn = dyn[0:nsub, :]
         self.dyn = np.transpose(dyn)
+
+        # Theoretical arc curvature
+        #V = 1
+        #k = 2*pi/lambda0
+        #L = rf^2*k
 
         return
 
@@ -292,6 +301,24 @@ class Simulation():
             plt.pcolormesh(self.x, self.freqs, np.transpose(self.spi))
             plt.ylabel('Frequency f')
         plt.title('Dynamic Spectrum (Intensity/Mean)')
+        plt.xlabel('$x/r_f$')
+        if not subplot:
+            plt.show()
+        return
+
+    def plot_efield(self, subplot=False):
+        if not hasattr(self, 'spe'):
+            self.get_intensity()
+
+        if self.lamsteps:
+            plt.pcolormesh(self.x, self.lams,
+                           np.real(np.transpose(self.spe)))
+            plt.ylabel(r'Wavelength $\lambda$')
+        else:
+            plt.pcolormesh(self.x, self.freqs,
+                           np.real(np.transpose(self.spe)))
+            plt.ylabel('Frequency f')
+        plt.title('Electric field (Intensity/Mean)')
         plt.xlabel('$x/r_f$')
         if not subplot:
             plt.show()

@@ -417,7 +417,7 @@ class Dynspec:
                 delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
                 high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
-                nsmooth=15, filename=None, noise_error=True, display=True):
+                nsmooth=5, filename=None, noise_error=True, display=True):
         """
         Find the arc curvature with maximum power along it
 
