@@ -21,7 +21,7 @@ from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
                          fit_parabola, fit_log_parabola
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
-from scipy.interpolate import griddata
+from scipy.interpolate import griddata, interp1d
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
 
@@ -220,12 +220,10 @@ class Dynspec:
                                                       is_valid(dyn)) > 0)])
         minval = np.min(dyn[is_valid(dyn)*np.array(np.abs(
                                                    is_valid(dyn)) > 0)])
-        maxval = np.max(dyn[is_valid(dyn)*np.array(np.abs(
-                                                   is_valid(dyn)) > 0)])
         # standard deviation
         std = np.std(dyn[is_valid(dyn)*np.array(np.abs(
                                                 is_valid(dyn)) > 0)])
-        vmin = medval-5*std
+        vmin = minval
         vmax = medval+5*std
         if input_dyn is None:
             if lamsteps:
@@ -522,18 +520,18 @@ class Dynspec:
                     ynew = ieta*np.power(x, 2)  # tdel coordinates to sample
                     # convert to pixel coordinates
                     xpx = ((x-np.min(x))/(max(x) - np.min(x)))*np.shape(z)[1]
-                    ynewpx = ((ynew-np.min(ynew))/(max(y)
-                                                   - np.min(ynew)))*np.shape(z)[0]
+                    ynewpx = ((ynew-np.min(ynew)) /
+                              (max(y) - np.min(ynew)))*np.shape(z)[0]
                     # left side
                     ind = np.where(x < 0)  # find -ve doppler
                     ynewL = ynew[ind]
                     xnewpxL = xpx[ind]
                     ynewpxL = ynewpx[ind]
-                    ind = np.where(ynewL < np.max(y))  # indices below tdel cuttof
+                    ind = np.where(ynewL < np.max(y))  # inds below tdel cutoff
                     xnewL = xnewpxL[ind]
                     ynewL = ynewpxL[ind]
-                    xynewL = np.array([[ynewL[ii], xnewL[ii]] for ii in range(0,
-                                       len(xnewL))]).T
+                    xynewL = np.array([[ynewL[ii], xnewL[ii]] for ii in
+                                      range(0, len(xnewL))]).T
                     znewL = map_coordinates(z, xynewL, order=1, cval=np.nan)
                     sumpowL.append(np.mean(znewL[~np.isnan(znewL)]))
 
@@ -542,11 +540,11 @@ class Dynspec:
                     ynewR = ynew[ind]
                     xnewpxR = xpx[ind]
                     ynewpxR = ynewpx[ind]
-                    ind = np.where(ynewR < np.max(y))  # indices below tdel cuttof
+                    ind = np.where(ynewR < np.max(y))  # inds below tdel cutoff
                     xnewR = xnewpxR[ind]
                     ynewR = ynewpxR[ind]
-                    xynewR = np.array([[ynewR[ii], xnewR[ii]] for ii in range(0,
-                                       len(xnewR))]).T
+                    xynewR = np.array([[ynewR[ii], xnewR[ii]] for ii in
+                                       range(0, len(xnewR))]).T
                     znewR = map_coordinates(z, xynewR, order=1, cval=np.nan)
                     sumpowR.append(np.mean(znewR[~np.isnan(znewR)]))
 
@@ -745,7 +743,7 @@ class Dynspec:
 
                     etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
 
-                if plot and iarc==0:
+                if plot and iarc == 0:
                     plt.plot(etaArray, norm_sspec_avg)
                     plt.plot(etaArray, norm_sspec_avg_filt)
                     plt.plot(xdata, yfit)
@@ -753,7 +751,8 @@ class Dynspec:
                                 facecolor='C2', alpha=0.5)
                     plt.xscale('log')
                     if lamsteps:
-                        plt.xlabel(r'Arc curvature, $\eta$ (${\rm m}^{-1}\,{\rm mHz}^{-2}$)')
+                        plt.xlabel(r'Arc curvature, '
+                                   r'$\eta$ (${\rm m}^{-1}\,{\rm mHz}^{-2}$)')
                     else:
                         plt.xlabel('eta (tdel)')
                     plt.ylabel('Mean power (dB)')
@@ -763,7 +762,7 @@ class Dynspec:
                     plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                                 facecolor='C{0}'.format(str(int(3+iarc))),
                                 alpha=0.3)
-                if plot and iarc==len(etamin_array)-1:
+                if plot and iarc == len(etamin_array)-1:
                     if filename is not None:
                         plt.savefig(filename, figsize=(6, 6), dpi=150,
                                     bbox_inches='tight', pad_inches=0.1)
@@ -775,7 +774,7 @@ class Dynspec:
                 raise ValueError('Unknown arc fitting method. Please choose \
                                  from gidmax or norm_sspec')
 
-            if iarc==0:  # save primary
+            if iarc == 0:  # save primary
                 if lamsteps:
                     self.betaeta = eta
                     self.betaetaerr = etaerr
@@ -862,9 +861,6 @@ class Dynspec:
             isspectot = np.add(isspectot, normline)
         isspecavg = isspectot/len(tdel)  # make average
         ind1 = np.argmin(abs(fdopnew-1)-2)
-        # ind2 = np.argmin(abs(fdopnew+1)-2)
-        # normfac = (abs(isspecavg[ind1])
-        #           + abs(isspecavg[ind2]))/2  # mean power at theoretical arc
         if isspecavg[ind1] < 0:
             isspecavg = isspecavg + 2  # make 1 instead of -1
         if plot:
@@ -1170,7 +1166,8 @@ class Dynspec:
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
 
-    def correct_band(self, frequency=True, time=False, lamsteps=False, nsmooth=None):
+    def correct_band(self, frequency=True, time=False, lamsteps=False,
+                     nsmooth=5):
         """
         Correct for the bandpass
         """
@@ -1198,6 +1195,8 @@ class Dynspec:
             timestructure = np.mean(dyn, axis=0)
             # Make sure there are no zeros
             timestructure[timestructure == 0] = np.mean(timestructure)
+            if nsmooth is not None:
+                timestructure = savgol_filter(timestructure, nsmooth, 1)
             dyn = np.divide(dyn, np.reshape(timestructure,
                                             [1, len(timestructure)]))
 
@@ -1393,35 +1392,19 @@ class Dynspec:
             # function to convert dyn(feq,t) to dyn(lameq,t)
             # fbw = fractional BW = BW / center frequency
             arin = cp(self.dyn)  # input array
-            fbw = self.bw/self.freq  # fractional bandwidth
             nf, nt = np.shape(arin)
-            # equal steps in fractional bandwidth
-            feq = np.linspace(1 - fbw/2, 1 + fbw/2, nf)
-            # all that matters is the ratio of frequencies
-            #   so we normalize for convenience
-            feq = feq/feq[0]
-            dl = (1/feq[0] - 1/feq[1])  # first guess
-            minl = 1/feq[-1]  # no need to multiply by c it will cancel out
-            maxl = 1
-            nl = ((maxl - minl)/dl)+1   # number of lameq samples
-            # now take floor of nl to get integer and inflate dl a bit to match
-            nl = np.floor(nl)
-            dl = (maxl - minl)/(nl-1)  # a bit larger than our first guess
-            lam = minl + np.arange(0, nl+1)*dl  # full lam array
-            flam = np.divide(1, lam)  # full array of equal frequency samples
-            # we can use linear interpolation provided fbw < 33%
-            arout = np.zeros([len(lam), int(nt)])
-            # maximum lambda is minimum freq
-            self.lam = np.flip(lam*sc.c/np.min(self.freqs*1e6), axis=0)
-            self.dlam = abs(self.lam[1]-self.lam[0])
-            if fbw <= 1/3:
-                for it in range(0, nt):
-                    arout[:, it] = np.interp(flam, feq, arin[:, it])
-                self.lamdyn = np.flipud(arout)
-            else:
-                print('for fbw > 0.33 need lsq interpolation')
-                return
-            return
+            freqs = cp(self.freqs)
+            lams = np.divide(sc.c, freqs*10**6)
+            dlam = np.max(np.abs(np.diff(lams)))
+            lam_eq = np.arange(np.min(lams), np.max(lams), dlam)
+            self.dlam = dlam
+            feq = np.divide(sc.c, lam_eq)/10**6
+            arout = np.zeros([len(lam_eq), int(nt)])
+            for it in range(0, nt):
+                f = interp1d(freqs, arin[:, it], kind='cubic')
+                arout[:, it] = f(feq)
+            self.lamdyn = np.flipud(arout)
+            self.lam = np.flipud(lam_eq)
         elif scale == 'trapezoid':
             arin = cp(self.dyn) - np.mean(self.dyn)  # input array
             nf, nt = np.shape(arin)

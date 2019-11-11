@@ -16,7 +16,7 @@ from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
 
 
-def make_dynspec(archive, template):
+def make_dynspec(archive, template=None, phasebin=1):
     """
     Creates a psrflux-format dynamic spectrum from an archive
         $ psrflux -s [template] -e dynspec [archive]

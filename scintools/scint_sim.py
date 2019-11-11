@@ -89,7 +89,7 @@ class Simulation():
         self.freq = freq
         self.nsub = int(np.shape(dyn)[0]) if nsub is None else nsub
         self.nchan = int(np.shape(dyn)[1])
-        lams = np.linspace(1, 1+self.dlam, self.nchan)
+        lams = np.linspace(1-self.dlam/2, 1+self.dlam/2, self.nchan)
         freqs = np.divide(1, lams)
         freqs = np.linspace(np.min(freqs), np.max(freqs), self.nchan)
         self.freqs = freqs*self.freq/np.mean(freqs)
