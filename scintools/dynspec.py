@@ -1379,7 +1379,8 @@ class Dynspec:
         elif method == 'medfilt':
             self.dyn = medfilt(self.dyn, kernel_size=m)
 
-    def scale_dyn(self, scale='lambda', factor=1):
+    def scale_dyn(self, scale='lambda', factor=1, window_frac=0.1,
+                  window='hanning'):
         """
         Scales the dynamic spectrum along the frequency axis,
             with an alpha relationship
@@ -1406,7 +1407,34 @@ class Dynspec:
             self.lamdyn = np.flipud(arout)
             self.lam = np.flipud(lam_eq)
         elif scale == 'trapezoid':
-            arin = cp(self.dyn) - np.mean(self.dyn)  # input array
+            dyn = cp(self.dyn)
+            dyn -= np.mean(dyn)
+            nf = np.shape(dyn)[0]
+            nt = np.shape(dyn)[1]
+            if window is not None:
+                # Window the dynamic spectrum
+                if window == 'hanning':
+                    cw = np.hanning(np.floor(window_frac*nt))
+                    sw = np.hanning(np.floor(window_frac*nf))
+                elif window == 'hamming':
+                    cw = np.hamming(np.floor(window_frac*nt))
+                    sw = np.hamming(np.floor(window_frac*nf))
+                elif window == 'blackman':
+                    cw = np.blackman(np.floor(window_frac*nt))
+                    sw = np.blackman(np.floor(window_frac*nf))
+                elif window == 'bartlett':
+                    cw = np.bartlett(np.floor(window_frac*nt))
+                    sw = np.bartlett(np.floor(window_frac*nf))
+                else:
+                    print('Window unknown.. Please add it!')
+                chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
+                                        np.ones([nt-len(cw)]))
+                subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
+                                          np.ones([nf-len(sw)]))
+                dyn = np.multiply(chan_window, dyn)
+                dyn = np.transpose(np.multiply(subint_window,
+                                               np.transpose(dyn)))
+            arin = dyn  # input array
             nf, nt = np.shape(arin)
             scalefrac = 1/(max(self.freqs)/min(self.freqs))
             timestep = max(self.times)*(1 - scalefrac)/(nf + 1)  # time step
