@@ -16,14 +16,6 @@ from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
 
 
-def make_dynspec(archive, template=None, phasebin=1):
-    """
-    Creates a psrflux-format dynamic spectrum from an archive
-        $ psrflux -s [template] -e dynspec [archive]
-    """
-    return
-
-
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
                   subint_threshold=5, output_directory=None):
     """
@@ -323,6 +315,13 @@ def get_true_anomaly(mjds, pars):
 
 
 # Potential future functions
+
+def make_dynspec(archive, template=None, phasebin=1):
+    """
+    Creates a psrflux-format dynamic spectrum from an archive
+        $ psrflux -s [template] -e dynspec [archive]
+    """
+    return
 
 
 def remove_duplicates(dyn_files):

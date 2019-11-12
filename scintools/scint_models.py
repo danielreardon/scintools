@@ -105,6 +105,13 @@ def scint_acf_model(params, xdata, ydata, weights):
     return np.concatenate((residuals_t, residuals_f))
 
 
+def scint_acf_model_2D(params, xdata, ydata, weights):
+    """
+    Fit an approximate 2D ACF function
+    """
+    return
+
+
 def tau_sspec_model(params, xdata, ydata, weights):
     """
     Fit 1D function to cut through ACF for scintillation timescale.
