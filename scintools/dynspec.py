@@ -331,9 +331,9 @@ class Dynspec:
             sspec = input_sspec
             xplot = input_x
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        # std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        vmin = medval - std
+        vmin = medval - 3
         vmax = maxval - 3
 
         # Get fdop plotting range
@@ -1207,7 +1207,7 @@ class Dynspec:
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
                    input_dyn=None, input_x=None, input_y=None, trap=False,
-                   window='hamming', window_frac=0.1):
+                   window='blackman', window_frac=0.1):
         """
         Calculate secondary spectrum
         """

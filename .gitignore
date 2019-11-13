@@ -1,3 +1,4 @@
+.DS_Store
 scintools/.DS_Store
 scintools/*.pyc
 scintools/__pycache__/*
