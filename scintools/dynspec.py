@@ -787,7 +787,7 @@ class Dynspec:
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=2, cutmid=3, lamsteps=False, scrunched=True,
                    plot_fit=True, ref_freq=1400, numsteps=None, filename=None,
-                   display=True, unscrunched=True):
+                   display=True, unscrunched=True, powerspec=True):
         """
         Normalise fdop axis using arc curvature
         """
@@ -859,11 +859,13 @@ class Dynspec:
             normline = np.interp(fdopnew, ifdop, isspec)
             normSspec.append(normline)
             isspectot = np.add(isspectot, normline)
-        isspecavg = isspectot/len(tdel)  # make average
+        isspecavg = np.nanmean(normSspec, axis=0)  # make average
+        powerspectrum = np.nanmean(normSspec, axis=1)
         ind1 = np.argmin(abs(fdopnew-1)-2)
         if isspecavg[ind1] < 0:
             isspecavg = isspecavg + 2  # make 1 instead of -1
         if plot:
+            # Plot delay-scrunched "power profile"
             if scrunched:
                 plt.plot(fdopnew, isspecavg)
                 bottom, top = plt.ylim()
@@ -882,6 +884,7 @@ class Dynspec:
                     plt.close()
                 elif display:
                     plt.show()
+            # Plot 2D normalised secondary spectrum
             if unscrunched:
                 plt.pcolormesh(fdopnew, tdel, normSspec, vmin=vmin, vmax=vmax)
                 if lamsteps:
@@ -900,9 +903,26 @@ class Dynspec:
                     plt.close()
                 elif display:
                     plt.show()
+            # plot power spectrum
+            if powerspec:
+                plt.loglog(np.sqrt(tdel), powerspectrum)
+                if lamsteps:
+                    plt.xlabel(r'$f_\lambda^{1/2}$ (m$^{-1/2}$)')
+                else:
+                    plt.xlabel(r'$f_\nu^{1/2}$ ($\mu$s$^{1/2}$)')
+                plt.ylabel("Mean power (dB)")
+                if filename is not None:
+                    filename_name = filename.split('.')[0]
+                    filename_extension = filename.split('.')[1]
+                    plt.savefig(filename_name + '_power.' + filename_extension,
+                                bbox_inches='tight', pad_inches=0.1)
+                    plt.close()
+                elif display:
+                    plt.show()
 
         self.normsspecavg = isspecavg
-        self.normsspec = np.array(normSspec)
+        self.normsspec = np.array(normSspec).squeeze()
+        self.normsspec_tdel = tdel
         return
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
