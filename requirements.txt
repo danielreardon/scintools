@@ -2,7 +2,5 @@ astropy
 numpy
 scipy
 matplotlib
-libstempo
 lmfit
 corner
-
