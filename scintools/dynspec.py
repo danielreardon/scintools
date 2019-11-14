@@ -18,7 +18,7 @@ import scipy.constants as sc
 from copy import deepcopy as cp
 from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
                          dnu_acf_model, fit_parabola, fit_log_parabola
-from scint_utils import is_valid
+from scint_utils import is_valid, svd_model
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata, interp1d
 from scipy.signal import convolve2d, medfilt, savgol_filter
@@ -191,6 +191,7 @@ class Dynspec:
 
         self.trim_edges()  # remove zeros on band edges
         self.refill()  # refill with linear interpolation
+        self.correct_dyn()
         self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
@@ -723,8 +724,6 @@ class Dynspec:
                 else:
                     yfit, eta, etaerr = fit_parabola(xdata, ydata)
 
-                print(etaerr)
-
                 if np.mean(np.gradient(np.diff(yfit))) > 0:
                     raise ValueError('Fit returned a forward parabola.')
                 eta = eta
@@ -746,8 +745,6 @@ class Dynspec:
 
                     etaerr = np.abs(etaArray[int(ind-ind1)] -
                                     etaArray[int(ind+ind2)])/2
-                    print(etaerr)
-                    print(noise)
 
                 if plot and iarc == 0:
                     plt.plot(etaArray, norm_sspec_avg)
@@ -1203,10 +1200,10 @@ class Dynspec:
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
 
-    def correct_band(self, frequency=True, time=False, lamsteps=False,
-                     nsmooth=5):
+    def correct_dyn(self, svd=True, nmodes=1, frequency=False, time=True,
+                    lamsteps=False, nsmooth=5):
         """
-        Correct for the bandpass
+        Correct for gain variations in time and frequency
         """
 
         if lamsteps:
@@ -1217,25 +1214,28 @@ class Dynspec:
             dyn = self.dyn
         dyn[np.isnan(dyn)] = 0
 
-        if frequency:
-            self.bandpass = np.mean(dyn, axis=1)
-            # Make sure there are no zeros
-            self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
-            if nsmooth is not None:
-                bandpass = savgol_filter(self.bandpass, nsmooth, 1)
-            else:
-                bandpass = self.bandpass
-            dyn = np.divide(dyn, np.reshape(bandpass,
-                                            [len(bandpass), 1]))
+        if svd:
+            dyn, model = svd_model(dyn, nmodes=nmodes)
+        else:
+            if frequency:
+                self.bandpass = np.mean(dyn, axis=1)
+                # Make sure there are no zeros
+                self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
+                if nsmooth is not None:
+                    bandpass = savgol_filter(self.bandpass, nsmooth, 1)
+                else:
+                    bandpass = self.bandpass
+                dyn = np.divide(dyn, np.reshape(bandpass,
+                                                [len(bandpass), 1]))
 
-        if time:
-            timestructure = np.mean(dyn, axis=0)
-            # Make sure there are no zeros
-            timestructure[timestructure == 0] = np.mean(timestructure)
-            if nsmooth is not None:
-                timestructure = savgol_filter(timestructure, nsmooth, 1)
-            dyn = np.divide(dyn, np.reshape(timestructure,
-                                            [1, len(timestructure)]))
+            if time:
+                timestructure = np.mean(dyn, axis=0)
+                # Make sure there are no zeros
+                timestructure[timestructure == 0] = np.mean(timestructure)
+                if nsmooth is not None:
+                    timestructure = savgol_filter(timestructure, nsmooth, 1)
+                dyn = np.divide(dyn, np.reshape(timestructure,
+                                                [1, len(timestructure)]))
 
         if lamsteps:
             self.lamdyn = dyn
@@ -1664,7 +1664,7 @@ def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
             bad_files.write("{0}\t tobs<{1}\n".format(dynfile, min_tsub))
             continue
         dyn.refill()  # linearly interpolate zero values
-        dyn.correct_band(time=True)  # correct for bandpass and gain variation
+        dyn.correct_dyn()  # correct for bandpass and gain variation
         dyn.calc_sspec()  # calculate secondary spectrum
         # report error and proceed
         if np.isnan(dyn.sspec).all():  # skip if secondary spectrum is all nan
