@@ -405,6 +405,34 @@ def slow_FT(dynspec, freqs):
     return SS
 
 
+def svd_model(arr, nmodes=1):
+    """                                                                                                                          
+    Take SVD of a dynamic spectrum, divide by the largest N modes
+    
+
+    Parameters                                                                                                                   
+    ----------                                                                                                                   
+    arr : array_like                                                                                                             
+      Time/freq visiblity matrix                                                                                                
+    nmodes :
+
+    Returns                                                                                                                      
+    -------                                                                                                                      
+    Original data array multiplied by the largest SVD mode conjugate,
+    and the model                                                            
+    """
+
+    u,s,w = np.linalg.svd(arr)
+    s[nmodes:] = 0.0
+    S = np.zeros([len(u), len(w)], np.complex128)
+    S[:len(s), :len(s)] = np.diag(s)
+
+
+    model = np.dot(np.dot(u, S), w)
+    arr = arr / np.abs(model)
+    return arr, model
+
+
 # Potential future functions
 
 def make_dynspec(archive, template=None, phasebin=1):
