@@ -17,8 +17,7 @@ import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
 from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
-                         dnu_acf_model, tau_sspec_model, dnu_sspec_model,\
-                         fit_parabola, fit_log_parabola
+                         dnu_acf_model, fit_parabola, fit_log_parabola
 from scint_utils import is_valid
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata, interp1d
@@ -415,7 +414,8 @@ class Dynspec:
                 delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True,
                 etamax=None, etamin=None, low_power_diff=-3,
                 high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
-                nsmooth=5, filename=None, noise_error=True, display=True):
+                nsmooth=5, filename=None, noise_error=True, display=True,
+                log_parabola=False):
         """
         Find the arc curvature with maximum power along it
 
@@ -460,7 +460,7 @@ class Dynspec:
         yaxis = yaxis[0:ind]
 
         # noise of mean out to delmax
-        noise = np.sqrt(np.sum(np.power(noise, 2)))/len(yaxis[startbin:])
+        noise = np.sqrt(np.sum(np.power(noise, 2)))/np.sqrt(len(yaxis))
 
         if etamax is None:
             etamax = ymax/((self.fdop[1]-self.fdop[0])*cutmid)**2
@@ -604,14 +604,13 @@ class Dynspec:
                     etaerr2 = etaerr
                     power = max_power
                     ind1 = 1
-                    while (power > max_power - noise and
-                           ind + ind1 < len(sumpow_filt)-1):  # -3db
-                        ind1 += 1
+                    while (power > max_power - noise and ind - ind1 > 1):
                         power = sumpow_filt[ind - ind1]
+                        ind1 += 1
                     power = max_power
                     ind2 = 1
                     while (power > max_power - noise and
-                           ind + ind2 < len(sumpow_filt)-1):  # -1db power
+                           ind + ind2 < len(sumpow_filt)-1):
                         ind2 += 1
                         power = sumpow_filt[ind + ind2]
 
@@ -719,7 +718,13 @@ class Dynspec:
 
                 # Do the fit
                 # yfit, eta, etaerr = fit_parabola(xdata, ydata)
-                yfit, eta, etaerr = fit_parabola(xdata, ydata)
+                if log_parabola:
+                    yfit, eta, etaerr = fit_log_parabola(xdata, ydata)
+                else:
+                    yfit, eta, etaerr = fit_parabola(xdata, ydata)
+
+                print(etaerr)
+
                 if np.mean(np.gradient(np.diff(yfit))) > 0:
                     raise ValueError('Fit returned a forward parabola.')
                 eta = eta
@@ -729,19 +734,20 @@ class Dynspec:
                     etaerr2 = etaerr  # error from parabola fit
                     power = max_power
                     ind1 = 1
-                    while (power > max_power - noise and
-                           ind + ind1 < len(norm_sspec_avg_filt)-1):  # -3db
-                        ind1 += 1
+                    while (power > (max_power - noise) and (ind - ind1 > 1)):
                         power = norm_sspec_avg_filt[ind - ind1]
+                        ind1 += 1
                     power = max_power
                     ind2 = 1
-                    while (power > max_power - noise and
-                           # -1db power
-                           ind + ind2 < len(norm_sspec_avg_filt)-1):
+                    while (power > (max_power - noise) and
+                           (ind + ind2 < len(norm_sspec_avg_filt) - 1)):
                         ind2 += 1
                         power = norm_sspec_avg_filt[ind + ind2]
 
-                    etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
+                    etaerr = np.abs(etaArray[int(ind-ind1)] -
+                                    etaArray[int(ind+ind2)])/2
+                    print(etaerr)
+                    print(noise)
 
                 if plot and iarc == 0:
                     plt.plot(etaArray, norm_sspec_avg)
@@ -785,9 +791,10 @@ class Dynspec:
                     self.etaerr2 = etaerr2
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
-                   maxnormfac=2, cutmid=3, lamsteps=False, scrunched=True,
-                   plot_fit=True, ref_freq=1400, numsteps=None, filename=None,
-                   display=True, unscrunched=True, powerspec=True):
+                   maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=False,
+                   scrunched=True, plot_fit=True, ref_freq=1400, numsteps=None,
+                   filename=None, display=True, unscrunched=True,
+                   powerspec=False):
         """
         Normalise fdop axis using arc curvature
         """
@@ -848,6 +855,10 @@ class Dynspec:
                            maxfdop]) if numsteps is None else numsteps
         fdopnew = np.linspace(-maxnormfac, maxnormfac,
                               nfdop)  # norm fdop
+        if minnormfac > 0:
+            unscrunched = False  # Cannot plot 2D function
+            inds = np.argwhere(np.abs(fdopnew) > minnormfac)
+            fdopnew = fdopnew[inds]
         normSspec = []
         isspectot = np.zeros(np.shape(fdopnew))
         for ii in range(0, len(tdel)):
@@ -859,8 +870,9 @@ class Dynspec:
             normline = np.interp(fdopnew, ifdop, isspec)
             normSspec.append(normline)
             isspectot = np.add(isspectot, normline)
+        normSspec = np.array(normSspec).squeeze()
         isspecavg = np.nanmean(normSspec, axis=0)  # make average
-        powerspectrum = np.nanmean(normSspec, axis=1)
+        powerspectrum = np.nanmean(np.power(10, normSspec/10), axis=1)
         ind1 = np.argmin(abs(fdopnew-1)-2)
         if isspecavg[ind1] < 0:
             isspecavg = isspecavg + 2  # make 1 instead of -1
@@ -906,11 +918,16 @@ class Dynspec:
             # plot power spectrum
             if powerspec:
                 plt.loglog(np.sqrt(tdel), powerspectrum)
+                # Overlay theory
+                kf = np.argwhere(np.sqrt(tdel) <= 10)
+                amp = np.mean(powerspectrum[kf]*(np.sqrt(tdel[kf]))**3.67)
+                plt.loglog(np.sqrt(tdel), amp*(np.sqrt(tdel))**(-3.67))
                 if lamsteps:
                     plt.xlabel(r'$f_\lambda^{1/2}$ (m$^{-1/2}$)')
                 else:
                     plt.xlabel(r'$f_\nu^{1/2}$ ($\mu$s$^{1/2}$)')
-                plt.ylabel("Mean power (dB)")
+                plt.ylabel("Mean PSD")
+                plt.grid(which='both', axis='both')
                 if filename is not None:
                     filename_name = filename.split('.')[0]
                     filename_extension = filename.split('.')[1]
@@ -921,7 +938,7 @@ class Dynspec:
                     plt.show()
 
         self.normsspecavg = isspecavg
-        self.normsspec = np.array(normSspec).squeeze()
+        self.normsspec = normSspec
         self.normsspec_tdel = tdel
         return
 
