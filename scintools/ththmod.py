@@ -99,16 +99,17 @@ def rev_map(thth,tau,fd,eta,edges):
     recov=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.abs(2*eta*fd_map.T)).real)[0] +\
+                         weights=np.ravel(thth).real)[0] +\
             np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.abs(2*eta*fd_map.T)).imag)[0]*1j
+                         weights=np.ravel(thth).imag)[0]*1j
     recov/=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges))[0]
     recov=np.nan_to_num(recov)
-    return(recov.T)
+    recov=recov.T/np.abs(2*eta*fd.value)
+    return(recov)
 
 def chisq_calc(SS, tau, fd, eta, edges,mask,N):
     """Calculate chisq of model SS using a 1d screen of given curvature
