@@ -16,9 +16,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
-from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
+from scintools.scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
                          dnu_acf_model, fit_parabola, fit_log_parabola
-from scint_utils import is_valid, svd_model
+from scintools.scint_utils import is_valid, svd_model
 from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata, interp1d
 from scipy.signal import convolve2d, medfilt, savgol_filter
