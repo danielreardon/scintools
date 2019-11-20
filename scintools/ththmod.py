@@ -88,7 +88,7 @@ def rev_map(thth,tau,fd,eta,edges):
     """
 
     ##Find bin centers
-     th_cents = (edges[1:] + edges[:-1]) / 2
+    th_cents = (edges[1:] + edges[:-1]) / 2
     th_cents -= th_cents[np.abs(th_cents) == np.abs(th_cents).min()]
 
     fd_map=(th_cents[np.newaxis,:]-th_cents[:,np.newaxis])
