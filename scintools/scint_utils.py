@@ -98,6 +98,10 @@ def write_results(filename, dyn=None):
         header += ",betaeta,betaetaerr"
         write_string += ",{0},{1}".format(dyn.betaeta, dyn.betaetaerr)
 
+    if hasattr(dyn, 'acf_tilt'):  # Arc curvature
+        header += ",acf_tilt,acf_tilt_err"
+        write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
+
     header += "\n"
     write_string += "\n"
 

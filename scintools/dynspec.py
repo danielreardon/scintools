@@ -308,7 +308,7 @@ class Dynspec:
     def plot_sspec(self, lamsteps=False, input_sspec=None, filename=None,
                    input_x=None, input_y=None, trap=False, prewhite=True,
                    plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
-                   cutmid=0, startbin=0, display=True):
+                   cutmid=0, startbin=0, display=True, colorbar=True):
         """
         Plot the secondary spectrum
         """
@@ -367,10 +367,12 @@ class Dynspec:
                 plt.plot(xplot, eta*np.power(xplot, 2),
                          'r--', alpha=0.5)
             plt.ylim(bottom, top)
-            plt.colorbar()
+            if colorbar:
+                plt.colorbar()
         else:
             plt.pcolormesh(xplot, input_y, sspec, vmin=vmin, vmax=vmax)
-            plt.colorbar()
+            if colorbar:
+                plt.colorbar()
 
         if filename is not None:
             plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
@@ -505,160 +507,10 @@ class Dynspec:
                                     (sqrt_eta_all >= np.sqrt(etamin))]
             numsteps_new = len(sqrt_eta)
 
-            # Define data
-            x = self.fdop
-            y = yaxis
-            z = sspec
-            # initiate arrays
-            sumpowL = []
-            sumpowR = []
+            # initiate
             etaArray = []
 
-            if method == 'gridmax':
-                for ii in range(0, len(sqrt_eta)):
-                    ieta = sqrt_eta[ii]**2
-                    etaArray.append(ieta)
-                    ynew = ieta*np.power(x, 2)  # tdel coordinates to sample
-                    # convert to pixel coordinates
-                    xpx = ((x-np.min(x))/(max(x) - np.min(x)))*np.shape(z)[1]
-                    ynewpx = ((ynew-np.min(ynew)) /
-                              (max(y) - np.min(ynew)))*np.shape(z)[0]
-                    # left side
-                    ind = np.where(x < 0)  # find -ve doppler
-                    ynewL = ynew[ind]
-                    xnewpxL = xpx[ind]
-                    ynewpxL = ynewpx[ind]
-                    ind = np.where(ynewL < np.max(y))  # inds below tdel cutoff
-                    xnewL = xnewpxL[ind]
-                    ynewL = ynewpxL[ind]
-                    xynewL = np.array([[ynewL[ii], xnewL[ii]] for ii in
-                                      range(0, len(xnewL))]).T
-                    znewL = map_coordinates(z, xynewL, order=1, cval=np.nan)
-                    sumpowL.append(np.mean(znewL[~np.isnan(znewL)]))
-
-                    # Right side
-                    ind = np.where(x > 0)  # find +ve doppler
-                    ynewR = ynew[ind]
-                    xnewpxR = xpx[ind]
-                    ynewpxR = ynewpx[ind]
-                    ind = np.where(ynewR < np.max(y))  # inds below tdel cutoff
-                    xnewR = xnewpxR[ind]
-                    ynewR = ynewpxR[ind]
-                    xynewR = np.array([[ynewR[ii], xnewR[ii]] for ii in
-                                       range(0, len(xnewR))]).T
-                    znewR = map_coordinates(z, xynewR, order=1, cval=np.nan)
-                    sumpowR.append(np.mean(znewR[~np.isnan(znewR)]))
-
-                    # Total
-                    sumpow = np.add(sumpowL, sumpowR)/2  # average
-
-                # Ignore nan sums and smooth
-                indicies = np.argwhere(is_valid(sumpow)).ravel()
-                etaArray = np.array(etaArray)[indicies]
-                sumpow = np.array(sumpow)[indicies]
-                sumpowL = np.array(sumpowL)[indicies]
-                sumpowR = np.array(sumpowR)[indicies]
-                sumpow_filt = savgol_filter(sumpow, nsmooth, 1)
-                sumpowL_filt = savgol_filter(sumpowL, nsmooth, 1)
-                sumpowR_filt = savgol_filter(sumpowR, nsmooth, 1)
-
-                indrange = np.argwhere((etaArray > constraint[0]) *
-                                       (etaArray < constraint[1]))
-                sumpow_inrange = sumpow_filt[indrange]
-                sumpowL_inrange = sumpow_filt[indrange]
-                sumpowR_inrange = sumpow_filt[indrange]
-                ind = np.argmin(np.abs(sumpow_filt - np.max(sumpow_inrange)))
-                indL = np.argmin(np.abs(sumpow_filt - np.max(sumpowL_inrange)))
-                indR = np.argmin(np.abs(sumpow_filt - np.max(sumpowR_inrange)))
-                eta = etaArray[ind]
-                etaL = etaArray[indL]
-                etaR = etaArray[indR]
-
-                # Now find eta and estimate error by fitting parabola
-                #   Data from -3db on low curvature side to -1.5db on high side
-                max_power = sumpow_filt[ind]
-                power = max_power
-                ind1 = 1
-                while (power > max_power + low_power_diff and
-                       ind + ind1 < len(sumpow_filt)-1):  # -3db, or half power
-                    ind1 += 1
-                    power = sumpow_filt[ind - ind1]
-                power = max_power
-                ind2 = 1
-                while (power > max_power + high_power_diff and
-                       ind + ind2 < len(sumpow_filt)-1):  # -1db power
-                    ind2 += 1
-                    power = sumpow_filt[ind + ind2]
-                # Now select this region of data for fitting
-                xdata = etaArray[int(ind-ind1):int(ind+ind2)]
-                ydata = sumpow[int(ind-ind1):int(ind+ind2)]
-
-                # Do the fit
-                # yfit, eta, etaerr = fit_parabola(xdata, ydata)
-                yfit, eta, etaerr = fit_log_parabola(xdata, ydata)
-                if np.mean(np.gradient(np.diff(yfit))) > 0:
-                    raise ValueError('Fit returned a forward parabola.')
-                eta = eta
-
-                if noise_error:
-                    # Now get error from the noise in secondary spectra instead
-                    etaerr2 = etaerr
-                    power = max_power
-                    ind1 = 1
-                    while (power > max_power - noise and ind - ind1 > 1):
-                        power = sumpow_filt[ind - ind1]
-                        ind1 += 1
-                    power = max_power
-                    ind2 = 1
-                    while (power > max_power - noise and
-                           ind + ind2 < len(sumpow_filt)-1):
-                        ind2 += 1
-                        power = sumpow_filt[ind + ind2]
-
-                    etaerr = np.ptp(etaArray[int(ind-ind1):int(ind+ind2)])/2
-
-                # Now plot
-                if plot and iarc == 0:
-                    if asymm:
-                        plt.subplot(2, 1, 1)
-                        plt.plot(etaArray, sumpowL)
-                        plt.plot(etaArray, sumpowL_filt)
-                        bottom, top = plt.ylim()
-                        plt.plot([etaL, etaL], [bottom, top])
-                        plt.ylabel('mean power (db)')
-                        plt.xscale('log')
-                        plt.subplot(2, 1, 2)
-                        plt.plot(etaArray, sumpowR)
-                        plt.plot(etaArray, sumpowR_filt)
-                        bottom, top = plt.ylim()
-                        plt.plot([etaR, etaR], [bottom, top])
-                    else:
-                        plt.plot(etaArray, sumpow)
-                        plt.plot(etaArray, sumpow_filt)
-                        plt.plot(xdata, yfit)
-                        bottom, top = plt.ylim()
-                    plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
-                                facecolor='C2', alpha=0.5)
-                    if lamsteps:
-                        plt.xlabel(r'Arc curvature, $\eta$ (${\rm m}^{-1}\,'
-                                   '{\rm mHz}^{-2}$)')
-                    else:
-                        plt.xlabel('eta (tdel)')
-                    plt.ylabel('mean power (dB)')
-                    plt.xscale('log')
-                elif plot:
-                    plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
-                                facecolor='C{0}'.format(str(int(3+iarc))),
-                                alpha=0.3)
-                if plot and iarc == len(etamin_array) - 1:
-                    if filename is not None:
-                        plt.savefig(filename, figsize=(6, 6), dpi=150,
-                                    bbox_inches='tight', pad_inches=0.1)
-                        plt.close()
-                    elif display:
-                        plt.show()
-
-            elif method == 'norm_sspec':
+            if method == 'norm_sspec':
                 # Get the normalised secondary spectrum, set for minimum eta as
                 #   normalisation. Then calculate peak as
                 self.norm_sspec(eta=etamin, delmax=delmax, plot=False,
@@ -829,9 +681,8 @@ class Dynspec:
                 eta = eta*beta_to_eta
 
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        vmin = medval - std
+        vmin = medval - 3
         vmax = maxval - 3
 
         ind = np.argmin(abs(self.tdel-delmax))
@@ -939,15 +790,78 @@ class Dynspec:
         self.normsspec_tdel = tdel
         return
 
+    def get_acf_tilt(self, plot=False, tmax=None, fmax=None):
+        """
+        Estimates the tilt in the ACF, which is proportional to the phase
+            gradient parallel to Veff
+        """
+        if not hasattr(self, 'acf'):
+            self.calc_acf()
+        if not hasattr(self, 'dnu'):
+            self.get_scint_params()
+
+        if tmax is None:
+            tmax = self.tau/60/5
+        else:
+            tmax = tmax
+        if fmax is None:
+            fmax = self.dnu/5
+        else:
+            fmax = fmax
+
+        acf = cp(self.acf)
+        nr, nc = np.shape(acf)
+        t_delays = np.linspace(-self.tobs/60, self.tobs/60, np.shape(acf)[1])
+        f_shifts = np.linspace(-self.bw, self.bw, np.shape(acf)[0])
+
+        # just the peak
+        xdata_inds = np.argwhere(abs(t_delays) <= tmax)
+        xdata = np.array(t_delays[xdata_inds]).squeeze()
+
+        inds = np.argwhere(abs(f_shifts) <= fmax)
+        peak_array = []
+        peakerr_array = []
+        y_array = []
+
+        for ii in inds:
+            f_shift = f_shifts[ii]
+            ind = np.argwhere(f_shifts == f_shift)
+            ydata = np.array(acf[ind, xdata_inds]).squeeze()
+            yfit, peak, peakerr = fit_parabola(xdata, ydata)
+            peak_array.append(peak)
+            peakerr_array.append(peakerr)
+            y_array.append(f_shift)
+
+        # Now do a weighted fit to the peaks
+        params, pcov = np.polyfit(peak_array, y_array, 1, cov=True,
+                                  w=1/np.array(peakerr_array).squeeze())
+        yfit = params[0]*peak_array + params[1]  # y values
+
+        # Get parameter errors
+        errors = []
+        for i in range(len(params)):  # for each parameter
+            errors.append(np.absolute(pcov[i][i])**0.5)
+
+        if plot:
+            plt.pcolormesh(t_delays, f_shifts, acf)
+            plt.plot(peak_array, y_array, 'r', alpha=0.2)
+            plt.plot(peak_array, yfit, 'k', alpha=0.2)
+            plt.show()
+
+        self.acf_tilt = float(params[0].squeeze())
+        self.acf_tilt_err = float(errors[0].squeeze())
+
+        return
+
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, display=True):
         """
         Measure the scintillation timescale
             Method:
                 acf1d - takes a 1D cut through the centre of the ACF for
-                sspec - measures timescale from the power spectrum
+                sspec - measures timescale from the secondary spectrum
                 acf2d - uses an analytic approximation to the ACF including
-                    phase gradient
+                    a phase gradient (a sheer to the ACF)
         """
 
         from lmfit import Minimizer, Parameters
