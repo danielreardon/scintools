@@ -19,7 +19,6 @@ from copy import deepcopy as cp
 from scint_models import scint_acf_model, scint_sspec_model, tau_acf_model,\
                          dnu_acf_model, fit_parabola, fit_log_parabola
 from scint_utils import is_valid, svd_model
-from scipy.ndimage import map_coordinates
 from scipy.interpolate import griddata, interp1d
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
@@ -801,11 +800,11 @@ class Dynspec:
             self.get_scint_params()
 
         if tmax is None:
-            tmax = self.tau/60/5
+            tmax = self.tau/60/3
         else:
             tmax = tmax
         if fmax is None:
-            fmax = self.dnu/5
+            fmax = self.dnu/10
         else:
             fmax = fmax
 
@@ -823,6 +822,7 @@ class Dynspec:
         peakerr_array = []
         y_array = []
 
+        # Fit parabolas to find the peak in each frequency-slice
         for ii in inds:
             f_shift = f_shifts[ii]
             ind = np.argwhere(f_shifts == f_shift)
@@ -832,7 +832,7 @@ class Dynspec:
             peakerr_array.append(peakerr)
             y_array.append(f_shift)
 
-        # Now do a weighted fit to the peaks
+        # Now do a weighted fit of a straight line to the peaks
         params, pcov = np.polyfit(peak_array, y_array, 1, cov=True,
                                   w=1/np.array(peakerr_array).squeeze())
         yfit = params[0]*peak_array + params[1]  # y values
@@ -842,14 +842,27 @@ class Dynspec:
         for i in range(len(params)):  # for each parameter
             errors.append(np.absolute(pcov[i][i])**0.5)
 
+        self.acf_tilt = float(params[0].squeeze())
+        self.acf_tilt_err = float(errors[0].squeeze())
+
         if plot:
+            plt.errorbar(peak_array, y_array,
+                         xerr=np.array(peakerr_array).squeeze(),
+                         marker='.', alpha=0.3)
+            plt.plot(peak_array, yfit, alpha=0.5)
+            plt.ylabel('Frequency lag (MHz)')
+            plt.xlabel('Time lag (mins)')
+            plt.title('Peak measurements, and weighted fit')
+            plt.show()
+
             plt.pcolormesh(t_delays, f_shifts, acf)
             plt.plot(peak_array, y_array, 'r', alpha=0.2)
             plt.plot(peak_array, yfit, 'k', alpha=0.2)
+            plt.ylabel('Frequency lag (MHz)')
+            plt.xlabel('Time lag (mins)')
+            plt.title(r'Tilt = {0} $\pm$ {1} (MHz/min)'.format(
+                    round(self.acf_tilt, 2), round(self.acf_tilt_err, 1)))
             plt.show()
-
-        self.acf_tilt = float(params[0].squeeze())
-        self.acf_tilt_err = float(errors[0].squeeze())
 
         return
 
@@ -919,13 +932,15 @@ class Dynspec:
             mcmc_results = func.emcee()
             results = mcmc_results
 
+        scale = np.sqrt(results.redchi)
+
         self.tau = results.params['tau'].value
-        self.tauerr = results.params['tau'].stderr
+        self.tauerr = results.params['tau'].stderr*scale
         self.dnu = results.params['dnu'].value
-        self.dnuerr = results.params['dnu'].stderr
+        self.dnuerr = results.params['dnu'].stderr*scale
         self.talpha = results.params['alpha'].value
         if alpha is None:
-            self.talphaerr = results.params['alpha'].stderr
+            self.talphaerr = results.params['alpha'].stderr*scale
 
         if plot:
             # get models:
