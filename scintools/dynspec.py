@@ -16,10 +16,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
-from scintools.scint_models import scint_acf_model, scint_sspec_model, \
- tau_acf_model, dnu_acf_model, fit_parabola, fit_log_parabola
-from scintools.scint_utils import is_valid, svd_model
-from scipy.interpolate import griddata, interp1d
+from scint_models import scint_acf_model, scint_acf_model_2D, tau_acf_model,\
+                         dnu_acf_model, scint_sspec_model, fit_parabola, fit_log_parabola
+from scint_utils import is_valid, svd_model
+from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
 
@@ -245,8 +245,9 @@ class Dynspec:
         elif input_dyn is None and display:
             plt.show()
 
-    def plot_acf(self, contour=False, filename=None, input_acf=None,
-                 input_t=None, input_f=None, fit=True, display=True):
+    def plot_acf(self, method='acf1d', alpha=None, contour=False, filename=None,
+                 input_acf=None, input_t=None, input_f=None, fit=True, mcmc=False,
+                 display=True):
         """
         Plot the ACF
         """
@@ -254,7 +255,7 @@ class Dynspec:
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau') and input_acf is None and fit:
-            self.get_scint_params()
+            self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc)
         if input_acf is None:
             arr = self.acf
             tspan = self.tobs
@@ -379,6 +380,60 @@ class Dynspec:
         elif input_sspec is None and display:
             plt.show()
 
+    def plot_scat_im(self, input_scat_im=None, display=True, colorbar=True,
+                     input_sspec=None, input_eta=None, input_fdop=None,
+                     input_tdel=None, lamsteps=False, trap=False,
+                     prewhite=True, use_angle=False, s=None, veff=None):
+        """
+        Plot the scattered image
+        """
+        c = 299792458.0  # m/s
+        if input_scat_im is None:
+            if not hasattr(self, 'scat_im'):
+                scat_im, xyaxes = self.calc_scat_im(input_sspec=input_sspec,
+                                                    input_eta=input_eta,
+                                                    input_fdop=input_fdop,
+                                                    input_tdel=input_tdel,
+                                                    lamsteps=lamsteps, trap=trap,
+                                                    prewhite=prewhite)
+
+                if use_angle:
+                    thetarad = (input_fdop / (1e3 * self.freq)) * \
+                             (c * s / (veff * 1000))
+                    thetadeg = thetarad * 180 / np.pi
+                    xyaxes = thetadeg
+
+        else:
+            scat_im = input_scat_im
+            if use_angle:
+                thetarad = (input_fdop / (1e3 * self.freq)) * (c * s / (veff * 1000))
+                thetadeg = thetarad * 180 / np.pi
+                xyaxes = thetadeg
+            else:
+                xyaxes = input_fdop
+
+        scat_im -= np.min(scat_im)
+        scat_im += 1e-10
+        scat_im = 10*np.log10(scat_im)
+        medval = np.median(scat_im[is_valid(scat_im) * np.array(np.abs(scat_im) > 0)])
+        # # std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        maxval = np.max(scat_im[is_valid(scat_im) * np.array(np.abs(scat_im) > 0)])
+        vmin = medval-3
+        vmax = maxval-3
+
+        plt.pcolormesh(xyaxes, xyaxes, scat_im, vmin=vmin, vmax=vmax)
+        plt.title('Scattered image')
+        if use_angle:
+            plt.xlabel('Angle parallel to velocity (deg)')
+            plt.ylabel('Angle perpendicular to velocity (deg)')
+        else:
+            plt.xlabel('Angle parallel to velocity')
+            plt.ylabel('Angle perpendicular to velocity')
+        if colorbar:
+            plt.colorbar()
+        if display:
+            plt.show()
+
     def plot_all(self, dyn=1, sspec=3, acf=2, norm_sspec=4, colorbar=True,
                  lamsteps=False, filename=None, display=True):
         """
@@ -412,12 +467,11 @@ class Dynspec:
         elif display:
             plt.show()
 
-    def fit_arc(self, method='norm_sspec', asymm=False, plot=False,
-                delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True,
-                etamax=None, etamin=None, low_power_diff=-3,
-                high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
-                nsmooth=5, filename=None, noise_error=True, display=True,
-                log_parabola=False):
+    def fit_arc(self, method='norm_sspec', asymm=False, plot=False, delmax=None,
+                numsteps=1e4, startbin=3, cutmid=3, lamsteps=True, etamax=None,
+                etamin=None, low_power_diff=-3, high_power_diff=-1.5, ref_freq=1400,
+                constraint=[0, np.inf], nsmooth=5, filename=None, noise_error=True,
+                display=True, log_parabola=False):
         """
         Find the arc curvature with maximum power along it
 
@@ -866,15 +920,15 @@ class Dynspec:
 
         return
 
-    def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
-                         mcmc=False, display=True):
+    def get_scint_params(self, method="acf1d", plot=False, alpha=None,
+                         mcmc=False, full_frame=False, display=True):
         """
         Measure the scintillation timescale
             Method:
                 acf1d - takes a 1D cut through the centre of the ACF for
                 sspec - measures timescale from the secondary spectrum
                 acf2d - uses an analytic approximation to the ACF including
-                    a phase gradient (a sheer to the ACF)
+                    a phase gradient (a shear to the ACF)
         """
 
         from lmfit import Minimizer, Parameters
@@ -885,27 +939,23 @@ class Dynspec:
         if not hasattr(self, 'sspec'):
             self.calc_sspec()
 
-        if method == 'acf1d':
-            scint_model = scint_acf_model
-            ydata_f = self.acf[int(self.nchan):, int(self.nsub)]
-            xdata_f = self.df*np.linspace(0, len(ydata_f), len(ydata_f))
-            ydata_t = self.acf[int(self.nchan), int(self.nsub):]
-            xdata_t = self.dt*np.linspace(0, len(ydata_t), len(ydata_t))
-        elif method == 'sspec':
-            scint_model = scint_sspec_model
-            arr = cp(self.acf)
-            arr = np.fft.ifftshift(arr)
-            # sspec = np.fft.fft2(arr)
+        ydata_f = self.acf[int(self.nchan):, int(self.nsub)]
+        xdata_f = self.df * np.linspace(0, len(ydata_f), len(ydata_f))
+        ydata_t = self.acf[int(self.nchan), int(self.nsub):]
+        xdata_t = self.dt * np.linspace(0, len(ydata_t), len(ydata_t))
+
+        nt = len(xdata_t)  # number of t-lag samples
+        nf = len(xdata_f)  # number of freq samples
 
         # concatenate x and y arrays
         xdata = np.array(np.concatenate((xdata_t, xdata_f)))
         ydata = np.array(np.concatenate((ydata_t, ydata_f)))
+
         weights = np.ones(np.shape(ydata))
 
         # Get initial parameter values
-        nt = len(xdata_t)  # number of t-lag samples
         # Estimate amp and white noise level
-        wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
+        wn = max([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
         amp = max([ydata_f[1], ydata_t[1]])
         # Estimate tau for initial guess. Closest index to 1/e power
         tau = xdata_t[np.argmin(abs(ydata_t - amp/np.e))]
@@ -920,25 +970,102 @@ class Dynspec:
         params.add('wn', value=wn, min=0.0, max=np.inf)
         params.add('nt', value=nt, vary=False)
         if alpha is None:
-            params.add('alpha', value=5/3, min=0, max=8)
+            params.add('alpha', value=5/3, vary=True,
+                       min=1, max=3)
         else:
             params.add('alpha', value=alpha, vary=False)
 
-        # Do fit
-        func = Minimizer(scint_model, params, fcn_args=(xdata, ydata, weights))
-        results = func.minimize()
-        if mcmc:
-            print('Doing mcmc posterior sample')
-            mcmc_results = func.emcee()
-            results = mcmc_results
+        def fitter(scint_model, params, args, mcmc=mcmc):
+            # Do fit
+            func = Minimizer(scint_model, params, fcn_args=args)
+            results = func.minimize()
+            if mcmc:
+                func = Minimizer(scint_model, results.params, fcn_args=args)
+                print('Doing mcmc posterior sample')
+                mcmc_results = func.emcee()
+                results = mcmc_results
+
+            return results
+
+        results = fitter(scint_acf_model, params, (xdata, ydata, weights))
+
+        if method == 'acf2d':
+            params = results.params
+
+            dnu = params['dnu']
+            tau = params['tau']
+
+            if 3 * (tau / self.dt) > self.nsub:
+                extent = 1
+            else:
+                extent = 3
+
+            fmin = int(self.nchan - 3 * (dnu / self.df))
+            fmax = int(self.nchan + 3 * (dnu / self.df))
+            tmin = int(self.nsub - extent * (tau / self.dt))
+            tmax = int(self.nsub + extent * (tau / self.dt))
+
+            ydata_2d = self.acf[fmin-1:fmax, tmin-1:tmax]
+            tticks = np.linspace(-self.tobs, self.tobs, len(self.acf[0, :]))
+            tdata = tticks[tmin-1:tmax]
+            fticks = np.linspace(-self.bw, self.bw, len(self.acf[:, 0]))
+            fdata = fticks[fmin-1:fmax]
+
+            weights_2d = np.ones(np.shape(ydata_2d))
+
+            params.add('tobs', value=self.tobs, vary=False)
+            params.add('freq', value=self.freq, vary=False)
+            params.add('phasegrad', value=1e-10, vary=True,
+                       min=-np.Inf, max=np.Inf)
+
+            results = fitter(scint_acf_model_2D, params, (tdata, fdata, ydata_2d, weights_2d), mcmc=mcmc)
+
+        elif method == 'sspec':
+            '''
+            sspec method
+            '''
+            # fdyn = np.fft.fft2(self.dyn, (2 * nf, 2 * nt))
+            # fdynsq = fdyn * np.conjugate(fdyn)
+            #
+            # secspec = np.real(fdynsq)
+            # #secspec = np.fft.fftshift(fdynsq)
+            # #secspec = secspec[nf:2*nf, :]
+            # #secspec = np.real(secspec)
+            #
+            # rowsum = np.sum(secspec[:, :nt], axis=0)
+            # ydata_t = rowsum / (2*nf)
+            # colsum = np.sum(secspec[:nf, :], axis=1)
+            # ydata_f = colsum / (2 * nt)
+            #
+            # # concatenate x and y arrays
+            # xdata = np.array(np.concatenate((xdata_t, xdata_f)))
+            # ydata = np.concatenate((ydata_t, ydata_f))
+            #
+            # weights = np.ones(np.shape(ydata))
+            #
+            # params = results.params
+            # results = fitter(scint_sspec_model, params, (xdata, ydata, weights))
 
         self.tau = results.params['tau'].value
         self.tauerr = results.params['tau'].stderr
         self.dnu = results.params['dnu'].value
         self.dnuerr = results.params['dnu'].stderr
-        self.talpha = results.params['alpha'].value
+        if method == 'acf2d':
+            self.phasegrad = results.params['phasegrad'].value
+            self.phasegraderr = results.params['phasegrad'].stderr
         if alpha is None:
+            self.talpha = results.params['alpha'].value
             self.talphaerr = results.params['alpha'].stderr
+        else:
+            self.talpha = alpha
+            self.talphaerr = 0
+
+        print("\t ACF FIT PARAMETERS\n")
+        print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau, err=self.tauerr))
+        print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu, err=self.dnuerr))
+        print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha, err=self.talphaerr))
+        if method == 'acf2d':
+            print("phase grad:\t\t{val} +/- {err}".format(val=self.phasegrad, err=self.phasegraderr))
 
         if plot:
             # get models:
@@ -952,26 +1079,59 @@ class Dynspec:
                                            weights[nt:])
                 fmodel = ydata_f - fmodel_res/weights[nt:]
 
-            plt.subplot(2, 1, 1)
-            plt.plot(xdata_t, ydata_t)
-            plt.plot(xdata_t, tmodel)
-            plt.xlabel('Time lag (s)')
-            plt.subplot(2, 1, 2)
-            plt.plot(xdata_f, ydata_f)
-            plt.plot(xdata_f, fmodel)
-            plt.xlabel('Frequency lag (MHz)')
-            if display:
-                plt.show()
-
-            if mcmc:
-                corner.corner(mcmc_results.flatchain,
-                              labels=mcmc_results.var_names,
-                              truths=list(mcmc_results.params.
-                                          valuesdict().values()))
+                plt.subplot(2, 1, 1)
+                plt.plot(xdata_t, ydata_t)
+                plt.plot(xdata_t, tmodel)
+                plt.xlabel('Time lag (s)')
+                plt.subplot(2, 1, 2)
+                plt.plot(xdata_f, ydata_f)
+                plt.plot(xdata_f, fmodel)
+                plt.xlabel('Frequency lag (MHz)')
                 if display:
                     plt.show()
 
-        return
+            elif method == 'acf2d':
+                # Get tau model
+                if full_frame:
+                    ydata = self.acf
+                    tdata = tticks
+                    fdata = fticks
+                    weights = np.ones(np.shape(ydata))
+                    model_res = scint_acf_model_2D(results.params, tdata, fdata, ydata,
+                                               weights)
+                    model = (ydata - model_res) / weights
+
+                else:
+                    ydata = ydata_2d
+                    model_res = scint_acf_model_2D(results.params, tdata, fdata, ydata,
+                                               weights_2d)
+                    model = (ydata - model_res) / weights_2d
+
+                data = [(ydata, 'data'), (model, 'model'), (model_res, 'residuals')]
+                for d in data:
+                    plt.pcolormesh(tdata/60, fdata, d[0])
+                    plt.title(d[1])
+                    plt.xlabel('Time lag (mins)')
+                    plt.ylabel('Frequency lag (MHz)')
+                    if display:
+                        plt.show()
+
+                if display:
+                    plt.show()
+
+            elif method == 'sspec':
+                '''
+                sspec plotting routine
+                '''
+
+            if mcmc:
+                corner.corner(results.flatchain,
+                              labels=results.var_names,
+                              truths=list(results.params.valuesdict().values()))
+                if display:
+                    plt.show()
+
+        return results.params
 
     def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None,
                 lamsteps=False, maxfdop=np.inf, figsize=(8, 13), display=True):
@@ -1168,6 +1328,125 @@ class Dynspec:
             self.lamdyn = dyn
         else:
             self.dyn = dyn
+
+    def calc_scat_im(self, input_sspec=None, input_eta=None, input_fdop=None,
+                     input_tdel=None, div=100, lamsteps=False, trap=False, prewhite=True,
+                     low_power_diff=-0.5, high_power_diff=-0.5, delmax=0.8,
+                     ref_freq=1400, s=None, veff=None, fit_arc=True, plotarc=False,
+                     plot_fit=False, plot=False, use_angle=False):
+        """
+        Calculate the scattered image
+        """
+
+        if input_sspec is None:
+            if lamsteps:
+                if not hasattr(self, 'lamsspec'):
+                    self.calc_sspec(lamsteps=lamsteps, prewhite=prewhite)
+                sspec = cp(self.lamsspec)
+            elif trap:
+                if not hasattr(self, 'trapsspec'):
+                    self.calc_sspec(trap=trap, prewhite=prewhite)
+                sspec = cp(self.trapsspec)
+            else:
+                if not hasattr(self, 'sspec'):
+                    self.calc_sspec(lamsteps=lamsteps, prewhite=prewhite)
+                sspec = cp(self.sspec)
+            fdop = cp(self.fdop)
+            tdel = cp(self.tdel)
+        else:
+            sspec = input_sspec
+            fdop = input_fdop
+            tdel = input_tdel
+
+        nf = len(fdop)
+        nt = len(tdel)
+
+        sspec = 10**(sspec / 10)
+
+        if input_eta is None and fit_arc:
+            if not hasattr(self, 'betaeta') and not hasattr(self, 'eta'):
+                self.fit_arc(input_sspec=input_sspec, input_x=fdop, input_y=tdel,
+                             lamsteps=lamsteps, log_parabola=True,
+                             low_power_diff=low_power_diff,
+                             high_power_diff=high_power_diff,
+                             delmax=delmax, plot=plot_fit)
+            if lamsteps:
+                c = 299792458.0  # m/s
+                beta_to_eta = c * 1e6 / ((ref_freq * 1e6)**2)
+                eta = self.betaeta / (self.freq / ref_freq)**2  # correct for freq
+                eta = eta*beta_to_eta
+                eta = eta
+            else:
+                eta = self.eta
+        else:
+            if input_eta is None:
+                eta = tdel[nt-1] / fdop[nf-1]**2
+            else:
+                eta = input_eta
+
+        if plotarc:
+            self.plot_sspec(lamsteps=lamsteps, plotarc=plotarc)
+
+        # crop sspec to desired region
+        flim = next(i for i, delay in enumerate(eta * fdop**2) if
+                    delay < np.max(tdel))
+        if flim == 0:
+            tlim = next(i for i, delay in enumerate(tdel) if
+                        delay > eta * fdop[0] ** 2)
+            sspec = sspec[:tlim, :]
+            tdel = fdop[:tlim]
+        else:
+            sspec = sspec[:, flim-int(0.03*nf):nf-flim+int(0.03*nf)]
+            fdop = fdop[flim-int(0.03*nf):nf-flim+int(0.03*nf)]
+
+        # fill infs and extremely small pixel values
+        array = cp(sspec)
+        x = np.arange(0, array.shape[1])
+        y = np.arange(0, array.shape[0])
+        # mask invalid values
+        array = np.ma.masked_where((array < 1e-22), array)
+        xx, yy = np.meshgrid(x, y)
+        # get only the valid values
+        x1 = xx[~array.mask]
+        y1 = yy[~array.mask]
+        newarr = np.ravel(array[~array.mask])
+        sspec = griddata((x1, y1), newarr, (xx, yy),
+                            method='linear')
+        # fill nans with the mean
+        meanval = np.mean(sspec[is_valid(sspec)])
+        medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        sspec[np.isnan(sspec)] = meanval
+
+        max_fd = max(fdop)
+        fd_step = max_fd / div
+
+        fdop_x = np.arange(-max_fd, max_fd, fd_step)
+        fdop_x = np.append(fdop_x, max_fd)
+        nx = len(fdop_x)
+
+        fdop_y = np.arange(0, max_fd, fd_step)
+        fdop_y = np.append(fdop_y, max_fd)
+        ny = len(fdop_y)
+
+        fdop_x_est, fdop_y_est = np.meshgrid(fdop_x, fdop_y)
+        fdop_est = fdop_x_est
+        tdel_est = (fdop_x_est**2 + fdop_y_est**2) * eta
+        fd, td = np.meshgrid(fdop, tdel)
+
+        # 2D interpolation
+        interp = RectBivariateSpline(td[:, 0], fd[0], sspec)
+        image = interp.ev(tdel_est, fdop_est)
+
+        image = image * fdop_y_est
+        scat_im = np.zeros((nx, nx))
+        scat_im[ny-1:nx, :] = image
+        scat_im[0:ny-1, :] = image[ny-1:0:-1, :]
+
+        if plot:
+            self.plot_scat_im(input_scat_im=scat_im, input_fdop=fdop_x, s=s,
+                              veff=veff, use_angle=use_angle)
+
+        return scat_im, fdop_x
 
     def calc_sspec(self, prewhite=True, plot=False, lamsteps=False,
                    input_dyn=None, input_x=None, input_y=None, trap=False,

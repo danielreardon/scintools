@@ -90,6 +90,14 @@ def write_results(filename, dyn=None):
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
 
+    if hasattr(dyn, 'acf_tilt'):  # Tilt in the ACF (MHz/min)
+        header += ",acf_tilt,acf_tilt_err"
+        write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
+
+    if hasattr(dyn, 'phasegrad'):  # Phase gradient (shear to the ACF)
+        header += ",phasegrad,phasegraderr"
+        write_string += ",{0},{1}".format(dyn.phasegrad, dyn.phasegraderr)
+
     if hasattr(dyn, 'eta'):  # Arc curvature
         header += ",eta,etaerr"
         write_string += ",{0},{1}".format(dyn.eta, dyn.etaerr)
@@ -97,10 +105,6 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'betaeta'):  # Beta arc curvature
         header += ",betaeta,betaetaerr"
         write_string += ",{0},{1}".format(dyn.betaeta, dyn.betaetaerr)
-
-    if hasattr(dyn, 'acf_tilt'):  # Arc curvature
-        header += ",acf_tilt,acf_tilt_err"
-        write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
 
     header += "\n"
     write_string += "\n"
