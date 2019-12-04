@@ -105,12 +105,43 @@ def scint_acf_model(params, xdata, ydata, weights):
     return np.concatenate((residuals_t, residuals_f))
 
 
-def scint_acf_model_2D(params, xdata, ydata, weights):
+def scint_acf_model_2D(params, tdata, fdata, ydata, weights):
     """
     Fit an approximate 2D ACF function
     """
-    return
 
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+
+    parvals = params.valuesdict()
+
+    amp = parvals['amp']
+    dnu = parvals['dnu']
+    tau = parvals['tau']
+    alpha = parvals['alpha']
+    phasegrad = parvals['phasegrad']
+    freq = parvals['freq']
+    tobs = parvals['tobs']
+    wn = parvals['wn']
+    nt = len(tdata)
+    nf = len(fdata)
+
+    tdata = np.reshape(tdata, (nt, 1))
+    fdata = np.reshape(fdata, (1, nf))
+    dt = tdata[1] - tdata[0]
+    df = fdata[:, 1] - fdata[:, 0]
+
+    model = amp * np.exp(-(abs((tdata / tau) + 2 * phasegrad *
+                               ((dnu / np.log(2)) / freq)**(1 / 6) *
+                               (fdata / (dnu / np.log(2))))**(3 * alpha / 2) +
+                         abs(fdata / (dnu / np.log(2)))**(3 / 2))**(2 / 3))
+    model = np.multiply(model, 1-np.divide(abs(tdata), tobs))  # multiply by triangle function
+    model = np.fft.fftshift(model)
+    model[1, 1] = model[1, 1] + wn  # add white noise spike
+    model = np.fft.fftshift(model)
+    model = np.transpose(model)
+
+    return (ydata - model) * weights
 
 def tau_sspec_model(params, xdata, ydata, weights):
     """
@@ -139,7 +170,7 @@ def tau_sspec_model(params, xdata, ydata, weights):
     model = np.concatenate((model, model_flipped))
     model = model[0:2*len(xdata)-1]
     # Get Fourier model
-    model = np.fft(model)
+    model = np.fft.fft(model)
     model = np.real(model)
     model = model[0:len(xdata)]
 
@@ -154,39 +185,54 @@ def dnu_sspec_model(params, xdata, ydata, weights):
         dnu = bandwidth at 1/2 power
         wn = white noise spike in ACF cut
     """
-#
-#    if weights is None:
-#        weights = np.ones(np.shape(ydata))
-#
-#    y = dnu_acf_model(xdata, ydata, weights, params)
-#    # From ACF model, construct Fourier-domain model
-#    y_flipped = y[::-1]
-#    y = list(y) + list(y_flipped)  # concatenate
-#    y = y[0:2*len(f)-1]
-#    # Get Fourier model
-#    yf = np.fft(y)
-#    yf = np.real(yf)
-#    yf = yf[0:len(f)]
-#    return (data - model) * weights
-    return
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+
+    amp = params['amp']
+    dnu = params['dnu']
+    wn = params['wn']
+
+    model = amp*np.exp(-np.divide(xdata, dnu/np.log(2)))
+    model[0] = model[0] + wn  # add white noise spike
+    # Multiply by triangle function
+    model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
+
+    model_flipped = model[::-1]
+    model = np.concatenate((model, model_flipped))
+    model = model[0:2*len(xdata)-1]
+    # Get Fourier model
+    model = np.fft.fft(model)
+    model = np.real(model)
+    model = model[0:len(xdata)]
+
+    return (ydata - model) * weights
 
 
 def scint_sspec_model(params, xdata, ydata, weights):
     """
     Fit both tau (tau_acf_model) and dnu (dnu_acf_model) simultaneously
     """
-#
-#    if weights is None:
-#        weights = np.ones(np.shape(ydata))
-#
-#    y_t = tau_sspec_model(t=t, tau=tau, amp=amp, wn=wn, alpha=alpha)
-#    y_f = dnu_sspec_model(f=f, dnu=dnu, amp=amp, wn=wn)
-#    # return list(y_t) + list(y_f)  # concatenate t and f models
-#
-#    return (ydata - model) * weights
 
-    return
-
+    # if weights is None:
+    #     weights = np.ones(np.shape(ydata))
+    #
+    # parvals = params.valuesdict()
+    #
+    # nt = parvals['nt']
+    #
+    # # Scintillation timescale model
+    # xdata_t = xdata[:nt]
+    # ydata_t = ydata[:nt]
+    # weights_t = weights[:nt]
+    # residuals_t = tau_sspec_model(params, xdata_t, ydata_t, weights_t)
+    #
+    # # Scintillation bandwidth model
+    # xdata_f = xdata[nt:]
+    # ydata_f = ydata[nt:]
+    # weights_f = weights[nt:]
+    # residuals_f = dnu_sspec_model(params, xdata_f, ydata_f, weights_f)
+    #
+    # return np.concatenate((residuals_t, residuals_f))
 
 def arc_power_curve(params, xdata, ydata, weights):
     """
@@ -297,7 +343,7 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         vism_ra = 0
         vism_dec = 0
 
-    if 'psi' in params.keys():  # anisotropic case
+    if 'vism_psi' in params.keys():  # anisotropic case
         psi = params['psi']*np.pi/180  # anisotropy angle
         vism_psi = params['vism_psi']  # vism in direction of anisotropy
         veff2 = (veff_ra*np.sin(psi) + veff_dec*np.cos(psi) - vism_psi)**2
