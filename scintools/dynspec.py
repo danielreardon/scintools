@@ -804,7 +804,7 @@ class Dynspec:
         else:
             tmax = tmax
         if fmax is None:
-            fmax = self.dnu/10
+            fmax = self.dnu/5
         else:
             fmax = fmax
 
@@ -932,15 +932,13 @@ class Dynspec:
             mcmc_results = func.emcee()
             results = mcmc_results
 
-        scale = np.sqrt(results.redchi)
-
         self.tau = results.params['tau'].value
-        self.tauerr = results.params['tau'].stderr*scale
+        self.tauerr = results.params['tau'].stderr
         self.dnu = results.params['dnu'].value
-        self.dnuerr = results.params['dnu'].stderr*scale
+        self.dnuerr = results.params['dnu'].stderr
         self.talpha = results.params['alpha'].value
         if alpha is None:
-            self.talphaerr = results.params['alpha'].stderr*scale
+            self.talphaerr = results.params['alpha'].stderr
 
         if plot:
             # get models:
