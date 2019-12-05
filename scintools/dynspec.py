@@ -920,8 +920,9 @@ class Dynspec:
 
         return
 
-    def get_scint_params(self, method="acf1d", plot=False, alpha=None,
-                         mcmc=False, full_frame=False, display=True):
+    def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
+                         mcmc=False, full_frame=False, display=True,
+                         nscale=3):
         """
         Measure the scintillation timescale
             Method:
@@ -945,7 +946,6 @@ class Dynspec:
         xdata_t = self.dt * np.linspace(0, len(ydata_t), len(ydata_t))
 
         nt = len(xdata_t)  # number of t-lag samples
-        nf = len(xdata_f)  # number of freq samples
 
         # concatenate x and y arrays
         xdata = np.array(np.concatenate((xdata_t, xdata_f)))
@@ -953,7 +953,7 @@ class Dynspec:
 
         weights = np.ones(np.shape(ydata))
 
-        # Get initial parameter values
+        # Get initial parameter values from 1d fit
         # Estimate amp and white noise level
         wn = max([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
         amp = max([ydata_f[1], ydata_t[1]])
@@ -995,13 +995,13 @@ class Dynspec:
             dnu = params['dnu']
             tau = params['tau']
 
-            if 3 * (tau / self.dt) > self.nsub:
+            if nscale * (tau / self.dt) > self.nsub:
                 extent = 1
             else:
-                extent = 3
+                extent = nscale
 
-            fmin = int(self.nchan - 3 * (dnu / self.df))
-            fmax = int(self.nchan + 3 * (dnu / self.df))
+            fmin = int(self.nchan - nscale * (dnu / self.df))
+            fmax = int(self.nchan + nscale * (dnu / self.df))
             tmin = int(self.nsub - extent * (tau / self.dt))
             tmax = int(self.nsub + extent * (tau / self.dt))
 
@@ -1018,7 +1018,8 @@ class Dynspec:
             params.add('phasegrad', value=1e-10, vary=True,
                        min=-np.Inf, max=np.Inf)
 
-            results = fitter(scint_acf_model_2D, params, (tdata, fdata, ydata_2d, weights_2d), mcmc=mcmc)
+            results = fitter(scint_acf_model_2D, params,
+                             (tdata, fdata, ydata_2d, weights_2d), mcmc=mcmc)
 
         elif method == 'sspec':
             '''
@@ -1044,7 +1045,8 @@ class Dynspec:
             # weights = np.ones(np.shape(ydata))
             #
             # params = results.params
-            # results = fitter(scint_sspec_model, params, (xdata, ydata, weights))
+            # results = fitter(scint_sspec_model, params,
+            #                  (xdata, ydata, weights))
 
         self.tau = results.params['tau'].value
         self.tauerr = results.params['tau'].stderr
@@ -1061,11 +1063,15 @@ class Dynspec:
             self.talphaerr = 0
 
         print("\t ACF FIT PARAMETERS\n")
-        print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau, err=self.tauerr))
-        print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu, err=self.dnuerr))
-        print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha, err=self.talphaerr))
+        print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau,
+              err=self.tauerr))
+        print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu,
+              err=self.dnuerr))
+        print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
+              err=self.talphaerr))
         if method == 'acf2d':
-            print("phase grad:\t\t{val} +/- {err}".format(val=self.phasegrad, err=self.phasegraderr))
+            print("phase grad:\t\t{val} +/- {err}".format(val=self.phasegrad,
+                  err=self.phasegraderr))
 
         if plot:
             # get models:
@@ -1097,17 +1103,18 @@ class Dynspec:
                     tdata = tticks
                     fdata = fticks
                     weights = np.ones(np.shape(ydata))
-                    model_res = scint_acf_model_2D(results.params, tdata, fdata, ydata,
-                                               weights)
+                    model_res = scint_acf_model_2D(results.params, tdata,
+                                                   fdata, ydata, weights)
                     model = (ydata - model_res) / weights
 
                 else:
                     ydata = ydata_2d
-                    model_res = scint_acf_model_2D(results.params, tdata, fdata, ydata,
-                                               weights_2d)
+                    model_res = scint_acf_model_2D(results.params, tdata,
+                                                   fdata, ydata, weights_2d)
                     model = (ydata - model_res) / weights_2d
 
-                data = [(ydata, 'data'), (model, 'model'), (model_res, 'residuals')]
+                data = [(ydata, 'data'), (model, 'model'),
+                        (model_res, 'residuals')]
                 for d in data:
                     plt.pcolormesh(tdata/60, fdata, d[0])
                     plt.title(d[1])
@@ -1127,7 +1134,8 @@ class Dynspec:
             if mcmc:
                 corner.corner(results.flatchain,
                               labels=results.var_names,
-                              truths=list(results.params.valuesdict().values()))
+                              truths=list(results.params.valuesdict().
+                                          values()))
                 if display:
                     plt.show()
 
