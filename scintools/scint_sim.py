@@ -402,7 +402,7 @@ gradients (beyond those that arise naturally) can be simulated from this.
 class ACF():
 
     def __init__(self, s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3,
-                 phasegrad_x=0, phasegrad_y=0, Vx=1, Vy=0, psi=0, plot=False):
+                 phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1):
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
@@ -427,21 +427,23 @@ class ACF():
         self.ns = ns
         self.nf = nf
         self.ar = ar
-        self.psi = psi
         self.alpha = alpha
         self.phasegrad_x = phasegrad_x
         self.phasegrad_y = phasegrad_y
-        self.Vx = Vx
-        self.Vy = Vy
-
-        self.calc_acf()
-
-        if plot:
-            self.plot_acf()
+        if psi != 0:
+            theta = np.arctan(V_y / V_x)  # angle of input velocity from x-axis
+            phi = psi + theta  # angle of anisotropy from x-axis
+            self.V_x = V_x * np.cos(phi) + V_y * np.sin(phi)
+            self.V_y = V_x * np.cos(phi + np.pi) + V_y * np.cos(phi)
+        else:
+            self.V_x = V_x
+            self.V_y = V_y
+        self.psi = psi
+        self.amp = amp
 
         return
 
-    def calc_acf(self):
+    def calc_acf(self, plot=False):
         """
         computes 2-D ACF of intensity vs t and v where optimal sampling of t
         and v is provided with the output ACF
@@ -496,21 +498,22 @@ class ACF():
 
         spmax = self.s_max
         dnumax = self.dnu_max
-        nf = self.nf
-        ns = self.ns
+        nf = self.nf + 3  # make odd, compute over-sized frame
+        ns = self.ns + 3
         nt = ns
         sigxn = self.phasegrad_x
         sigyn = self.phasegrad_y
-        Vx = self.Vx
-        Vy = self.Vy
+        V_x = self.V_x
+        V_y = self.V_y
+        amp = self.amp
 
-        dsp = 2*(spmax)/(nt-1)
-        ddnun = 2*(dnumax)/(nf-1)
+        dsp = 2 * spmax / (nt - 1)
+        # ddnun = 2 * dnumax / (nf - 1)
 
-        Vmag = np.sqrt(self.Vx**2 + self.Vy**2)
+        Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
         sqrtar = np.sqrt(self.ar)
         # equally spaced dnu array dnu = dnun * nuhalf
-        dnun = np.arange(0, dnumax, ddnun)
+        dnun = np.linspace(0, dnumax, (nf - 1)/2)
         ndnun = len(dnun)
 
         if sigxn == 0 and sigyn == 0:
@@ -519,8 +522,8 @@ class ACF():
             gammitv = np.zeros((int(ns/2), int(nf/2)))
             # equally spaced t array t= tn*S0
             tn = np.arange(0.0, spmax/Vmag, dsp/Vmag)
-            snx = Vx*tn
-            sny = Vy*tn
+            snx = V_x*tn
+            sny = V_y*tn
             snp = np.arange(-2*spmax, 2*spmax, dsp)
             SNPX, SNPY = np.meshgrid(snp, snp)
             gammes = np.exp(-0.5*((SNPX/sqrtar)**2 +
@@ -567,45 +570,57 @@ class ACF():
             f2 = np.linspace(-dnumax, dnumax, nf)
             s2 = t2*Vmag
 
-#        else
-#            %calculate two quadrants -tmax t < tmax
-#            display('Calculating ACF... w/ two quad')
-#            tn = -(spmax/Vmag):(dsp/Vmag):(spmax/Vmag);  %equally spaced t array t= tn*S0
-#            snx= Vx*tn; sny = Vy*tn;
-#            [SNPX,SNPY] = meshgrid(-spmax:dsp:spmax);
-#            gammes=exp(-0.5*((SNPX/sqrtar).^2+(SNPY*sqrtar).^2).^alph2); %ACF of e-field
-#            %compute dnun=0 first
-#            gammitv(:,1)=exp(-0.5*((snx/sqrtar).^2 + (sny*sqrtar).^2).^alph2);
-#            for idn=2:ndnun
-#                snxt= snx -2*sigxn*dnun(idn);
-#                snyt = sny - 2*sigyn*dnun(idn);
-#            for isn=1:length(snx);
-#                %temp=gammes.*exp(1i*((SNPX-snx(isn)).^2+(SNPY-sny(isn)).^2)/(2*dnun(idn)));
-#                %gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
-#                temp=gammes.*exp(1i*((SNPX-snxt(isn)).^2+(SNPY-snyt(isn)).^2)/(2*dnun(idn)));
-#                gammitv(isn,idn)= -1i*dsp^2*sum(temp(:))/((2*pi)*dnun(idn));
-#            end
-#            end
-#            gammitv=real(gammitv.*conj(gammitv));  %equation A1 convert ACF of E to ACF of I
-#            gam3=[fliplr(flipud(gammitv(:,2:end))),gammitv]';
-#            f2=[fliplr(-dnun(2:end)),dnun];
-#            t2=tn;
-#            s2=t2.*Vmag;
+        else:
+            # calculate two quadrants -tmax t < tmax
+            print('Calculating ACF... w/ two quad')
+            tn = np.linspace(-spmax/Vmag, spmax/Vmag, ns)  # equally spaced t array t = tn*S0
+            snx, sny = V_x * tn, V_y * tn
+            snp = np.arange(-spmax, spmax, dsp)
+            SNPX, SNPY = np.meshgrid(snp, snp)
+            gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 + (SNPY * sqrtar)**2)**alph2)  #ACF of E-field
+            # compute dnun = 0 first
+            gammitv = np.zeros((int(ns), int(nf/2)))
+            gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 + (sny * sqrtar)**2)**alph2)
+            for idn in range(1, ndnun):
+                snxt = snx - 2 * sigxn * dnun[idn]
+                snyt = sny - 2 * sigyn * dnun[idn]
+                for isn in range(len(snx)):
+                    # temp = gammes * np.exp(1j * ((SNPX - snx[isn])**2 + (SNPY - sny[isn])**2) / (2 * dnun[idn]))
+                    # gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) / ((2 * np.pi) * dnun[idn])
+                    temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 + (SNPY - snyt[isn])**2) / (2 * dnun[idn]))
+                    gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) / ((2 * np.pi) * dnun[idn])
 
+            gammitv = np.real(gammitv * np.conj(gammitv))  # equation A1 convert ACF of E to ACF of I
+            gam3 = np.flipud(np.transpose(np.conj(np.block([np.fliplr(np.flipud(gammitv[:, :])),
+                                                  gammitv]))))
+            gam3 = amp * gam3[:nf - 3, :ns - 3]  # scale by amplitude and crop to match data
+            f2 = np.transpose(np.block([[np.flip(-dnun[:]), dnun]])).flatten()
+            f2 = f2[:nf - 3]
+            t2 = tn[:ns - 3]
+            s2 = t2 * Vmag
 
         self.fn = f2
         self.tn = t2
         self.sn = s2
         self.acf = gam3
-        return
 
+        if plot:
+            self.plot_acf()
+
+        return
 
     def plot_acf(self):
         """
         Plots the simulated ACF
         """
+
+        if not hasattr(self, 'acf'):
+            self.calc_acf()
+
         plt.figure(1)
         plt.pcolormesh(self.tn, self.fn, self.acf)
+        plt.xlabel('Time lag (s)')
+        plt.ylabel('Frequency lag (MHz)')
+        plt.show()
+
         return
-
-
