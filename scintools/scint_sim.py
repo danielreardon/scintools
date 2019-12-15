@@ -435,8 +435,8 @@ class ACF():
             self.V_x = V_x * np.sin(psi) + V_y * np.cos(psi)
             self.V_y = V_x * np.cos(psi) + V_y * np.sin(psi)
         else:
-            self.V_x = V_x
-            self.V_y = V_y
+            self.V_x = V_y
+            self.V_y = V_x
         self.psi = psi
         self.amp = amp
 
