@@ -431,10 +431,9 @@ class ACF():
         self.phasegrad_x = phasegrad_x
         self.phasegrad_y = phasegrad_y
         if psi != 0:
-            theta = np.arctan(V_y / V_x)  # angle of input velocity from x-axis
-            phi = psi + theta  # angle of anisotropy from x-axis
-            self.V_x = V_x * np.cos(phi) + V_y * np.sin(phi)
-            self.V_y = V_x * np.cos(phi + np.pi) + V_y * np.cos(phi)
+            # here x is RA and y is dec
+            self.V_x = V_x * np.sin(psi) + V_y * np.cos(psi)
+            self.V_y = V_x * np.cos(psi) + V_y * np.sin(psi)
         else:
             self.V_x = V_x
             self.V_y = V_y
