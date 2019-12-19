@@ -8,6 +8,8 @@ Importing dynamic spectra
 
 A Dynspec object can be loaded from a `psrflux`-format dynamic spectrum, a simulation object, or ...
 
+blah blah this is how you do things
+
 
 Basic plotting
 --------------
@@ -26,3 +28,6 @@ Secondary spectra
 -----------------
 
 Calculation of the secondary spectrum. Includes pre-whitening and post-darkening by default ....
+
+
+arcs are cool

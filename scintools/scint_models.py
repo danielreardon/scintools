@@ -128,20 +128,20 @@ def scint_acf_model_2D(params, tdata, fdata, ydata, weights):
 
     tdata = np.reshape(tdata, (nt, 1))
     fdata = np.reshape(fdata, (1, nf))
-    dt = tdata[1] - tdata[0]
-    df = fdata[:, 1] - fdata[:, 0]
 
     model = amp * np.exp(-(abs((tdata / tau) + 2 * phasegrad *
                                ((dnu / np.log(2)) / freq)**(1 / 6) *
                                (fdata / (dnu / np.log(2))))**(3 * alpha / 2) +
                          abs(fdata / (dnu / np.log(2)))**(3 / 2))**(2 / 3))
-    model = np.multiply(model, 1-np.divide(abs(tdata), tobs))  # multiply by triangle function
+    # multiply by triangle function
+    model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
     model = np.fft.fftshift(model)
     model[1, 1] = model[1, 1] + wn  # add white noise spike
     model = np.fft.fftshift(model)
     model = np.transpose(model)
 
     return (ydata - model) * weights
+
 
 def tau_sspec_model(params, xdata, ydata, weights):
     """

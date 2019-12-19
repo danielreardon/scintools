@@ -14,6 +14,7 @@ import os
 import csv
 from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
+from scipy.interpolate import griddata
 
 
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
@@ -438,6 +439,24 @@ def svd_model(arr, nmodes=1):
     arr = arr / np.abs(model)
 
     return arr, model
+
+
+def interp_nan_2d(array):
+    """
+    Fill in NaN values of a 2D array using linear interpolation
+    """
+    array = np.array(array).squeeze()
+    x = np.arange(0, array.shape[1])
+    y = np.arange(0, array.shape[0])
+    # mask invalid values
+    array = np.ma.masked_invalid(array)
+    xx, yy = np.meshgrid(x, y)
+    # get only the valid values
+    x1 = xx[~array.mask]
+    y1 = yy[~array.mask]
+    newarr = np.ravel(array[~array.mask])
+    array = griddata((x1, y1), newarr, (xx, yy), method='linear')
+    return array
 
 
 # Potential future functions

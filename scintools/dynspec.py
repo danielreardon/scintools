@@ -17,8 +17,8 @@ import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
 from scint_models import scint_acf_model, scint_acf_model_2D, tau_acf_model,\
-                         dnu_acf_model, scint_sspec_model, fit_parabola, fit_log_parabola
-from scint_utils import is_valid, svd_model
+                         dnu_acf_model, fit_parabola, fit_log_parabola
+from scint_utils import is_valid, svd_model, interp_nan_2d
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
@@ -245,9 +245,9 @@ class Dynspec:
         elif input_dyn is None and display:
             plt.show()
 
-    def plot_acf(self, method='acf1d', alpha=None, contour=False, filename=None,
-                 input_acf=None, input_t=None, input_f=None, fit=True, mcmc=False,
-                 display=True):
+    def plot_acf(self, method='acf1d', alpha=5.3, contour=False, filename=None,
+                 input_acf=None, input_t=None, input_f=None, fit=True,
+                 mcmc=False, display=True):
         """
         Plot the ACF
         """
@@ -390,11 +390,11 @@ class Dynspec:
         c = 299792458.0  # m/s
         if input_scat_im is None:
             if not hasattr(self, 'scat_im'):
-                scat_im, xyaxes = self.calc_scat_im(input_sspec=input_sspec,
-                                                    input_eta=input_eta,
+                scat_im, xyaxes = self.calc_scat_im(input_eta=input_eta,
                                                     input_fdop=input_fdop,
                                                     input_tdel=input_tdel,
-                                                    lamsteps=lamsteps, trap=trap,
+                                                    lamsteps=lamsteps,
+                                                    trap=trap,
                                                     prewhite=prewhite)
 
                 if use_angle:
@@ -406,7 +406,8 @@ class Dynspec:
         else:
             scat_im = input_scat_im
             if use_angle:
-                thetarad = (input_fdop / (1e3 * self.freq)) * (c * s / (veff * 1000))
+                thetarad = (input_fdop / (1e3 * self.freq)) * \
+                    (c * s / (veff * 1000))
                 thetadeg = thetarad * 180 / np.pi
                 xyaxes = thetadeg
             else:
@@ -415,9 +416,11 @@ class Dynspec:
         scat_im -= np.min(scat_im)
         scat_im += 1e-10
         scat_im = 10*np.log10(scat_im)
-        medval = np.median(scat_im[is_valid(scat_im) * np.array(np.abs(scat_im) > 0)])
+        medval = np.median(scat_im[is_valid(scat_im) *
+                           np.array(np.abs(scat_im) > 0)])
         # # std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        maxval = np.max(scat_im[is_valid(scat_im) * np.array(np.abs(scat_im) > 0)])
+        maxval = np.max(scat_im[is_valid(scat_im) *
+                        np.array(np.abs(scat_im) > 0)])
         vmin = medval-3
         vmax = maxval-3
 
@@ -467,11 +470,12 @@ class Dynspec:
         elif display:
             plt.show()
 
-    def fit_arc(self, method='norm_sspec', asymm=False, plot=False, delmax=None,
-                numsteps=1e4, startbin=3, cutmid=3, lamsteps=True, etamax=None,
-                etamin=None, low_power_diff=-3, high_power_diff=-1.5, ref_freq=1400,
-                constraint=[0, np.inf], nsmooth=5, filename=None, noise_error=True,
-                display=True, log_parabola=False):
+    def fit_arc(self, method='norm_sspec', asymm=False, plot=False,
+                delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True,
+                etamax=None, etamin=None, low_power_diff=-3,
+                high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
+                nsmooth=5, filename=None, noise_error=True, display=True,
+                log_parabola=False):
         """
         Find the arc curvature with maximum power along it
 
@@ -515,8 +519,8 @@ class Dynspec:
         sspec = sspec[0:ind, :]  # cut at delmax
         yaxis = yaxis[0:ind]
 
-        # noise of mean out to delmax
-        noise = np.sqrt(np.sum(np.power(noise, 2)))/np.sqrt(len(yaxis))
+        # noise of mean out to delmax.
+        noise = np.sqrt(np.sum(np.power(noise, 2)))/np.sqrt(len(yaxis)*2)
 
         if etamax is None:
             etamax = ymax/((self.fdop[1]-self.fdop[0])*cutmid)**2
@@ -696,7 +700,7 @@ class Dynspec:
                    maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=False,
                    scrunched=True, plot_fit=True, ref_freq=1400, numsteps=None,
                    filename=None, display=True, unscrunched=True,
-                   powerspec=False):
+                   powerspec=False, interp_nan=False):
         """
         Normalise fdop axis using arc curvature
         """
@@ -772,7 +776,10 @@ class Dynspec:
             normSspec.append(normline)
             isspectot = np.add(isspectot, normline)
         normSspec = np.array(normSspec).squeeze()
-        isspecavg = np.nanmean(normSspec, axis=0)  # make average
+        if interp_nan:
+            # interpolate NaN values
+            normSspec = interp_nan_2d(normSspec)
+        isspecavg = np.mean(normSspec, axis=0)  # make average
         powerspectrum = np.nanmean(np.power(10, normSspec/10), axis=1)
         ind1 = np.argmin(abs(fdopnew-1)-2)
         if isspecavg[ind1] < 0:
@@ -1278,19 +1285,11 @@ class Dynspec:
 
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
-        array = cp(self.dyn)
-        x = np.arange(0, array.shape[1])
-        y = np.arange(0, array.shape[0])
+
         if linear:  # do linear interpolation
-            # mask invalid values
-            array = np.ma.masked_invalid(array)
-            xx, yy = np.meshgrid(x, y)
-            # get only the valid values
-            x1 = xx[~array.mask]
-            y1 = yy[~array.mask]
-            newarr = np.ravel(array[~array.mask])
-            self.dyn = griddata((x1, y1), newarr, (xx, yy),
-                                method='linear')
+            array = cp(self.dyn)
+            self.dyn = interp_nan_2d(array)
+
         # Fill remainder with the mean
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
@@ -1338,10 +1337,11 @@ class Dynspec:
             self.dyn = dyn
 
     def calc_scat_im(self, input_sspec=None, input_eta=None, input_fdop=None,
-                     input_tdel=None, div=100, lamsteps=False, trap=False, prewhite=True,
-                     low_power_diff=-0.5, high_power_diff=-0.5, delmax=0.8,
-                     ref_freq=1400, s=None, veff=None, fit_arc=True, plotarc=False,
-                     plot_fit=False, plot=False, use_angle=False):
+                     input_tdel=None, div=100, lamsteps=False, trap=False,
+                     prewhite=True, low_power_diff=-0.5, high_power_diff=-0.5,
+                     delmax=0.8, ref_freq=1400, s=None, veff=None,
+                     fit_arc=True, plotarc=False, plot_fit=False, plot=False,
+                     use_angle=False):
         """
         Calculate the scattered image
         """
@@ -1373,15 +1373,15 @@ class Dynspec:
 
         if input_eta is None and fit_arc:
             if not hasattr(self, 'betaeta') and not hasattr(self, 'eta'):
-                self.fit_arc(input_sspec=input_sspec, input_x=fdop, input_y=tdel,
-                             lamsteps=lamsteps, log_parabola=True,
-                             low_power_diff=low_power_diff,
+                self.fit_arc(lamsteps=lamsteps,
+                             log_parabola=True, low_power_diff=low_power_diff,
                              high_power_diff=high_power_diff,
                              delmax=delmax, plot=plot_fit)
             if lamsteps:
                 c = 299792458.0  # m/s
                 beta_to_eta = c * 1e6 / ((ref_freq * 1e6)**2)
-                eta = self.betaeta / (self.freq / ref_freq)**2  # correct for freq
+                # correct for freq
+                eta = self.betaeta / (self.freq / ref_freq)**2
                 eta = eta*beta_to_eta
                 eta = eta
             else:
@@ -1404,8 +1404,8 @@ class Dynspec:
             sspec = sspec[:tlim, :]
             tdel = fdop[:tlim]
         else:
-            sspec = sspec[:, flim-int(0.03*nf):nf-flim+int(0.03*nf)]
-            fdop = fdop[flim-int(0.03*nf):nf-flim+int(0.03*nf)]
+            sspec = sspec[:, flim:nf-flim]
+            fdop = fdop[flim:nf-flim]
 
         # fill infs and extremely small pixel values
         array = cp(sspec)
@@ -1419,10 +1419,9 @@ class Dynspec:
         y1 = yy[~array.mask]
         newarr = np.ravel(array[~array.mask])
         sspec = griddata((x1, y1), newarr, (xx, yy),
-                            method='linear')
+                         method='linear')
         # fill nans with the mean
         meanval = np.mean(sspec[is_valid(sspec)])
-        medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         sspec[np.isnan(sspec)] = meanval
 
         max_fd = max(fdop)
@@ -1445,10 +1444,13 @@ class Dynspec:
         interp = RectBivariateSpline(td[:, 0], fd[0], sspec)
         image = interp.ev(tdel_est, fdop_est)
 
+        plt.pcolor(10*np.log10(image))
+        plt.show()
+
         image = image * fdop_y_est
         scat_im = np.zeros((nx, nx))
         scat_im[ny-1:nx, :] = image
-        scat_im[0:ny-1, :] = image[ny-1:0:-1, :]
+        scat_im[0:ny, :] = np.flipud(image[0:ny, :])
 
         if plot:
             self.plot_scat_im(input_scat_im=scat_im, input_fdop=fdop_x, s=s,
