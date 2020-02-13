@@ -105,7 +105,7 @@ def scint_acf_model(params, xdata, ydata, weights):
     return np.concatenate((residuals_t, residuals_f))
 
 
-def scint_acf_model_2D(params, tdata, fdata, ydata, weights):
+def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     """
     Fit an approximate 2D ACF function
     """
@@ -143,6 +143,53 @@ def scint_acf_model_2D(params, tdata, fdata, ydata, weights):
     return (ydata - model) * weights
 
 
+<<<<<<< HEAD
+=======
+def scint_acf_model_2d(params, ydata, weights):
+    """
+    Fit an analytical 2D ACF function
+    """
+    from scint_sim import ACF
+
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+
+    parvals = params.valuesdict()
+
+    tau = parvals['tau']
+    dnu = parvals['dnu']
+    alpha = parvals['alpha']
+    ar = parvals['ar']
+    phasegrad_x = parvals['phasegrad_x']
+    phasegrad_y = parvals['phasegrad_y']
+    wn = parvals['wn']
+    amp = parvals['amp']
+
+    tobs = parvals['tobs']
+    bw = parvals['bw']
+    ns_fullfr = 2 * parvals['nt']
+    nf_fullfr = 2 * parvals['nf']
+    ns = len(ydata[0])
+    nf = len(ydata)
+
+    V_x = parvals['v_ra']
+    V_y = parvals['v_dec']
+    psi = parvals['psi']
+
+    s_max = (ns / ns_fullfr) * tobs / tau
+    dnu_max = (nf / nf_fullfr) * bw / dnu
+
+    acf = ACF(s_max=s_max, dnu_max=dnu_max, ns=ns, nf=nf, ar=ar, alpha=alpha,
+              phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y, V_x=V_x, V_y=V_y,
+              psi=psi, amp=amp)
+    acf.calc_acf()
+    model = acf.acf
+    model[int(nf / 2) + 1, int(ns / 2) + 1] += wn  # add white noise spike
+
+    return (ydata - model) * weights
+
+
+>>>>>>> 89226bdf7f5cc06effe14374936c5427f46def8a
 def tau_sspec_model(params, xdata, ydata, weights):
     """
     Fit 1D function to cut through ACF for scintillation timescale.

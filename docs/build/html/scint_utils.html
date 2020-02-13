@@ -1,0 +1,371 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>scint_utils module &#8212; scintools 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Simulation class" href="simulation.html" />
+    <link rel="prev" title="scint_models module" href="scint_models.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="scint-utils-module">
+<h1>scint_utils module<a class="headerlink" href="#scint-utils-module" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="astrophysical-modelling">
+<h2>Astrophysical modelling<a class="headerlink" href="#astrophysical-modelling" title="Permalink to this headline">¶</a></h2>
+<code class="descname">get_ssb_delay</code><span class="sig-paren">(</span><em>mjds, raj, decj</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Get Romer delay to Solar System Barycentre (SSB) for correction of site arrival times to barycentric.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</li>
+<li><strong>raj</strong> (<cite>float</cite>) - right ascension (J2000) of the pulsar in degrees</li>
+<li><strong>decj</strong> (<cite>float</cite>) - declination (J2000) of the pulsar in degrees</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>List of Romer delays</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">get_earth_velocity</code><span class="sig-paren">(</span><em>mjds, raj, decj</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Calculates the component of Earth’s velocity transverse to the line of sight, in RA and DEC</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</li>
+<li><strong>raj</strong> (<cite>float</cite>) - right ascension (J2000) of the pulsar in degrees</li>
+<li><strong>decj</strong> (<cite>float</cite>) - declination (J2000) of the pulsar in degrees</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>List of Earth velocities in RA</li>
+<li>List of Earth velocities in dec</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">get_true_anomaly</code><span class="sig-paren">(</span><em>mjds, pars</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Calculates true anomalies for an array of barycentric MJDs and a parameter dictionary</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</li>
+<li><strong>pars</strong> (<cite>dict</cite>) - parameter file containing the orbital eccentricity (‘ECC’), binary period (‘PB’), MJD of binary period measurement (‘T0’), and binary period derivative,  (‘PBDOT’).</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>List of true anomalies</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+</div>
+<div class="section" id="reading-and-writing-data">
+<h2>Reading and writing data<a class="headerlink" href="#reading-and-writing-data" title="Permalink to this headline">¶</a></h2>
+<code class="descname">read_dynlist</code><span class="sig-paren">(</span><em>file_path</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Reads list of dynamic spectra filenames from path</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>file_path</strong> (<cite>str</cite>) - file path containing the dynamic spectra files</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>List of dynamic spectrum file paths</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">write_results</code><span class="sig-paren">(</span><em>filename, dyn=None</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Appends dynamic spectrum information and parameters of interest to file</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>filename</strong> (<cite>str</cite>) - path of the file to write to</li>
+<li><strong>dyn</strong> (<cite>Dynspec object</cite>) - Dynspec object</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">read_results</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Reads a CSV results file written by <cite>write_results()</cite></p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>filename</strong> (<cite>str</cite>) - path of the file to read from</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>Dictionary of parameters from file</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">float_array_from_dict</code><span class="sig-paren">(</span><em>dictionary, key</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Convert an array stored in dictionary to a numpy array</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>dictionary</strong> (<cite>dict</cite>) - dictionary containing the array</li>
+<li><strong>key</strong> (<cite>str</cite>) - key of the array</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>numpy array from stored array</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">read_par</code><span class="sig-paren">(</span><em>parfile</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Reads a parameter file and return a dictionary of parameter names and values</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>parfile</strong> (<cite>str</cite>) - path to parameter file for conversion</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>resulting dictionary</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">pars_to_params</code><span class="sig-paren">(</span><em>pars, params=None</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Converts a dictionary of parameter file parameters from <code class="docutils literal notranslate"><span class="pre">read_par()</span></code> to an <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object to use in models. By default, parameters are not varied.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>pars</strong> (<cite>dict</cite>) - dictionary of parameters</li>
+<li><strong>params</strong> (<cite>lmfit Parameters() object, optional</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object to append parameters to. If None, initializes new object.</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>appended <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+</div>
+<div class="section" id="other-utilities">
+<h2>Other utilities<a class="headerlink" href="#other-utilities" title="Permalink to this headline">¶</a></h2>
+<code class="descname">clean_archive</code><span class="sig-paren">(</span><em>archive, template=None, bandwagon=0.99, channel_threshold=7, subint_threshold=5, output_directory=None</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Cleans a psrchive archive object using <code class="docutils literal notranslate"><span class="pre">coast_guard</span></code>.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>archive</strong> (<cite>psarchive archive object</cite>) - psarchive archive</li>
+<li><strong>template</strong> (<cite>str, optional</cite>) -</li>
+<li><strong>bandwagon</strong> (<cite>float, optional</cite>) - bandwagon value</li>
+<li><strong>channel_threshold</strong> (<cite>float, optional</cite>) - channel threshold</li>
+<li><strong>subint_threshold</strong> (<cite>float, optional</cite>) - sub-integration threshold</li>
+<li><strong>output_directory</strong> (<cite>str</cite>) - directory to output the cleaned archive</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">is_valid</code><span class="sig-paren">(</span><em>array</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Returns boolean array of values that are finite an not nan.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>array</strong> (<cite>numpy ndarray</cite>) - input array</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>Boolean ndarray</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">slow_FT</code><span class="sig-paren">(</span><em>dynspec, freqs</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Slow FT of dynamic spectrum along points of t*(f / fref), account for phase scaling of f_D. Given a uniform t axis, this reduces to a regular FT.</p>
+<p>Uses Olaf’s c-implemation if possible, otherwise reverts to a slow, pure Python/numpy method.</p>
+<p>Reference freq is currently hardcoded to the middle of the band.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>dynspec</strong> (<cite>numpy 2D array</cite>) - input dynamic spectrum</li>
+<li><strong>freqs</strong> (<cite>numpy 1D array</cite>) - frequency axis of the dynamic spectrum in MHz</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>Fourier-transformed dynamic spectrum</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">svd_model</code><span class="sig-paren">(</span><em>arr, nmodes=1</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Take SVD of a dynamic spectrum, divide by the largest N modes</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>arr</strong> (<cite>numpy 2D array</cite>) - input dynamic spectrum</li>
+<li><strong>nmodes</strong> (<cite>int, optional</cite>) - number of singular values to compute up to.</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>Array divided by absolute value of SVD model</li>
+<li>SVD model</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">make_dynspec</code><span class="sig-paren">(</span><em>archive, template=None, phasebin=1</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Creates a <cite>psrflux</cite>-format dynamic spectrum from an archive <code class="docutils literal notranslate"><span class="pre">$</span> <span class="pre">psrflux</span> <span class="pre">-s</span> <span class="pre">[template]</span> <span class="pre">-e</span> <span class="pre">dynspec</span> <span class="pre">[archive]</span></code></p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>archive</strong> (<cite>psarchive archive object</cite>) - psarchive archive</li>
+<li><strong>template</strong> (<cite>str, optional</cite>) -</li>
+<li><strong>phasebin</strong> (<cite>int, optional</cite>) -</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">remove_duplicates</code><span class="sig-paren">(</span><em>dyn_files</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Filters out dynamic spectra from simultaneous observations.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>dyn_files</strong> (<cite>list or numpy 1D array or str</cite>) - list of dynamic spectrum file paths</li>
+</ul>
+</dd>
+<dt><strong>Returns:</strong></dt>
+<dd><ul class="first last simple">
+<li>Filtered list of dynamic spectrum file paths</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+<code class="descname">make_pickle</code><span class="sig-paren">(</span><em>dyn, process=True, sspec=True, acf=True, lamsteps=True</em><span class="sig-paren">)</span><p></p>
+<blockquote>
+<div><p>Pickles a dynamic spectrum object.</p>
+<dl class="docutils">
+<dt><strong>Parameters:</strong></dt>
+<dd><ul class="first last simple">
+<li><strong>dyn</strong> (<cite>Dynspec object</cite>) - dynamic spectrum Dynspec object.</li>
+<li><strong>process</strong> (<cite>bool, optional</cite>) - perform default processing. Involves trimming the edges, refilling, correction, and calculation of the ACF and secondary spectrum.</li>
+<li><strong>sspec</strong> (<cite>numpy 2D array, optional</cite>) - input secondary spectrum.</li>
+<li><strong>acf</strong> (<cite>numpy 2D array, optional</cite>) - input autocorrelation function.</li>
+<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
+</ul>
+</dd>
+</dl>
+</div></blockquote>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">scint_utils module</a><ul>
+<li><a class="reference internal" href="#astrophysical-modelling">Astrophysical modelling</a></li>
+<li><a class="reference internal" href="#reading-and-writing-data">Reading and writing data</a></li>
+<li><a class="reference internal" href="#other-utilities">Other utilities</a></li>
+</ul>
+</li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="scint_models.html" title="previous chapter">scint_models module</a></li>
+      <li>Next: <a href="simulation.html" title="next chapter">Simulation class</a></li>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/scint_utils.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Daniel J. Reardon.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.4</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
+      
+      |
+      <a href="_sources/scint_utils.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
