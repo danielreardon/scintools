@@ -5,3 +5,8 @@ scintools/__pycache__/*
 scintools/__pycache__
 scintools/examples/.ipynb_checkpoints/*
 scintools/examples/.ipynb_checkpoints
+build/
+build/*
+*egg*
+dist/
+dist/*
