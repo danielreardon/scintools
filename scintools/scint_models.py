@@ -22,6 +22,8 @@ A library of scintillation models to use with lmfit
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import numpy as np
+from scipy.interpolate import interp2d
+import matplotlib.pyplot as plt
 
 
 def tau_acf_model(params, xdata, ydata, weights):
@@ -153,6 +155,7 @@ def scint_acf_model_2d(params, ydata, weights):
         weights = np.ones(np.shape(ydata))
 
     parvals = params.valuesdict()
+    print(parvals)
 
     tau = parvals['tau']
     dnu = parvals['dnu']
@@ -165,24 +168,39 @@ def scint_acf_model_2d(params, ydata, weights):
 
     tobs = parvals['tobs']
     bw = parvals['bw']
-    ns_fullfr = 2 * parvals['nt']
-    nf_fullfr = 2 * parvals['nf']
-    ns = len(ydata[0])
-    nf = len(ydata)
+    ns = parvals['nt']
+    nf = parvals['nf']
 
-    V_x = parvals['v_ra']
-    V_y = parvals['v_dec']
-    psi = parvals['psi']
+    V_x = parvals['v_dec']
+    V_y = parvals['v_ra']
 
-    s_max = (ns / ns_fullfr) * tobs / tau
-    dnu_max = (nf / nf_fullfr) * bw / dnu
+    s_max = tobs / tau
+    dnu_max = bw / dnu
 
-    acf = ACF(s_max=s_max, dnu_max=dnu_max, ns=ns, nf=nf, ar=ar, alpha=alpha,
-              phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y, V_x=V_x,
-              V_y=V_y, psi=psi, amp=amp)
+    maxscale = np.max([s_max, dnu_max])
+
+    acf = ACF(s_max=maxscale, dnu_max=maxscale, ns=ns, nf=nf, ar=ar,
+              alpha=alpha, phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y,
+              V_x=V_x, V_y=V_y, amp=amp)
     acf.calc_acf()
     model = acf.acf
+    # now interpolate back down to s_max and dnu_max
+    dnu_orig = np.linspace(-bw, bw, nf)
+    s_orig = np.linspace(-tobs, tobs, ns)
+    dnu_sim = np.linspace(-bw*maxscale/dnu_max, bw*maxscale/dnu_max, nf)
+    s_sim = np.linspace(-tobs*maxscale/s_max, tobs*maxscale/s_max, ns)
+
+    f = interp2d(s_sim, dnu_sim, model)
+
+    model = f(s_orig, dnu_orig)
     model[int(nf / 2) + 1, int(ns / 2) + 1] += wn  # add white noise spike
+
+    plt.figure(1)
+    plt.subplot(121)
+    plt.imshow(model)
+    plt.subplot(122)
+    plt.imshow((ydata - model))
+    plt.show()
 
     return (ydata - model) * weights
 

@@ -20,7 +20,7 @@ from scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          scint_acf_model_2d, tau_acf_model, dnu_acf_model,\
                          fit_parabola, fit_log_parabola
 from scint_utils import is_valid, svd_model, interp_nan_2d
-from scipy.interpolate import griddata, interp1d, RectBivariateSpline
+from scipy.interpolate import griddata, interp1d, RectBivariateSpline, interp2d
 from scipy.integrate import quad
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
@@ -1027,7 +1027,7 @@ class Dynspec:
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, display=True,
-                         nscale=3):
+                         nscale=4, data_size=128):
         """
         Measure the scintillation timescale
             Method:
@@ -1082,14 +1082,15 @@ class Dynspec:
         else:
             params.add('alpha', value=alpha, vary=False)
 
-        def fitter(scint_model, params, args, mcmc=mcmc):
+        def fitter(scint_model, params, args, mcmc=mcmc, pos=None):
             # Do fit
             func = Minimizer(scint_model, params, fcn_args=args)
             results = func.minimize()
             if mcmc:
                 func = Minimizer(scint_model, results.params, fcn_args=args)
                 print('Doing mcmc posterior sample')
-                mcmc_results = func.emcee()
+                mcmc_results = func.emcee(nwalkers=50, steps=2000,
+                                          burn=500, pos=pos, is_weighted=False)
                 results = mcmc_results
 
             return results
@@ -1120,9 +1121,19 @@ class Dynspec:
 
             ydata_2d = self.acf[fmin-1:fmax, tmin-1:tmax]
             tticks = np.linspace(-self.tobs, self.tobs, len(self.acf[0, :]))
-            tdata = tticks[tmin-1:tmax]
+            tdata_orig = tticks[tmin-1:tmax]
             fticks = np.linspace(-self.bw, self.bw, len(self.acf[:, 0]))
-            fdata = fticks[fmin-1:fmax]
+            fdata_orig = fticks[fmin-1:fmax]
+
+            # resample to a smaller size for speed
+            params['nt'].value = data_size
+            params['nf'].value = data_size
+            tdata = np.linspace(np.min(tdata_orig), np.max(tdata_orig),
+                                data_size)
+            fdata = np.linspace(np.min(fdata_orig), np.max(fdata_orig),
+                                data_size)
+            f = interp2d(tdata_orig, fdata_orig, ydata_2d)
+            ydata_2d = f(tdata, fdata)
 
             weights_2d = np.ones(np.shape(ydata_2d))
 
@@ -1139,29 +1150,52 @@ class Dynspec:
 
             elif method == 'acf2d':
 
-                params.add('tobs', value=self.tobs, vary=False)
-                params.add('bw', value=self.bw, vary=False)
-                params.add('ar', value=np.random.normal(loc=4, scale=2),
+                params.add('tobs', value=np.max(tdata), vary=False)
+                params.add('bw', value=np.max(fdata), vary=False)
+                params.add('nscale', value=nscale, vary=False)
+                params.add('ar', value=1,
                            vary=True, min=1, max=10)
-                params.add('phasegrad_x', value=1, vary=True,
+                params.add('phasegrad_x', value=0.01, vary=True,
                            min=-10, max=10)
-                params.add('phasegrad_y', value=1, vary=True,
+                params.add('phasegrad_y', value=0.01, vary=True,
                            min=-10, max=10)
-                # params.add('phasegrad_x', value=0, vary=False,
-                #            min=-10, max=10)
-                # params.add('phasegrad_y', value=0, vary=False,
-                #            min=-10, max=10)
-                params.add('v_ra', value=np.random.normal(loc=0, scale=20),
-                           vary=True, min=-100, max=100)
-                params.add('v_dec', value=np.random.normal(loc=0, scale=20),
-                           vary=True, min=-100, max=100)
-                params.add('psi', value=np.random.uniform(low=0, high=180),
-                           vary=True, min=0, max=180)
-                # params.add('psi', value=0, vary=False,
-                #            min=0, max=180)
+                params.add('v_ra', value=np.random.normal(loc=0, scale=1),
+                           vary=True, min=-10, max=10)
+                params.add('v_dec', value=np.random.normal(loc=0, scale=1),
+                           vary=True, min=-10, max=10)
+                #params.add('psi', value=np.random.uniform(low=0, high=180),
+                #           vary=True, min=0, max=180)
+
+                plt.imshow(ydata_2d)
+                plt.show()
+
+                if mcmc:
+                    nitr = 50
+                    pos_array = []
+                    for itr in range(0, nitr):
+                        pos_i = [np.random.normal(loc=params['tau'].value,
+                                                  scale=0.2*params['tau'].value),  # tau
+                                 np.random.normal(loc=params['dnu'].value,
+                                                  scale=0.2*params['dnu'].value),  # dnu
+                                 np.random.normal(loc=params['amp'].value,
+                                                  scale=0.1*params['amp'].value),  # amp
+                                 np.random.normal(loc=params['wn'].value,
+                                                  scale=0.1*params['wn'].value),  # wn
+                                 # ar
+                                 1 + np.abs(np.random.normal(loc=0, scale=2)),
+                                 np.random.normal(loc=0, scale=1),  # phs_x
+                                 np.random.normal(loc=0, scale=1),  # phs_y
+                                 np.random.normal(loc=0, scale=0.1),  # v_ra
+                                 np.random.normal(loc=0, scale=0.1),  # v_dec
+                                # np.random.uniform(low=0, high=180),  # psi
+                                 np.random.uniform(low=0, high=10),  # lnsigma
+                                 ]
+                        pos_array.append(pos_i)
+
+                    pos = np.array(pos_array)
 
                 results = fitter(scint_acf_model_2d, params,
-                                 (ydata_2d, weights_2d), mcmc=mcmc)
+                                 (ydata_2d, weights_2d), mcmc=mcmc, pos=pos)
 
         elif method == 'sspec':
             '''

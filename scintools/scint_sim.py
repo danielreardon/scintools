@@ -601,7 +601,8 @@ class ACF():
                                                   gammitv]))))
             # scale by amplitude and crop to match data
             gam3 = amp * gam3[:nf - 3, :ns - 3]
-            f2 = np.transpose(np.block([[np.flip(-dnun[:]), dnun]])).flatten()
+            f2 = np.transpose(np.block([[np.flip(-dnun[:], axis=0),
+                                         dnun]])).flatten()
             f2 = f2[:nf - 3]
             t2 = tn[:ns - 3]
             s2 = t2 * Vmag
