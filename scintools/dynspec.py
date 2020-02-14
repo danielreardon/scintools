@@ -1027,7 +1027,7 @@ class Dynspec:
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, display=True,
-                         nscale=4, data_size=128):
+                         nscale=4, nitr=1):
         """
         Measure the scintillation timescale
             Method:
@@ -1089,15 +1089,18 @@ class Dynspec:
             if mcmc:
                 func = Minimizer(scint_model, results.params, fcn_args=args)
                 print('Doing mcmc posterior sample')
-                mcmc_results = func.emcee(nwalkers=50, steps=2000,
+                mcmc_results = func.emcee(nwalkers=nitr, steps=2000,
                                           burn=500, pos=pos, is_weighted=False)
                 results = mcmc_results
 
             return results
 
-        results = fitter(scint_acf_model, params, (xdata, ydata, weights))
+        if method == 'acf1d':
+            results = fitter(scint_acf_model, params, (xdata, ydata, weights), mcmc=mcmc)
 
         if method == 'acf2d_approx' or method == 'acf2d':
+            results = fitter(scint_acf_model, params, (xdata, ydata, weights), mcmc=False)
+            
             params = results.params
 
             dnu = params['dnu']
@@ -1105,12 +1108,12 @@ class Dynspec:
 
             ntau = nscale
             ndnu = nscale
-            while ntau * (tau / self.dt) > self.nsub:
-                ntau -= 1
+            while ntau > (self.tobs / tau):
+                ntau -= 0.5
                 print('Warning: nscale too large for number of sub ints.' +
                       'Decreasing.')
-            while ndnu * (dnu / self.df) > self.nchan:
-                ndnu -= 1
+            while ndnu > (self.bw / dnu):
+                ndnu -= 0.5
                 print('Warning: nscale too large for number of channels. ' +
                       'Decreasing.')
 
@@ -1121,19 +1124,9 @@ class Dynspec:
 
             ydata_2d = self.acf[fmin-1:fmax, tmin-1:tmax]
             tticks = np.linspace(-self.tobs, self.tobs, len(self.acf[0, :]))
-            tdata_orig = tticks[tmin-1:tmax]
+            tdata = tticks[tmin-1:tmax]
             fticks = np.linspace(-self.bw, self.bw, len(self.acf[:, 0]))
-            fdata_orig = fticks[fmin-1:fmax]
-
-            # resample to a smaller size for speed
-            params['nt'].value = data_size
-            params['nf'].value = data_size
-            tdata = np.linspace(np.min(tdata_orig), np.max(tdata_orig),
-                                data_size)
-            fdata = np.linspace(np.min(fdata_orig), np.max(fdata_orig),
-                                data_size)
-            f = interp2d(tdata_orig, fdata_orig, ydata_2d)
-            ydata_2d = f(tdata, fdata)
+            fdata = fticks[fmin-1:fmax]
 
             weights_2d = np.ones(np.shape(ydata_2d))
 
@@ -1156,12 +1149,12 @@ class Dynspec:
                 params.add('ar', value=1,
                            vary=True, min=1, max=10)
                 params.add('phasegrad_x', value=0.01, vary=True,
-                           min=-10, max=10)
+                           min=-5, max=5)
                 params.add('phasegrad_y', value=0.01, vary=True,
-                           min=-10, max=10)
-                params.add('v_ra', value=np.random.normal(loc=0, scale=1),
+                           min=-5, max=5)
+                params.add('v_x', value=np.random.normal(loc=0, scale=1),
                            vary=True, min=-10, max=10)
-                params.add('v_dec', value=np.random.normal(loc=0, scale=1),
+                params.add('v_y', value=np.random.normal(loc=0, scale=1),
                            vary=True, min=-10, max=10)
                 #params.add('psi', value=np.random.uniform(low=0, high=180),
                 #           vary=True, min=0, max=180)
@@ -1170,7 +1163,6 @@ class Dynspec:
                 plt.show()
 
                 if mcmc:
-                    nitr = 50
                     pos_array = []
                     for itr in range(0, nitr):
                         pos_i = [np.random.normal(loc=params['tau'].value,
@@ -1240,12 +1232,12 @@ class Dynspec:
             self.phasegrad_xerr = results.params['phasegrad_x'].stderr
             self.phasegrad_y = results.params['phasegrad_y'].value
             self.phasegrad_yerr = results.params['phasegrad_y'].stderr
-            self.v_ra = results.params['v_ra'].value
-            self.v_raerr = results.params['v_ra'].stderr
-            self.v_dec = results.params['v_dec'].value
-            self.v_decerr = results.params['v_dec'].stderr
-            self.psi = results.params['psi'].value
-            self.psierr = results.params['psi'].stderr
+            self.v_x = results.params['v_x'].value
+            self.v_xerr = results.params['v_x'].stderr
+            self.v_y = results.params['v_y'].value
+            self.v_yerr = results.params['v_y'].stderr
+            # self.psi = results.params['psi'].value
+            # self.psierr = results.params['psi'].stderr
         if alpha is None:
             self.talpha = results.params['alpha'].value
             self.talphaerr = results.params['alpha'].stderr
