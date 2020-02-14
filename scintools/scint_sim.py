@@ -430,14 +430,10 @@ class ACF():
         self.alpha = alpha
         self.phasegrad_x = phasegrad_x
         self.phasegrad_y = phasegrad_y
-        if psi != 0:
-            # here x is RA and y is dec
-            self.V_x = V_x * np.sin(psi) + V_y * np.cos(psi)
-            self.V_y = V_x * np.cos(psi) + V_y * np.sin(psi)
-        else:
-            self.V_x = V_y
-            self.V_y = V_x
-        self.psi = psi
+        self.V_x = V_x
+        self.V_y = V_y
+        self.use_t = use_t
+        # self.psi = psi
         self.amp = amp
 
         return
@@ -495,24 +491,26 @@ class ACF():
 
         alph2 = self.alpha/2
 
-        spmax = self.s_max
-        dnumax = self.dnu_max
-        nf = self.nf + 3  # make odd, compute over-sized frame
-        ns = self.ns + 3
-        nt = ns
+        cf = 5
+        ct = 5
+
+        nf = self.nf + cf  # make odd, compute oversized frame
+        ns = self.ns + ct
+        spmax = self.s_max * (ns / self.ns)
+        dnumax = self.dnu_max * (nf / self.nf)
         sigxn = self.phasegrad_x
         sigyn = self.phasegrad_y
         V_x = self.V_x
         V_y = self.V_y
         amp = self.amp
 
-        dsp = 2 * spmax / (nt - 1)
-        # ddnun = 2 * dnumax / (nf - 1)
-
         Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
+
+        dsp = spmax / ns
+        
         sqrtar = np.sqrt(self.ar)
         # equally spaced dnu array dnu = dnun * nuhalf
-        dnun = np.linspace(0, dnumax, (nf - 1)/2)
+        dnun = np.linspace(0, dnumax, int((nf + 1) / 2))
         ndnun = len(dnun)
 
         if sigxn == 0 and sigyn == 0:
@@ -572,39 +570,40 @@ class ACF():
         else:
             # calculate two quadrants -tmax t < tmax
             print('Calculating ACF... w/ two quad')
-            # equally spaced t array t = tn*S0
-            tn = np.linspace(-spmax/Vmag, spmax/Vmag, ns)
+            if self.use_t:
+                # equally spaced t array t = tn*S0
+                tn = np.linspace(-spmax, spmax, ns)
+                snp = np.arange(-spmax*Vmag, spmax*Vmag, dsp)
+            else:
+                tn = np.linspace(-spmax/Vmag, spmax/Vmag, ns)
+                snp = np.arange(-spmax, spmax, dsp)
             snx, sny = V_x * tn, V_y * tn
-            snp = np.arange(-spmax, spmax, dsp)
             SNPX, SNPY = np.meshgrid(snp, snp)
-            # ACF of E-field
-            gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 +
-                                    (SNPY * sqrtar)**2)**alph2)
+            gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 + 
+                           (SNPY * sqrtar)**2)**alph2)  #ACF of E-field
             # compute dnun = 0 first
-            gammitv = np.zeros((int(ns), int(nf/2)))
-            gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 +
-                                   (sny * sqrtar)**2)**alph2)
+            gammitv = np.zeros((int(ns), int((nf + 1) / 2)))
+            gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 + 
+                                  (sny * sqrtar)**2)**alph2)
             for idn in range(1, ndnun):
                 snxt = snx - 2 * sigxn * dnun[idn]
                 snyt = sny - 2 * sigyn * dnun[idn]
                 for isn in range(len(snx)):
-                    temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 +
-                                                 (SNPY - snyt[isn])**2) /
-                                                (2 * dnun[idn]))
-                    gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) /\
-                        ((2 * np.pi) * dnun[idn])
-
+                    temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 + 
+                                                 (SNPY - snyt[isn])**2) /\
+                                           (2 * dnun[idn]))
+                    gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) /\ 
+                                        ((2 * np.pi) * dnun[idn])
+            
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
-            gam3 = np.flipud(np.transpose(np.conj(np.block([np.fliplr(
-                                                np.flipud(gammitv[:, :])),
-                                                  gammitv]))))
-            # scale by amplitude and crop to match data
-            gam3 = amp * gam3[:nf - 3, :ns - 3]
-            f2 = np.transpose(np.block([[np.flip(-dnun[:], axis=0),
-                                         dnun]])).flatten()
-            f2 = f2[:nf - 3]
-            t2 = tn[:ns - 3]
+            gam3 = np.flipud(np.transpose(np.conj(np.block([np.fliplr(np.flipud(
+                                              gammitv[:, 1:])), gammitv]))))
+
+            gam3 = amp * gam3[1:nf-cf+1, 1:ns-ct+1]  # scale by amplitude and crop to match data
+            f2 = np.transpose(np.block([[np.flip(-dnun[:]), dnun]])).flatten()
+            f2 = f2[1:nf-cf+1]
+            t2 = tn[1:ns-ct+1]
             s2 = t2 * Vmag
 
         self.fn = f2
