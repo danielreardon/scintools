@@ -155,7 +155,6 @@ def scint_acf_model_2d(params, ydata, weights):
         weights = np.ones(np.shape(ydata))
 
     parvals = params.valuesdict()
-    print(parvals)
 
     tau = parvals['tau']
     dnu = parvals['dnu']
@@ -166,41 +165,38 @@ def scint_acf_model_2d(params, ydata, weights):
     wn = parvals['wn']
     amp = parvals['amp']
 
+    V_x = parvals['v_x']
+    V_y = parvals['v_y']
+    # psi = parvals['psi']
+
     tobs = parvals['tobs']
     bw = parvals['bw']
-    ns = parvals['nt']
-    nf = parvals['nf']
+    nt = 2 * parvals['nt']
+    nf = 2 * parvals['nf']
+    dt = 2 * tobs / nt
+    df = 2 * bw / nf
 
-    V_x = parvals['v_dec']
-    V_y = parvals['v_ra']
+    nt_crop = len(ydata[0])
+    nf_crop = len(ydata)
 
-    s_max = tobs / tau
-    dnu_max = bw / dnu
+    taumax = (nt_crop / nt) * tobs / tau
+    dnumax = (nf_crop / nf) * bw / dnu
 
-    maxscale = np.max([s_max, dnu_max])
-
-    acf = ACF(s_max=maxscale, dnu_max=maxscale, ns=ns, nf=nf, ar=ar,
-              alpha=alpha, phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y,
-              V_x=V_x, V_y=V_y, amp=amp)
+    acf = ACF(s_max=dnumax, dnu_max=taumax, ns=nt_crop, nf=nf_crop, ar=ar, alpha=alpha,
+              phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y, amp=amp, V_x=V_x, V_y=V_y,
+              psi=None, use_t=False)
     acf.calc_acf()
     model = acf.acf
-    # now interpolate back down to s_max and dnu_max
-    dnu_orig = np.linspace(-bw, bw, nf)
-    s_orig = np.linspace(-tobs, tobs, ns)
-    dnu_sim = np.linspace(-bw*maxscale/dnu_max, bw*maxscale/dnu_max, nf)
-    s_sim = np.linspace(-tobs*maxscale/s_max, tobs*maxscale/s_max, ns)
 
-    f = interp2d(s_sim, dnu_sim, model)
+    model[int(nf_crop / 2) + 1, int(nt_crop / 2) + 1] += wn  # add white noise spike
 
-    model = f(s_orig, dnu_orig)
-    model[int(nf / 2) + 1, int(ns / 2) + 1] += wn  # add white noise spike
-
-    plt.figure(1)
-    plt.subplot(121)
-    plt.imshow(model)
-    plt.subplot(122)
-    plt.imshow((ydata - model))
-    plt.show()
+    triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-nt_crop * dt / 2, nt_crop * dt / 2,
+                                                          nt_crop)), (nf_crop, 1)),
+                                                          tobs)
+    triangle_f = np.transpose(1 - np.divide(np.tile(np.abs(np.linspace(-nf_crop * df / 2, nf_crop * df / 2, nf_crop)),
+                                       (nt_crop, 1)), bw))
+    triangle = np.multiply(triangle_t, triangle_f)
+    model = np.multiply(model, triangle)  # multiply by triangle function
 
     return (ydata - model) * weights
 
