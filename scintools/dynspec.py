@@ -1027,7 +1027,7 @@ class Dynspec:
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, display=True,
-                         nscale=4, data_size=None, nitr=1):
+                         nscale=4, nitr=1):
         """
         Measure the scintillation timescale
             Method:
@@ -1127,17 +1127,6 @@ class Dynspec:
             tdata = tticks[tmin-1:tmax]
             fticks = np.linspace(-self.bw, self.bw, len(self.acf[:, 0]))
             fdata = fticks[fmin-1:fmax]
-
-            if data_size is not None:          
-                # resample to a smaller size for speed
-                params['nt'].value = data_size
-                params['nf'].value = data_size
-                tdata = np.linspace(np.min(tdata_orig), np.max(tdata_orig),
-                                    data_size)
-                fdata = np.linspace(np.min(fdata_orig), np.max(fdata_orig),
-                                    data_size)
-                f = interp2d(tdata_orig, fdata_orig, ydata_2d)
-                ydata_2d = f(tdata, fdata)
 
             weights_2d = np.ones(np.shape(ydata_2d))
 
