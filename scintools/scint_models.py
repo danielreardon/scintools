@@ -182,7 +182,7 @@ def scint_acf_model_2d(params, ydata, weights):
     taumax = (nt_crop / nt) * tobs / tau
     dnumax = (nf_crop / nf) * bw / dnu
 
-    acf = ACF(s_max=dnumax, dnu_max=taumax, ns=nt_crop, nf=nf_crop, ar=ar, alpha=alpha,
+    acf = ACF(s_max=taumax, dnu_max=dnumax, ns=nt_crop, nf=nf_crop, ar=ar, alpha=alpha,
               phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y, amp=amp, V_x=V_x, V_y=V_y,
               psi=None, use_t=False)
     acf.calc_acf()
