@@ -62,8 +62,8 @@ def thth_map(SS, tau, fd, eta, edges):
     pnts = (tau_inv > 0) * (tau_inv < tau.shape[0]) * (fd_inv < fd.shape[0])
     thth[pnts] = SS[tau_inv[pnts], fd_inv[pnts]]
 
-    # Preserve flux
-    thth *= np.abs(2*eta*(th2-th1)).value
+    # Preserve flux (int
+    thth *= np.sqrt(np.abs(2*eta*(th2-th1)).value)
 
     # Force Hermetian
     thth -= np.tril(thth)
@@ -131,11 +131,11 @@ def rev_map(thth, tau, fd, eta, edges):
     recov=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.abs(2*eta*fd_map.T)).real)[0] +\
+                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T)))).real)[0] +\
             np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.abs(2*eta*fd_map.T)).imag)[0]*1j
+                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T))).imag)[0]*1j
     recov/=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges))[0]
@@ -169,7 +169,9 @@ def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
 def Eval_calc(SS, tau, fd, eta, edges):
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
-    w,V=eigsh(thth_red,1)
+    v0=thth_red[thth_red.shape[0]//2,:]
+    v0/=np.sqrt((np.abs(v0)**2).sum())
+    w,V=eigsh(thth_red,1,v0=v0)
     return(np.abs(w[0]))
 
 def G_revmap(w,V,eta,edges,tau,fd):
