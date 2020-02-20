@@ -166,6 +166,12 @@ def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
     chisq=np.sum((model-dspec)[mask]**2)/N
     return(chisq)
 
+def Eval_calc(SS, tau, fd, eta, edges):
+    thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
+    ##Find first eigenvector and value
+    w,V=eigsh(thth_red,1)
+    return(np.abs(w[0]))
+
 def G_revmap(w,V,eta,edges,tau,fd):
     th_cents=(edges[1:]+edges[:-1])/2
     th_cents-=th_cents[np.abs(th_cents)==np.abs(th_cents).min()]
