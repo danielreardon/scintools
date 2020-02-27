@@ -131,11 +131,11 @@ def rev_map(thth, tau, fd, eta, edges):
     recov=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T)))).real)[0] +\
+                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] +\
             np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T))).imag)[0]*1j
+                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
     recov/=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges))[0]
@@ -158,7 +158,7 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
     ##Map back to SS for high
 #    thth2_red[thth_red==0]=0
     recov=rev_map(thth2_red,tau2,fd2,eta,edges_red)
-    model=2*np.fft.ifft2(np.fft.ifftshift(recov)).real
+    model=np.fft.ifft2(np.fft.ifftshift(recov)).real
     return(thth_red,thth2_red,recov,model,edges_red)
 
 def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
@@ -212,9 +212,9 @@ def ext_find(x, y):
            (y[0] - dy / 2).value, (y[-1] + dy / 2).value]
     return (ext)
 
-def fft_axis(x, unit, pad=1):
+def fft_axis(x, unit, pad=0):
     fx = np.fft.fftshift(
-        np.fft.fftfreq(pad * x.shape[0], x[1] - x[0]).to_value(unit)) * unit
+        np.fft.fftfreq((pad+1) * x.shape[0], x[1] - x[0]).to_value(unit)) * unit
     return (fx)
 
 def sample_plot(dspec,
