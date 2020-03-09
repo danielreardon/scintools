@@ -159,7 +159,7 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
 #    thth2_red[thth_red==0]=0
     recov=rev_map(thth2_red,tau2,fd2,eta,edges_red)
     model=np.fft.ifft2(np.fft.ifftshift(recov)).real
-    return(thth_red,thth2_red,recov,model,edges_red)
+    return(thth_red,thth2_red,recov,model,edges_red,w,V)
 
 def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
     model=modeler(SS, tau, fd, eta, edges,fd2,tau2)[3][:dspec.shape[0],:dspec.shape[1]]
