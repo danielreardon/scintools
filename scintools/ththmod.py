@@ -107,7 +107,7 @@ def thth_redmap(SS, tau, fd, eta, edges):
     return thth_red, edges_red
 
 
-def rev_map(thth, tau, fd, eta, edges,isdspec=true):
+def rev_map(thth, tau, fd, eta, edges,isdspec=True):
     """
     Map back from theta-theta space to SS space
 
