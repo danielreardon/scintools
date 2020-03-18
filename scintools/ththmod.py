@@ -107,7 +107,7 @@ def thth_redmap(SS, tau, fd, eta, edges):
     return thth_red, edges_red
 
 
-def rev_map(thth, tau, fd, eta, edges):
+def rev_map(thth, tau, fd, eta, edges,isdspec=true):
     """
     Map back from theta-theta space to SS space
 
@@ -136,20 +136,21 @@ def rev_map(thth, tau, fd, eta, edges):
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges),
                          weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
-    recov += np.histogram2d(np.ravel(-fd_map),
-                         np.ravel(-tau_map),
-                         bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] -\
-            np.histogram2d(np.ravel(-fd_map),
-                         np.ravel(-tau_map),
-                         bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
     norm=np.histogram2d(np.ravel(fd_map),
                          np.ravel(tau_map),
                          bins=(fd_edges,tau_edges))[0]
-    norm+=np.histogram2d(np.ravel(-fd_map),
-                         np.ravel(-tau_map),
-                         bins=(fd_edges,tau_edges))[0] 
+    if isdspec:
+        recov += np.histogram2d(np.ravel(-fd_map),
+                            np.ravel(-tau_map),
+                            bins=(fd_edges,tau_edges),
+                            weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] -\
+                np.histogram2d(np.ravel(-fd_map),
+                            np.ravel(-tau_map),
+                            bins=(fd_edges,tau_edges),
+                            weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
+        norm+=np.histogram2d(np.ravel(-fd_map),
+                            np.ravel(-tau_map),
+                            bins=(fd_edges,tau_edges))[0] 
     recov/=norm
     recov=np.nan_to_num(recov)
     return(recov.T)
