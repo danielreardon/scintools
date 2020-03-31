@@ -11,6 +11,7 @@ import astropy.units as u
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from scipy.optimize import curve_fit
 
 def svd_model(arr, nmodes=1):
     u, s, w = np.linalg.svd(arr)
@@ -264,10 +265,10 @@ def single_search(params):
     SS = np.fft.fftshift(SS)
     eigs = np.zeros(etas.shape)
     for i in range(eigs.shape[0]):
-        # try:
-        eigs[i] = Eval_calc(SS, tau, fd, etas[i], edges)
-        # except:
-        #     eigs[i]=np.nan
+        try:
+            eigs[i] = Eval_calc(SS, tau, fd, etas[i], edges)
+        except:
+            eigs[i]=np.nan
     try:
         etas=etas[np.isfinite(eigs)]
         eigs=eigs[np.isfinite(eigs)]
