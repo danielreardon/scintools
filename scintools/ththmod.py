@@ -264,10 +264,10 @@ def single_search(params):
     SS = np.fft.fftshift(SS)
     eigs = np.zeros(etas.shape)
     for i in range(eigs.shape[0]):
-        try:
-            eigs[i] = Eval_calc(SS, tau, fd, etas[i], edges)
-        except:
-            eigs[i]=np.nan
+        # try:
+        eigs[i] = Eval_calc(SS, tau, fd, etas[i], edges)
+        # except:
+        #     eigs[i]=np.nan
     try:
         etas=etas[np.isfinite(eigs)]
         eigs=eigs[np.isfinite(eigs)]
