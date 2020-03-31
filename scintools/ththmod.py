@@ -265,7 +265,7 @@ def single_search(params):
     eigs = np.zeros(etas.shape)
     for i in range(eigs.shape[0]):
         try:
-            eigs[i] = THTH.Eval_calc(SS, tau, fd, etas[i], edges)
+            eigs[i] = Eval_calc(SS, tau, fd, etas[i], edges)
         except:
             eigs[i]=np.nan
     try:
@@ -279,12 +279,12 @@ def single_search(params):
             A = (eigs_fit[-1] - C) / ((etas_fit[-1].value - x0)**2)
         else:
             A = (eigs_fit[0] - C) / ((etas_fit[0].value - x0)**2)
-        popt, pcov = curve_fit(THTH.chi_par,
+        popt, pcov = curve_fit(chi_par,
                                 etas_fit.value,
                                 eigs_fit,
                                 p0=np.array([A, x0, C]))
         eta_fit = popt[1]*u.us/u.mHz**2
-        eta_sig = np.sqrt((eigs_fit - THTH.chi_par(etas_fit.value, *popt)).std() / np.abs(popt[0]))*u.us/u.mHz**2
+        eta_sig = np.sqrt((eigs_fit - chi_par(etas_fit.value, *popt)).std() / np.abs(popt[0]))*u.us/u.mHz**2
     except:
         popt=None
         eta_fit=np.nan
@@ -330,7 +330,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
     plt.subplot(grid[0,0])
     plt.imshow(dspec2,
             aspect='auto',
-            extent=THTH.ext_find(time.to(u.min),freq),
+            extent=ext_find(time.to(u.min),freq),
             origin='lower',
             vmin=0,vmax=dspec2.max())
     plt.xlabel('Time (min)')
@@ -339,7 +339,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
     plt.subplot(grid[0,1])
     plt.imshow(model[:dspec2.shape[0],:dspec2.shape[1]],
             aspect='auto',
-            extent=THTH.ext_find(time.to(u.min),freq),
+            extent=ext_find(time.to(u.min),freq),
             origin='lower',
             vmin=0,vmax=dspec2.max())
     plt.xlabel('Time (min)')
@@ -350,7 +350,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
             norm=LogNorm(),
             origin='lower',
             aspect='auto',
-            extent=THTH.ext_find(fd,tau),
+            extent=ext_find(fd,tau),
             vmin=np.abs(SS).max()**2/100,vmax=np.abs(SS).max()**2)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
@@ -362,7 +362,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
             norm=LogNorm(),
             origin='lower',
             aspect='auto',
-            extent=THTH.ext_find(fd,tau),
+            extent=ext_find(fd,tau),
             vmin=np.abs(SS).max()**2/100,vmax=np.abs(SS).max()**2)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
@@ -399,7 +399,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
         err_string = '0%s' % fmt.format(10**(exp_fit) + eta_sig.value)[1:]
         
         plt.plot(etas_fit,
-            THTH.chi_par(etas_fit.value, *popt),
+            chi_par(etas_fit.value, *popt),
             label=r'$\eta$ = %s $\pm$ %s $s^3$' % (fit_string, err_string))
         plt.legend()
     plt.title('Eigenvalue Search')
@@ -409,7 +409,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
     plt.imshow(np.angle(model_E),
             cmap='twilight',
             aspect='auto',
-            extent=THTH.ext_find(time.to(u.min),freq),
+            extent=ext_find(time.to(u.min),freq),
             origin='lower',
             vmin=-np.pi,vmax=np.pi)
     plt.xlabel('Time (min)')
@@ -420,7 +420,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
             norm=LogNorm(),
             origin='lower',
             aspect='auto',
-            extent=THTH.ext_find(fd,tau),
+            extent=ext_find(fd,tau),
             vmin=N_E)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
