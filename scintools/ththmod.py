@@ -431,3 +431,26 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
     plt.colorbar()
     plt.tight_layout()
 
+def single_chunk_retrieval(params):
+    dspec2,edges,time2,freq2,eta,idx_t,idx_f = params
+    npad = 3
+    fd = fft_axis(time2, u.mHz, npad)
+    tau = fft_axis(freq2, u.us, npad)
+
+    dspec_pad = np.pad(dspec2,
+                   ((0, npad * dspec2.shape[0]), (0, npad * dspec2.shape[1])),
+                   mode='constant',
+                   constant_values=dspec2.mean())
+
+    SS = np.fft.fft2(dspec_pad)
+    SS = np.fft.fftshift(SS)
+
+    thth_red, thth2_red, recov, model, edges_red,w,V = modeler(SS, tau, fd, etas.mean(), edges)
+
+    ththE_red=thth_red*0
+    ththE_red[ththE_red.shape[0]//2,:]=np.conjugate(V)*np.sqrt(w)
+    ##Map back to time/frequency space
+    recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,isdspec = False)
+    model_E=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2.shape[0],:dspec2.shape[1]]
+    model_E*=(dspec2.shape[0]*dspec2.shape[1]/4)
+    return(model_E,idx_f,idx_t)
