@@ -292,7 +292,7 @@ def single_search(params):
         eta_sig=np.nan
     try:
         if plot:
-            PlotFunc(dspec2,time,freq,SS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt,tau_lim)
+            PlotFunc(dspec2,time,freq,SS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
             plt.savefig(name)
             plt.close()
     except:
