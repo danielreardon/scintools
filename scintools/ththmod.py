@@ -303,7 +303,7 @@ def single_search(params):
 def PlotFunc(dspec2,time,freq,SS,fd,tau,
             edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt,
             tau_lim=None):
-    fd_lim=min(2*edges.max(),fd.max())
+    fd_lim=min(2*edges.max(),fd.max().value)
     if np.isnan(eta_fit):
         eta=etas.mean()
         thth_red, thth2_red, recov, model, edges_red,w,V = modeler(SS, tau, fd, etas.mean(), edges)
