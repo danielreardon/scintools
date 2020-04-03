@@ -290,13 +290,13 @@ def single_search(params):
         popt=None
         eta_fit=np.nan
         eta_sig=np.nan
-    # try:
-    if plot:
-        PlotFunc(dspec2,time,freq,SS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
-        plt.savefig(name)
-        plt.close()
-    # except:
-    #     print('Plotting Error',flush=True)
+    try:
+        if plot:
+            PlotFunc(dspec2,time2,freq2,SS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
+            plt.savefig(name)
+            plt.close()
+    except:
+        print('Plotting Error',flush=True)
     print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq2.mean()),flush=True)
     return(eta_fit,eta_sig,freq2.mean(),time2.mean())
 
