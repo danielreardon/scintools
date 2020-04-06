@@ -445,7 +445,7 @@ def single_chunk_retrieval(params):
     SS = np.fft.fft2(dspec_pad)
     SS = np.fft.fftshift(SS)
 
-    thth_red, thth2_red, recov, model, edges_red,w,V = modeler(SS, tau, fd, etas.mean(), edges)
+    thth_red, thth2_red, recov, model, edges_red,w,V = modeler(SS, tau, fd, eta, edges)
 
     ththE_red=thth_red*0
     ththE_red[ththE_red.shape[0]//2,:]=np.conjugate(V)*np.sqrt(w)
