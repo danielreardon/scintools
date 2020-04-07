@@ -300,9 +300,29 @@ def single_search(params):
     print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq2.mean()),flush=True)
     return(eta_fit,eta_sig,freq2.mean(),time2.mean())
 
-def PlotFunc(dspec2,time,freq,SS,fd,tau,
-            edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt,
-            tau_lim=None):
+def PlotFunc(dspec,time,freq,SS,fd,tau,
+            edges,eta_fit,eta_sig,etas,measure,etas_fit,fit_res,
+            tau_lim=None,method='eigenvalue'):
+    '''
+    Plotting script to look at invidivual chunks
+
+    Arguments
+    dspec -- 2D numpy array containing the dynamic spectrum
+    time -- 1D numpy array of the dynamic spectrum time bins (with units)
+    freq -- 1D numpy array of the dynamic spectrum frequency channels (with units)
+    SS -- 2D numpy array of the conjugate spectrum
+    fd -- 1D numpy array of the SS fd bins (with units)
+    tau -- 1D numpy array of the SS tau bins (with units)
+    edges -- 1D numpy array with the bin edges for theta-theta
+    eta_fit -- Best fit curvature
+    eta_sig -- Error on best fir curvature
+    etas -- 1D numpy array of curvatures searched over
+    measure -- 1D numpy array with largest eigenvalue (method = 'eigenvalue') or chisq value (method = 'chisq') for etas
+    etas_fit -- Subarray of etas used for fitting
+    fit_res -- Fit parameters for parabola at extremum
+    tau_lim -- Largest tau value for SS plots
+    method -- Either 'eigenvalue' or 'chisq' depending on how curvature was found
+    '''
     fd_lim=min(2*edges.max(),fd.max().value)
     if np.isnan(eta_fit):
         eta=etas.mean()
@@ -314,35 +334,35 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
     ththE_red[ththE_red.shape[0]//2,:]=np.conjugate(V)*np.sqrt(w)
     ##Map back to time/frequency space
     recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,isdspec = False)
-    model_E=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2.shape[0],:dspec2.shape[1]]
-    model_E*=(dspec2.shape[0]*dspec2.shape[1]/4)
-    model_E[dspec2>0]=np.sqrt(dspec2[dspec2>0])*np.exp(1j*np.angle(model_E[dspec2>0]))
+    model_E=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec.shape[0],:dspec.shape[1]]
+    model_E*=(dspec.shape[0]*dspec.shape[1]/4)
+    model_E[dspec>0]=np.sqrt(dspec[dspec>0])*np.exp(1j*np.angle(model_E[dspec>0]))
     model_E=np.pad(model_E,
                     (   (0,SS.shape[0]-model_E.shape[0]),
                         (0,SS.shape[1]-model_E.shape[1])),
                     mode='constant',
                     constant_values=0)
     recov_E=np.abs(np.fft.fftshift(np.fft.fft2(model_E)))**2
-    model_E=model_E[:dspec2.shape[0],:dspec2.shape[1]]
+    model_E=model_E[:dspec.shape[0],:dspec.shape[1]]
     N_E=recov_E[:recov_E.shape[0]//4,:].mean()
 
     grid=plt.GridSpec(5,2)
     plt.figure(figsize=(8,20))
     plt.subplot(grid[0,0])
-    plt.imshow(dspec2,
+    plt.imshow(dspec,
             aspect='auto',
             extent=ext_find(time.to(u.min),freq),
             origin='lower',
-            vmin=0,vmax=dspec2.max())
+            vmin=0,vmax=dspec.max())
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Data Dynamic Spectrum')
     plt.subplot(grid[0,1])
-    plt.imshow(model[:dspec2.shape[0],:dspec2.shape[1]],
+    plt.imshow(model[:dspec.shape[0],:dspec.shape[1]],
             aspect='auto',
             extent=ext_find(time.to(u.min),freq),
             origin='lower',
-            vmin=0,vmax=dspec2.max())
+            vmin=0,vmax=dspec.max())
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Model Dynamic Spectrum')
@@ -391,7 +411,7 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Data $\theta-\theta$')
     plt.subplot(grid[3,:])
-    plt.plot(etas,eigs)
+    plt.plot(etas,measure)
     if not np.isnan(eta_fit):
         exp_fit = int(('%.0e' % eta_fit.value)[2:])
         exp_err = int(('%.0e' % eta_sig.value)[2:])
@@ -400,12 +420,16 @@ def PlotFunc(dspec2,time,freq,SS,fd,tau,
         err_string = '0%s' % fmt.format(10**(exp_fit) + eta_sig.value)[1:]
         
         plt.plot(etas_fit,
-            chi_par(etas_fit.value, *popt),
+            chi_par(etas_fit.value, *fit_res),
             label=r'$\eta$ = %s $\pm$ %s $s^3$' % (fit_string, err_string))
         plt.legend()
-    plt.title('Eigenvalue Search')
+    if method == 'eigenvalue':
+        plt.title('Eigenvalue Search')
+        plt.ylabel(r'Largest Eigenvalue')
+    else:
+        plt.title('Chisquare Search')
+        plt.ylabel(r'$\chi^2$')
     plt.xlabel(r'$\eta$ ($s^3$)')
-    plt.ylabel(r'Largest Eigenvalue')
     plt.subplot(grid[4,0])
     plt.imshow(np.angle(model_E),
             cmap='twilight',
