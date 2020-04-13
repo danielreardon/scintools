@@ -29,7 +29,7 @@ def chi_par(x, A, x0, C):
     return A*(x - x0)**2 + C
 
 
-def thth_map(SS, tau, fd, eta, edges):
+def thth_map(SS, tau, fd, eta, edges,hermetian=True):
     """Map from Secondary Spectrum to theta-theta space
 
     Arguments:
@@ -65,18 +65,18 @@ def thth_map(SS, tau, fd, eta, edges):
 
     # Preserve flux (int
     thth *= np.sqrt(np.abs(2*eta*(th2-th1)).value)
-
-    # Force Hermetian
-    thth -= np.tril(thth)
-    thth += np.conjugate(np.triu(thth).T)
-    thth -= np.diag(np.diag(thth))
-    thth -= np.diag(np.diag(thth[::-1, :]))[::-1, :]
-    thth = np.nan_to_num(thth)
+    if hermetian
+        # Force Hermetian
+        thth -= np.tril(thth)
+        thth += np.conjugate(np.triu(thth).T)
+        thth -= np.diag(np.diag(thth))
+        thth -= np.diag(np.diag(thth[::-1, :]))[::-1, :]
+        thth = np.nan_to_num(thth)
 
     return thth
 
 
-def thth_redmap(SS, tau, fd, eta, edges):
+def thth_redmap(SS, tau, fd, eta, edges,hermetian=true):
     """
     Map from Secondary Spectrum to theta-theta space for the largest
     possible filled in sqaure within edges
@@ -90,7 +90,7 @@ def thth_redmap(SS, tau, fd, eta, edges):
     """
 
     # Find full thth
-    thth = thth_map(SS, tau, fd, eta, edges)
+    thth = thth_map(SS, tau, fd, eta, edges,hermetian)
 
     # Find region that is fully within SS
     th_cents = (edges[1:]+edges[:-1])/2
