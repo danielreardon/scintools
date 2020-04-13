@@ -76,7 +76,7 @@ def thth_map(SS, tau, fd, eta, edges,hermetian=True):
     return thth
 
 
-def thth_redmap(SS, tau, fd, eta, edges,hermetian=true):
+def thth_redmap(SS, tau, fd, eta, edges,hermetian=True):
     """
     Map from Secondary Spectrum to theta-theta space for the largest
     possible filled in sqaure within edges
