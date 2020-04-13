@@ -65,7 +65,7 @@ def thth_map(SS, tau, fd, eta, edges,hermetian=True):
 
     # Preserve flux (int
     thth *= np.sqrt(np.abs(2*eta*(th2-th1)).value)
-    if hermetian
+    if hermetian:
         # Force Hermetian
         thth -= np.tril(thth)
         thth += np.conjugate(np.triu(thth).T)
