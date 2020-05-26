@@ -149,7 +149,7 @@ def scint_acf_model_2d(params, ydata, weights):
     """
     Fit an analytical 2D ACF function
     """
-    from scint_sim import ACF
+    #from scint_sim import ACF
 
     if weights is None:
         weights = np.ones(np.shape(ydata))
@@ -184,7 +184,7 @@ def scint_acf_model_2d(params, ydata, weights):
 
     acf = ACF(s_max=taumax, dnu_max=dnumax, ns=nt_crop, nf=nf_crop, ar=ar, alpha=alpha,
               phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y, amp=amp, V_x=V_x, V_y=V_y,
-              psi=None, use_t=False)
+              psi=None)
     acf.calc_acf()
     model = acf.acf
 
@@ -306,18 +306,6 @@ def arc_power_curve(params, xdata, ydata, weights):
     return (ydata - model) * weights
 
 
-def thin_screen(params, xdata, ydata, weights):
-    """
-    Thin screen effective velocity
-    """
-
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
-
-    model = []
-    return (ydata - model) * weights
-
-
 def fit_parabola(x, y):
     """
     Fit a parabola and return the value and error for the peak
@@ -413,6 +401,54 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     model = d * s * (1 - s)/(2 * veff2)  # in 1/(km * Hz**2)
     # Convert to 1/(m * mHz**2) for beta in 1/m and fdop in mHz
     model = model/1e9
+
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+
+    return (ydata - model) * weights
+
+
+def veff_thin_screen(params, ydata, weights, true_anomaly,
+                     vearth_ra, vearth_dec, D):
+    """
+    Effective velocity thin screen model
+
+        ydata: arc curvature
+    """
+
+    # ensure dimensionality of arrays makes sense
+    if hasattr(ydata,  "__len__"):
+        ydata = ydata.squeeze()
+        weights = weights.squeeze()
+        true_anomaly = true_anomaly.squeeze()
+        vearth_ra = vearth_ra.squeeze()
+        vearth_dec = vearth_dec.squeeze()
+
+    # Other parameters in lower-case
+    d = params['d']  # pulsar distance in kpc
+    kmpkpc = 3.085677581e16
+    d = d * kmpkpc  # kms for transverse velocity calculation
+    s = params['s']  # fractional screen distance
+
+    veff_ra, veff_dec, vp_ra, vp_dec = \
+        effective_velocity_annual(params, true_anomaly,
+                                  vearth_ra, vearth_dec)
+
+    if 'vism_ra' in params.keys():
+        vism_ra = params['vism_ra']
+        vism_dec = params['vism_dec']
+    else:
+        vism_ra = 0
+        vism_dec = 0
+
+    veff = np.sqrt((veff_ra - vism_ra)**2 + (veff_dec - vism_dec)**2)
+    vlos = veff/s  # LOS velocity defined at Earth
+
+    # Scale model according for thin screen Aiss in Cordes & Rickett (1998)
+    model = vlos / np.sqrt(2*(1-s)/s)  # Assumes Aiss = 2.78*10**4
+
+    # scale data according to the model distance
+    ydata *= np.sqrt((d/kmpkpc)/D)
 
     if weights is None:
         weights = np.ones(np.shape(ydata))

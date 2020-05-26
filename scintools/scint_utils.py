@@ -11,10 +11,13 @@ from __future__ import (absolute_import, division,
 
 import numpy as np
 import os
+import sys
 import csv
 from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
 from scipy.interpolate import griddata
+import pickle
+from astropy.time import Time
 
 
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
@@ -258,6 +261,15 @@ def read_par(parfile):
     return par
 
 
+def mjd_to_year(mjd):
+    """
+    converts mjd to year
+    """
+    t = Time(mjd, format='mjd')
+    yrs = t.byear  # observation year
+    return yrs
+
+
 def pars_to_params(pars, params=None):
     """
     Converts a dictionary of par file parameters from read_par() to an
@@ -459,6 +471,32 @@ def interp_nan_2d(array):
     return array
 
 
+def make_pickle(obj, filepath):
+    """
+    pickle.write, which works for very large files
+    """
+    max_bytes = 2**31 - 1
+    bytes_out = pickle.dumps(obj)
+    n_bytes = sys.getsizeof(bytes_out)
+    with open(filepath, 'wb') as f_out:
+        for idx in range(0, n_bytes, max_bytes):
+            f_out.write(bytes_out[idx:idx+max_bytes])
+
+
+def load_pickle(filepath):
+    """
+    pickle.load, which works for very large files
+    """
+    max_bytes = 2**31 - 1
+    input_size = os.path.getsize(filepath)
+    bytes_in = bytearray(0)
+    with open(filepath, 'rb') as f_in:
+        for _ in range(0, input_size, max_bytes):
+            bytes_in += f_in.read(max_bytes)
+        obj = pickle.loads(bytes_in)
+    return obj
+
+
 # Potential future functions
 
 def make_dynspec(archive, template=None, phasebin=1):
@@ -475,9 +513,3 @@ def remove_duplicates(dyn_files):
     """
     return dyn_files
 
-
-def make_pickle(dyn, process=True, sspec=True, acf=True, lamsteps=True):
-    """
-    Pickles a dynamic spectrum object
-    """
-    return

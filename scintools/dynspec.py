@@ -16,10 +16,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
-from scint_models import scint_acf_model, scint_acf_model_2d_approx,\
+from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          scint_acf_model_2d, tau_acf_model, dnu_acf_model,\
                          fit_parabola, fit_log_parabola
-from scint_utils import is_valid, svd_model, interp_nan_2d
+from scintools.scint_utils import is_valid, svd_model, interp_nan_2d
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline, interp2d
 from scipy.integrate import quad
 from scipy.signal import convolve2d, medfilt, savgol_filter
@@ -199,11 +199,11 @@ class Dynspec:
         self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
-                 input_x=None, input_y=None, trap=False, display=True):
+                 input_x=None, input_y=None, trap=False, display=True,
+                 figsize=(6, 6)):
         """
         Plot the dynamic spectrum
         """
-        plt.figure(1, figsize=(12, 6))
         if input_dyn is None:
             if lamsteps:
                 if not hasattr(self, 'lamdyn'):
@@ -241,7 +241,7 @@ class Dynspec:
             plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax)
 
         if filename is not None:
-            plt.savefig(filename, dpi=200, papertype='a4', bbox_inches='tight',
+            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
                         pad_inches=0.1)
             plt.close()
         elif input_dyn is None and display:
@@ -249,11 +249,10 @@ class Dynspec:
 
     def plot_acf(self, method='acf1d', alpha=5.3, contour=False, filename=None,
                  input_acf=None, input_t=None, input_f=None, fit=True,
-                 mcmc=False, display=True):
+                 mcmc=False, display=True, figsize=(6, 6)):
         """
         Plot the ACF
         """
-
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau') and input_acf is None and fit:
@@ -302,7 +301,8 @@ class Dynspec:
             plt.xlabel('Time lag (mins)')
 
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+                        pad_inches=0.1)
             plt.close()
         elif input_acf is None and display:
             plt.show()
@@ -311,11 +311,10 @@ class Dynspec:
                    input_x=None, input_y=None, trap=False, prewhite=True,
                    plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
                    cutmid=0, startbin=0, display=True, colorbar=True,
-                   title=None):
+                   title=None, figsize=(6, 6)):
         """
         Plot the secondary spectrum
         """
-
         if input_sspec is None:
             if lamsteps:
                 if not hasattr(self, 'lamsspec'):
@@ -379,7 +378,8 @@ class Dynspec:
             plt.title(title)
 
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+                        pad_inches=0.1)
             plt.close()
         elif input_sspec is None and display:
             plt.show()
@@ -452,7 +452,8 @@ class Dynspec:
         if colorbar:
             plt.colorbar()
         if filename is not None:
-            plt.savefig(filename)
+            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+                        pad_inches=0.1)
         if display:
             plt.show()
         else:
@@ -681,7 +682,7 @@ class Dynspec:
                 if plot and iarc == 0:
                     plt.plot(etaArray, norm_sspec_avg)
                     plt.plot(etaArray, norm_sspec_avg_filt)
-                    plt.plot(xdata, yfit)
+                    plt.plot(xdata, yfit, 'k')
                     plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                                 facecolor='C2', alpha=0.5)
                     plt.xscale('log')
@@ -692,8 +693,10 @@ class Dynspec:
                         plt.xlabel('eta (tdel)')
                     plt.ylabel('Mean power (dB)')
                 elif plot:
+                    #plt.plot(xdata, yfit,
+                    #         color='C{0}'.format(str(int(3+iarc))))
                     plt.plot(xdata, yfit,
-                             color='C{0}'.format(str(int(3+iarc))))
+                             color='k')
                     plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                                 facecolor='C{0}'.format(str(int(3+iarc))),
                                 alpha=0.3)
@@ -877,8 +880,10 @@ class Dynspec:
         if interp_nan:
             # interpolate NaN values
             normSspec = interp_nan_2d(normSspec)
-        isspecavg = np.mean(normSspec, axis=0)  # make average
-        powerspectrum = np.nanmean(np.power(10, normSspec/10), axis=1)
+        # make average
+        isspecavg = np.average(normSspec, axis=0,
+                               weights=np.nanmean(normSspec, axis=1))
+        self.powerspectrum = np.nanmean(np.power(10, normSspec/10), axis=1)
         ind1 = np.argmin(abs(fdopnew-1)-2)
         if isspecavg[ind1] < 0:
             isspecavg = isspecavg + 2  # make 1 instead of -1
@@ -923,11 +928,11 @@ class Dynspec:
                     plt.show()
             # plot power spectrum
             if powerspec:
-                plt.loglog(np.sqrt(tdel), powerspectrum)
+                plt.loglog(np.sqrt(tdel), self.powerspectrum)
                 # Overlay theory
                 kf = np.argwhere(np.sqrt(tdel) <= 10)
-                amp = np.mean(powerspectrum[kf]*(np.sqrt(tdel[kf]))**3.67)
-                plt.loglog(np.sqrt(tdel), amp*(np.sqrt(tdel))**(-3.67))
+                amp = np.mean(self.powerspectrum[kf]*(np.sqrt(tdel[kf]))**4.67)
+                plt.loglog(np.sqrt(tdel), amp*(np.sqrt(tdel))**(-4.67))
                 if lamsteps:
                     plt.xlabel(r'$f_\lambda^{1/2}$ (m$^{-1/2}$)')
                 else:
@@ -1027,7 +1032,7 @@ class Dynspec:
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, display=True,
-                         nscale=4, nitr=1):
+                         nscale=4, nitr=100):
         """
         Measure the scintillation timescale
             Method:
@@ -1100,7 +1105,7 @@ class Dynspec:
 
         if method == 'acf2d_approx' or method == 'acf2d':
             results = fitter(scint_acf_model, params, (xdata, ydata, weights), mcmc=False)
-            
+
             params = results.params
 
             dnu = params['dnu']
@@ -1185,6 +1190,8 @@ class Dynspec:
                         pos_array.append(pos_i)
 
                     pos = np.array(pos_array)
+                else:
+                    pos = None
 
                 results = fitter(scint_acf_model_2d, params,
                                  (ydata_2d, weights_2d), mcmc=mcmc, pos=pos)
@@ -1845,7 +1852,7 @@ class Dynspec:
             self.dyn = medfilt(self.dyn, kernel_size=m)
 
     def scale_dyn(self, scale='lambda', factor=1, window_frac=0.1,
-                  window='hanning'):
+                  window='hanning', spacing='max'):
         """
         Scales the dynamic spectrum along the frequency axis,
             with an alpha relationship
@@ -1861,7 +1868,16 @@ class Dynspec:
             nf, nt = np.shape(arin)
             freqs = cp(self.freqs)
             lams = np.divide(sc.c, freqs*10**6)
-            dlam = np.max(np.abs(np.diff(lams)))
+            if spacing == 'max':
+                dlam = np.max(np.abs(np.diff(lams)))
+            elif spacing == 'median':
+                dlam = np.median(np.abs(np.diff(lams)))
+            elif spacing == 'mean':
+                dlam = np.mean(np.abs(np.diff(lams)))
+            elif spacing == 'min':
+                dlam = np.min(np.abs(np.diff(lams)))
+            elif spacing == 'auto':
+                dlam = (np.max(lams) - np.min(lams))/len(freqs)
             lam_eq = np.arange(np.min(lams), np.max(lams), dlam)
             self.dlam = dlam
             feq = np.divide(sc.c, lam_eq)/10**6
@@ -1871,6 +1887,7 @@ class Dynspec:
                 arout[:, it] = f(feq)
             self.lamdyn = np.flipud(arout)
             self.lam = np.flipud(lam_eq)
+            self.nlam = len(self.lam)
         elif scale == 'trapezoid':
             dyn = cp(self.dyn)
             dyn -= np.mean(dyn)

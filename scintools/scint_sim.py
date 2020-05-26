@@ -15,6 +15,8 @@ from scipy.special import gamma
 import matplotlib.pyplot as plt
 from numpy.random import randn
 from numpy.fft import fft2, ifft2
+import scipy.constants as sc
+import pickle
 
 
 class Simulation():
@@ -92,10 +94,21 @@ class Simulation():
         self.freq = freq
         self.nsub = int(np.shape(dyn)[0]) if nsub is None else nsub
         self.nchan = int(np.shape(dyn)[1])
-        lams = np.linspace(1-self.dlam/2, 1+self.dlam/2, self.nchan)
-        freqs = np.divide(1, lams)
-        freqs = np.linspace(np.min(freqs), np.max(freqs), self.nchan)
-        self.freqs = freqs*self.freq/np.mean(freqs)
+        # lams = np.linspace(1-self.dlam/2, 1+self.dlam/2, self.nchan)
+        # freqs = np.divide(1, lams)
+        # freqs = np.linspace(np.min(freqs), np.max(freqs), self.nchan)
+        # self.freqs = freqs*self.freq/np.mean(freqs)
+        if not lamsteps:
+            self.df = self.freq*self.dlam/(self.nchan - 1)
+            self.freqs = self.freq + np.arange(-self.nchan/2,
+                                               self.nchan/2, 1)*self.df
+        else:
+            self.lam = sc.c/(self.freq*10**6)  # centre wavelength in m
+            self.dl = self.lam*self.dlam/(self.nchan - 1)
+            self.lams = self.lam + np.arange(-self.nchan/2,
+                                             self.nchan/2, 1)*self.dl
+            self.freqs = sc.c/self.lams/10**6  # in MHz
+            self.freq = (np.max(self.freqs) - np.min(self.freqs))/2
         self.bw = max(self.freqs) - min(self.freqs)
         self.times = self.dt*np.arange(0, self.nsub)
         self.df = self.bw/self.nchan
@@ -402,7 +415,8 @@ gradients (beyond those that arise naturally) can be simulated from this.
 class ACF():
 
     def __init__(self, s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3,
-                 phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1):
+                 phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1,
+                 use_t=True):
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
@@ -507,7 +521,7 @@ class ACF():
         Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
 
         dsp = spmax / ns
-        
+
         sqrtar = np.sqrt(self.ar)
         # equally spaced dnu array dnu = dnun * nuhalf
         dnun = np.linspace(0, dnumax, int((nf + 1) / 2))
@@ -579,22 +593,22 @@ class ACF():
                 snp = np.arange(-spmax, spmax, dsp)
             snx, sny = V_x * tn, V_y * tn
             SNPX, SNPY = np.meshgrid(snp, snp)
-            gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 + 
+            gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 +
                            (SNPY * sqrtar)**2)**alph2)  #ACF of E-field
             # compute dnun = 0 first
             gammitv = np.zeros((int(ns), int((nf + 1) / 2)))
-            gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 + 
+            gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 +
                                   (sny * sqrtar)**2)**alph2)
             for idn in range(1, ndnun):
                 snxt = snx - 2 * sigxn * dnun[idn]
                 snyt = sny - 2 * sigyn * dnun[idn]
                 for isn in range(len(snx)):
-                    temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 + 
+                    temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 +
                                                  (SNPY - snyt[isn])**2) /\
                                            (2 * dnun[idn]))
-                    gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) /\ 
+                    gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) /\
                                         ((2 * np.pi) * dnun[idn])
-            
+
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
             gam3 = np.flipud(np.transpose(np.conj(np.block([np.fliplr(np.flipud(
