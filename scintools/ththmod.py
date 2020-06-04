@@ -455,6 +455,45 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.colorbar()
     plt.tight_layout()
 
+def VLBI_chunk_retrieval(params):
+    dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,n_dish = params
+    print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
+    npad = 3
+    fd = fft_axis(time2, u.mHz, npad)
+    tau = fft_axis(freq2, u.us, npad)
+
+    thth_red=list()
+    for i in range(len(dspec2_list)):
+        dspec_pad = np.pad(dspec2_list[i],
+                    ((0, npad * dspec2_list[i].shape[0]), (0, npad * dspec2_list[i].shape[1])),
+                    mode='constant',
+                    constant_values=dspec2_list[i].mean())
+
+        SS = np.fft.fftshift(np.fft.fft2(dspec_pad))
+        thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges)
+        thth_red.append(thth_single)
+    thth_size=thth_red[0].shape[0]
+    thth_comp=np.zeros((thth_size*n_dish,thth_size*n_dish),dtype=complex)
+    for d1 in range(n_dish):
+        for d2 in range(n_dish-d1):
+            idx=int(((n_dish*(n_dish+1))//2)-(((n_dish-d1)*(n_dish-d1+1))//2)+d2)
+            thth_comp[d1*thth_size:(d1+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=thth_red[idx]
+            thth_comp[(d1+d2)*thth_size:(d1+d2+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=np.conjugate(thth_red[idx].T)
+    w,V=eigsh(thth_comp,1)
+    w=w[0]
+    V=V[:,0]
+    thth_temp=np.zeros((thth_size,thth_size),dtype=complex)
+    model_E=list()
+    for d in range(n_dish):
+        thth_temp*=0
+        thth_temp[thth_size//2,:]=np.conjugate(V[d*thth_size:(d+1)*thth_size])*np.sqrt(w)
+        recov_E=rev_map(thth_temp,tau,fd,eta,edges_red,isdspec = False)
+        model_E_temp=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2_list[0].shape[0],:dspec2_list[0].shape[1]]
+        model_E_temp*=(dspec2_list[0].shape[0]*dspec2_list[0].shape[1]/4)
+        model_E.append(model_E_temp)
+    print("Chunk %s-%s success" %(idx_f,idx_t),flush=True)
+    return(model_E,idx_f,idx_t)
+
 def single_chunk_retrieval(params):
     dspec2,edges,time2,freq2,eta,idx_t,idx_f = params
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
@@ -484,3 +523,4 @@ def single_chunk_retrieval(params):
         print(e,flush=True)
         model_E=np.zeros(dspec2.shape,dtype=complex)
     return(model_E,idx_f,idx_t)
+
