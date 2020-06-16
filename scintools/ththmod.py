@@ -478,7 +478,7 @@ def VLBI_chunk_retrieval(params):
         for d2 in range(n_dish-d1):
             idx=int(((n_dish*(n_dish+1))//2)-(((n_dish-d1)*(n_dish-d1+1))//2)+d2)
             thth_comp[d1*thth_size:(d1+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=thth_red[idx]
-            thth_comp[(d1+d2)*thth_size:(d1+d2+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=np.conjugate(thth_red[idx].T)
+            thth_comp[(d1+d2)*thth_size:(d1+d2+1)*thth_size,d1*thth_size:(d1+1)*thth_size]=np.conjugate(thth_red[idx].T)
     w,V=eigsh(thth_comp,1)
     w=w[0]
     V=V[:,0]
