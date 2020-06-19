@@ -248,7 +248,7 @@ def single_search(params):
         name -- A string filename used if plotting
         plot -- A bool controlling if the result should be plotted
     """
-    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot=params
+    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw=params
 
     etas = np.linspace(eta_low, eta_high, 100) * u.us / u.mHz**2
     npad=3
@@ -272,8 +272,8 @@ def single_search(params):
     try:
         etas=etas[np.isfinite(eigs)]
         eigs=eigs[np.isfinite(eigs)]
-        etas_fit = etas[np.abs(etas - etas[eigs == eigs.max()]) < .1 * etas[eigs == eigs.max()]]
-        eigs_fit = eigs[np.abs(etas - etas[eigs == eigs.max()]) < .1 * etas[eigs == eigs.max()]]
+        etas_fit = etas[np.abs(etas - etas[eigs == eigs.max()]) < fw * etas[eigs == eigs.max()]]
+        eigs_fit = eigs[np.abs(etas - etas[eigs == eigs.max()]) < fw * etas[eigs == eigs.max()]]
         C = eigs_fit.max()
         x0 = etas_fit[eigs_fit == C][0].value
         if x0 == etas_fit[0].value:
