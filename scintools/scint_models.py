@@ -383,6 +383,12 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
+    if 'nmodel' in params.keys():
+        nmodel = params['nmodel']
+    else:
+        nmodel = 0.5
+
+
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
         vism_dec = params['vism_dec']
@@ -390,7 +396,7 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         vism_ra = 0
         vism_dec = 0
 
-    if 'vism_psi' in params.keys():  # anisotropic case
+    if nmodel > 0.5:  # anisotropic
         psi = params['psi']*np.pi/180  # anisotropy angle
         vism_psi = params['vism_psi']  # vism in direction of anisotropy
         veff2 = (veff_ra*np.sin(psi) + veff_dec*np.cos(psi) - vism_psi)**2
@@ -479,15 +485,22 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
         ECC = params['ECC']  # orbital eccentricity
         OM = params['OM']*np.pi/180  # longitude of periastron rad
         # Note: fifth Keplerian param T0 used in true anomaly calculation
-        KIN = params['KIN']*np.pi/180  # inclination
+        if 'KIN' in params.keys():
+            INC = params['KIN']*np.pi/180  # inclination
+        elif 'COSI' in params.keys():
+            INC = np.arccos(params['COSI'])
+        elif 'SINI' in params.keys():
+            INC = np.arcsin(params['SINI'])
+        else:
+            print('Warning: inclination parameter (KIN, COSI, or SINI) not found')
         KOM = params['KOM']*np.pi/180  # longitude ascending node
 
         # Calculate pulsar velocity aligned with the line of nodes (Vx) and
         #   perpendicular in the plane (Vy)
-        vp_0 = (2 * np.pi * A1 * v_c) / (np.sin(KIN) * PB * 86400 *
+        vp_0 = (2 * np.pi * A1 * v_c) / (np.sin(INC) * PB * 86400 *
                                          np.sqrt(1 - ECC**2))
         vp_x = -vp_0 * (ECC * np.sin(OM) + np.sin(true_anomaly + OM))
-        vp_y = vp_0 * np.cos(KIN) * (ECC * np.cos(OM) + np.cos(true_anomaly
+        vp_y = vp_0 * np.cos(INC) * (ECC * np.cos(OM) + np.cos(true_anomaly
                                                                + OM))
     else:
         vp_x = 0

@@ -200,7 +200,7 @@ class Dynspec:
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
-                 figsize=(6, 6)):
+                 figsize=(12, 8)):
         """
         Plot the dynamic spectrum
         """
@@ -225,7 +225,7 @@ class Dynspec:
         std = np.std(dyn[is_valid(dyn)*np.array(np.abs(
                                                 is_valid(dyn)) > 0)])
         vmin = minval
-        vmax = medval+5*std
+        vmax = medval + 7*std
         if input_dyn is None:
             if lamsteps:
                 plt.pcolormesh(self.times/60, self.lam, dyn,
@@ -679,6 +679,8 @@ class Dynspec:
                     etaerr = np.abs(etaArray[int(ind-ind1)] -
                                     etaArray[int(ind+ind2)])/2
 
+                self.eta_array = etaArray
+                self.norm_sspec_avg = norm_sspec_avg
                 if plot and iarc == 0:
                     plt.plot(etaArray, norm_sspec_avg)
                     plt.plot(etaArray, norm_sspec_avg_filt)
@@ -928,16 +930,16 @@ class Dynspec:
                     plt.show()
             # plot power spectrum
             if powerspec:
-                plt.loglog(np.sqrt(tdel), self.powerspectrum)
+                plt.loglog(np.sqrt(tdel), tdel*self.powerspectrum)
                 # Overlay theory
                 kf = np.argwhere(np.sqrt(tdel) <= 10)
-                amp = np.mean(self.powerspectrum[kf]*(np.sqrt(tdel[kf]))**4.67)
-                plt.loglog(np.sqrt(tdel), amp*(np.sqrt(tdel))**(-4.67))
+                amp = np.mean(self.powerspectrum[kf]*(np.sqrt(tdel[kf]))**(11/3 +1))
+                plt.loglog(np.sqrt(tdel), tdel*amp*(np.sqrt(tdel))**-((11/3 + 1)))
                 if lamsteps:
                     plt.xlabel(r'$f_\lambda^{1/2}$ (m$^{-1/2}$)')
                 else:
                     plt.xlabel(r'$f_\nu^{1/2}$ ($\mu$s$^{1/2}$)')
-                plt.ylabel("Mean PSD")
+                plt.ylabel("$f_\lambda D(f_\lambda^{1/2})$ ")
                 plt.grid(which='both', axis='both')
                 if filename is not None:
                     filename_name = filename.split('.')[0]
@@ -1171,13 +1173,13 @@ class Dynspec:
                     pos_array = []
                     for itr in range(0, nitr):
                         pos_i = [np.random.normal(loc=params['tau'].value,
-                                                  scale=0.2*params['tau'].value),  # tau
+                                                  scale=params['tau'].value),  # tau
                                  np.random.normal(loc=params['dnu'].value,
-                                                  scale=0.2*params['dnu'].value),  # dnu
+                                                  scale=params['dnu'].value),  # dnu
                                  np.random.normal(loc=params['amp'].value,
-                                                  scale=0.1*params['amp'].value),  # amp
+                                                  scale=params['amp'].value),  # amp
                                  np.random.normal(loc=params['wn'].value,
-                                                  scale=0.1*params['wn'].value),  # wn
+                                                  scale=params['wn'].value),  # wn
                                  # ar
                                  1 + np.abs(np.random.normal(loc=0, scale=2)),
                                  np.random.normal(loc=0, scale=1),  # phs_x
@@ -1880,7 +1882,7 @@ class Dynspec:
                 dlam = (np.max(lams) - np.min(lams))/len(freqs)
             lam_eq = np.arange(np.min(lams), np.max(lams), dlam)
             self.dlam = dlam
-            feq = np.divide(sc.c, lam_eq)/10**6
+            feq = np.round(np.divide(sc.c, lam_eq)/10**6, 6)
             arout = np.zeros([len(lam_eq), int(nt)])
             for it in range(0, nt):
                 f = interp1d(freqs, arin[:, it], kind='cubic')

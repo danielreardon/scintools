@@ -113,7 +113,7 @@ def write_results(filename, dyn=None):
     header += "\n"
     write_string += "\n"
 
-    with open(filename, "a") as outfile:
+    with open(filename, "a+") as outfile:
         if os.stat(filename).st_size == 0:  # file is empty, write header
             outfile.write(header)
         outfile.write(write_string)
@@ -134,6 +134,19 @@ def read_results(filename):
             param_dict[keys[ii]].append(row[ii])
 
     return param_dict
+
+
+def search_and_replace(filename, search, replace):
+
+    with open(filename, 'r') as file:
+        data = file.read()
+
+    data = data.replace(search, replace)
+
+    with open(filename, 'w') as file:
+        file.write(data)
+
+    return
 
 
 def float_array_from_dict(dictionary, key):
