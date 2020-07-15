@@ -248,10 +248,9 @@ def single_search(params):
         name -- A string filename used if plotting
         plot -- A bool controlling if the result should be plotted
     """
-    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw=params
+    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad=params
 
     etas = np.linspace(eta_low, eta_high, 100) * u.us / u.mHz**2
-    npad=3
 
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
@@ -456,9 +455,8 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.tight_layout()
 
 def VLBI_chunk_retrieval(params):
-    dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,n_dish = params
+    dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,npad,n_dish = params
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
-    npad = 3
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
 
@@ -495,9 +493,8 @@ def VLBI_chunk_retrieval(params):
     return(model_E,idx_f,idx_t)
 
 def single_chunk_retrieval(params):
-    dspec2,edges,time2,freq2,eta,idx_t,idx_f = params
+    dspec2,edges,time2,freq2,eta,idx_t,idx_f,npad = params
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
-    npad = 3
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
 
