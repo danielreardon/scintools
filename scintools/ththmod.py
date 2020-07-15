@@ -371,7 +371,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             origin='lower',
             aspect='auto',
             extent=ext_find(fd,tau),
-            vmin=np.abs(SS).max()**2/100,vmax=np.abs(SS).max()**2)
+            vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
     plt.xlabel(r'$f_D$ (mHz)')
@@ -383,7 +383,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             origin='lower',
             aspect='auto',
             extent=ext_find(fd,tau),
-            vmin=np.abs(SS).max()**2/100,vmax=np.abs(SS).max()**2)
+            vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
     plt.xlabel(r'$f_D$ (mHz)')
@@ -395,7 +395,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             origin='lower',
             aspect='auto',
             extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],
-            vmin=np.abs(thth_red).max()**2/100,vmax=np.abs(thth_red).max()**2)
+            vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2)
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Data $\theta-\theta$')
@@ -405,7 +405,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             origin='lower',
             aspect='auto',
             extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],
-            vmin=np.abs(thth_red).max()**2/100,vmax=np.abs(thth_red).max()**2)
+            vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2)
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Data $\theta-\theta$')
