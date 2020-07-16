@@ -377,6 +377,9 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.xlabel(r'$f_D$ (mHz)')
     plt.ylabel(r'$\tau$ (us)')
     plt.title('Data Secondary Spectrum')
+    plt.plot(fd,eta*(fd**2),'r',alpha=.7)
+    plt.xlabel(r'$f_D$ (mHz)')
+    plt.ylabel(r'$\tau$ (us)')
     plt.subplot(grid[1,1])
     plt.imshow(np.abs(recov)**2,
             norm=LogNorm(),
@@ -386,9 +389,6 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
-    plt.plot(fd,eta*(fd**2),'r',alpha=.7)
-    plt.xlabel(r'$f_D$ (mHz)')
-    plt.ylabel(r'$\tau$ (us)')
     plt.title('Model Secondary Spectrum')
     plt.subplot(grid[2,0])
     plt.imshow(np.abs(thth_red)**2,
