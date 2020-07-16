@@ -386,6 +386,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2)
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
+    plt.plot(fd,eta*(fd**2),'r',alpha=.7)
     plt.xlabel(r'$f_D$ (mHz)')
     plt.ylabel(r'$\tau$ (us)')
     plt.title('Model Secondary Spectrum')
