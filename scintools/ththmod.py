@@ -297,7 +297,7 @@ def single_search(params):
     except:
         print('Plotting Error',flush=True)
     print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq2.mean()),flush=True)
-    return(eta_fit,eta_sig,freq2.mean(),time2.mean())
+    return(eta_fit,eta_sig,freq2.mean(),time2.mean(),eigs)
 
 def PlotFunc(dspec,time,freq,SS,fd,tau,
             edges,eta_fit,eta_sig,etas,measure,etas_fit,fit_res,
