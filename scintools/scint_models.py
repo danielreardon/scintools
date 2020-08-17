@@ -26,6 +26,33 @@ from scipy.interpolate import interp2d
 import matplotlib.pyplot as plt
 
 
+def fitter(model, params, args, mcmc=False, pos=None):
+
+    from lmfit import Minimizer
+
+    # Do fit
+    func = Minimizer(model, params, fcn_args=args)
+    results = func.minimize()
+    if mcmc:
+        func = Minimizer(model, results.params, fcn_args=args)
+        mcmc_results = func.emcee(nwalkers=nitr, steps=2000,
+                                  burn=500, pos=pos, is_weighted=True)
+        results = mcmc_results
+    return results
+
+def powerspectrum_model(params, xdata, ydata):
+
+    parvals = params.valuesdict()
+
+    amp = parvals['amp']
+    wn = parvals['wn']
+    alpha = parvals['alpha']
+
+    model = wn + amp * xdata**alpha
+
+    return (ydata - model)
+
+
 def tau_acf_model(params, xdata, ydata, weights):
     """
     Fit 1D function to cut through ACF for scintillation timescale.
@@ -386,7 +413,10 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     if 'nmodel' in params.keys():
         nmodel = params['nmodel']
     else:
-        nmodel = 0.5
+        if 'vism_psi' in params.keys():
+            nmodel = 1
+        else:
+            nmodel = 0
 
 
     if 'vism_ra' in params.keys():

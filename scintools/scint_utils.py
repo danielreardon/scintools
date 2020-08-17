@@ -110,6 +110,28 @@ def write_results(filename, dyn=None):
         header += ",betaeta,betaetaerr"
         write_string += ",{0},{1}".format(dyn.betaeta, dyn.betaetaerr)
 
+    if hasattr(dyn, 'eta_left'):  # Arc curvature
+        header += ",eta_left,etaerr_left"
+        write_string += ",{0},{1}".format(dyn.eta_left, dyn.etaerr_left)
+
+    if hasattr(dyn, 'betaeta_left'):  # Beta arc curvature
+        header += ",betaeta_left,betaetaerr_left"
+        write_string += ",{0},{1}".format(dyn.betaeta_left,
+                          dyn.betaetaerr_left)
+
+    if hasattr(dyn, 'eta_right'):  # Arc curvature
+        header += ",eta_right,etaerr_right"
+        write_string += ",{0},{1}".format(dyn.eta_right, dyn.etaerr_right)
+
+    if hasattr(dyn, 'betaeta_right'):  # Beta arc curvature
+        header += ",betaeta_right,betaetaerr_right"
+        write_string += ",{0},{1}".format(dyn.betaeta_right,
+                          dyn.betaetaerr_right)
+
+    if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
+        header += ",delmax"
+        write_string += ",{0}".format(dyn.norm_delmax)
+
     header += "\n"
     write_string += "\n"
 
@@ -149,11 +171,22 @@ def search_and_replace(filename, search, replace):
     return
 
 
+def cov_to_corr(cov):
+    """
+    Calculate correlation matrix from covariance
+    """
+    std = np.sqrt(np.diag(cov))
+    outer_std = np.outer(std, std)
+    corr = cov / outer_std
+    corr[cov == 0] = 0
+    return corr
+
+
 def float_array_from_dict(dictionary, key):
     """
     Convert an array stored in dictionary to a numpy array
     """
-    return np.array(list(map(float, dictionary[key])))
+    return np.array(list(map(float, dictionary[key]))).squeeze()
 
 
 def get_ssb_delay(mjds, raj, decj):
