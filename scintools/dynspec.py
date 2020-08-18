@@ -1034,7 +1034,7 @@ class Dynspec:
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, display=True,
-                         nscale=4, nitr=100):
+                         nscale=4, nitr=100, verbose=True):
         """
         Measure the scintillation timescale
             Method:
@@ -1049,7 +1049,7 @@ class Dynspec:
 
         if not hasattr(self, 'acf'):
             self.calc_acf()
-        if not hasattr(self, 'sspec'):
+        if not hasattr(self, 'sspec') and 'sspec' in method:
             self.calc_sspec()
 
         ydata_f = self.acf[int(self.nchan):, int(self.nsub)]
@@ -1095,7 +1095,6 @@ class Dynspec:
             results = func.minimize()
             if mcmc:
                 func = Minimizer(scint_model, results.params, fcn_args=args)
-                print('Doing mcmc posterior sample')
                 mcmc_results = func.emcee(nwalkers=nitr, steps=2000,
                                           burn=500, pos=pos, is_weighted=False)
                 results = mcmc_results
@@ -1253,18 +1252,19 @@ class Dynspec:
         else:
             self.talpha = alpha
             self.talphaerr = 0
-
-        print("\t ACF FIT PARAMETERS\n")
-        print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau,
-              err=self.tauerr))
-        print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu,
-              err=self.dnuerr))
-        print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
-              err=self.talphaerr))
-        if method == 'acf2d_approx':
+        
+        if verbose:
+            print("\t ACF FIT PARAMETERS\n")
+            print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau,
+                  err=self.tauerr))
+            print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu,
+                  err=self.dnuerr))
+            print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
+                  err=self.talphaerr))
+        if method == 'acf2d_approx' and verbose:
             print("phase grad:\t\t{val} +/- {err}".format(val=self.phasegrad,
                   err=self.phasegraderr))
-        elif method == 'acf2d':
+        elif method == 'acf2d' and verbose:
             print("ar:\t\t{val} +/- {err}".format(val=self.ar,
                   err=self.arerr))
             print("phase grad x:\t\t{val} +/- {err}".format(
