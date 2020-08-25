@@ -16,7 +16,6 @@ import matplotlib.pyplot as plt
 from numpy.random import randn
 from numpy.fft import fft2, ifft2
 import scipy.constants as sc
-import pickle
 
 
 class Simulation():
@@ -594,27 +593,29 @@ class ACF():
             snx, sny = V_x * tn, V_y * tn
             SNPX, SNPY = np.meshgrid(snp, snp)
             gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 +
-                           (SNPY * sqrtar)**2)**alph2)  #ACF of E-field
+                            (SNPY * sqrtar)**2)**alph2)  # ACF of E-field
             # compute dnun = 0 first
             gammitv = np.zeros((int(ns), int((nf + 1) / 2)))
             gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 +
-                                  (sny * sqrtar)**2)**alph2)
+                                   (sny * sqrtar)**2)**alph2)
             for idn in range(1, ndnun):
                 snxt = snx - 2 * sigxn * dnun[idn]
                 snyt = sny - 2 * sigyn * dnun[idn]
                 for isn in range(len(snx)):
                     temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 +
-                                                 (SNPY - snyt[isn])**2) /\
+                                                 (SNPY - snyt[isn])**2) /
                                            (2 * dnun[idn]))
                     gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) /\
-                                        ((2 * np.pi) * dnun[idn])
+                        ((2 * np.pi) * dnun[idn])
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
-            gam3 = np.flipud(np.transpose(np.conj(np.block([np.fliplr(np.flipud(
+            gam3 = np.flipud(np.transpose(
+                                np.conj(np.block([np.fliplr(np.flipud(
                                               gammitv[:, 1:])), gammitv]))))
 
-            gam3 = amp * gam3[1:nf-cf+1, 1:ns-ct+1]  # scale by amplitude and crop to match data
+            # scale by amplitude and crop to match data
+            gam3 = amp * gam3[1:nf-cf+1, 1:ns-ct+1]
             f2 = np.transpose(np.block([[np.flip(-dnun[:]), dnun]])).flatten()
             f2 = f2[1:nf-cf+1]
             t2 = tn[1:ns-ct+1]

@@ -117,7 +117,7 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'betaeta_left'):  # Beta arc curvature
         header += ",betaeta_left,betaetaerr_left"
         write_string += ",{0},{1}".format(dyn.betaeta_left,
-                          dyn.betaetaerr_left)
+                                          dyn.betaetaerr_left)
 
     if hasattr(dyn, 'eta_right'):  # Arc curvature
         header += ",eta_right,etaerr_right"
@@ -126,7 +126,7 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'betaeta_right'):  # Beta arc curvature
         header += ",betaeta_right,betaetaerr_right"
         write_string += ",{0},{1}".format(dyn.betaeta_right,
-                          dyn.betaetaerr_right)
+                                          dyn.betaetaerr_right)
 
     if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
         header += ",delmax"
@@ -558,4 +558,3 @@ def remove_duplicates(dyn_files):
     Filters out dynamic spectra from simultaneous observations
     """
     return dyn_files
-

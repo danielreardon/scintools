@@ -22,23 +22,24 @@ A library of scintillation models to use with lmfit
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import numpy as np
-from scipy.interpolate import interp2d
-import matplotlib.pyplot as plt
+from scint_sim import ACF
+from lmfit import Minimizer
 
 
-def fitter(model, params, args, mcmc=False, pos=None):
-
-    from lmfit import Minimizer
+def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
+           steps=1000, burn=0.2):
 
     # Do fit
     func = Minimizer(model, params, fcn_args=args)
     results = func.minimize()
     if mcmc:
         func = Minimizer(model, results.params, fcn_args=args)
-        mcmc_results = func.emcee(nwalkers=nitr, steps=2000,
-                                  burn=500, pos=pos, is_weighted=True)
+        mcmc_results = func.emcee(nwalkers=nwalkers, steps=steps,
+                                  burn=int(burn*steps), pos=pos,
+                                  is_weighted=True)
         results = mcmc_results
     return results
+
 
 def powerspectrum_model(params, xdata, ydata):
 
@@ -176,7 +177,6 @@ def scint_acf_model_2d(params, ydata, weights):
     """
     Fit an analytical 2D ACF function
     """
-    #from scint_sim import ACF
 
     if weights is None:
         weights = np.ones(np.shape(ydata))
@@ -209,19 +209,24 @@ def scint_acf_model_2d(params, ydata, weights):
     taumax = (nt_crop / nt) * tobs / tau
     dnumax = (nf_crop / nf) * bw / dnu
 
-    acf = ACF(s_max=taumax, dnu_max=dnumax, ns=nt_crop, nf=nf_crop, ar=ar, alpha=alpha,
-              phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y, amp=amp, V_x=V_x, V_y=V_y,
-              psi=None)
+    acf = ACF(s_max=taumax, dnu_max=dnumax, ns=nt_crop, nf=nf_crop, ar=ar,
+              alpha=alpha, phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y,
+              amp=amp, V_x=V_x, V_y=V_y, psi=None)
     acf.calc_acf()
     model = acf.acf
 
-    model[int(nf_crop / 2) + 1, int(nt_crop / 2) + 1] += wn  # add white noise spike
+    # add white noise spike
+    model[int(nf_crop / 2) + 1, int(nt_crop / 2) + 1] += wn
 
-    triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-nt_crop * dt / 2, nt_crop * dt / 2,
-                                                          nt_crop)), (nf_crop, 1)),
-                                                          tobs)
-    triangle_f = np.transpose(1 - np.divide(np.tile(np.abs(np.linspace(-nf_crop * df / 2, nf_crop * df / 2, nf_crop)),
-                                       (nt_crop, 1)), bw))
+    triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-nt_crop*dt/2,
+                                                          nt_crop*dt/2,
+                                                          nt_crop)),
+                                       (nf_crop, 1)), tobs)
+    triangle_f = \
+        np.transpose(1 - np.divide(np.tile(np.abs(np.linspace(-nf_crop*df/2,
+                                                              nf_crop*df/2,
+                                                              nf_crop)),
+                                           (nt_crop, 1)), bw))
     triangle = np.multiply(triangle_t, triangle_f)
     model = np.multiply(model, triangle)  # multiply by triangle function
 
@@ -410,14 +415,14 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
+    # Model to toggle between isotropic and anisotropic
     if 'nmodel' in params.keys():
         nmodel = params['nmodel']
     else:
-        if 'vism_psi' in params.keys():
+        if 'psi' in params.keys():
             nmodel = 1
         else:
             nmodel = 0
-
 
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
@@ -522,7 +527,8 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
         elif 'SINI' in params.keys():
             INC = np.arcsin(params['SINI'])
         else:
-            print('Warning: inclination parameter (KIN, COSI, or SINI) not found')
+            print('Warning: inclination parameter (KIN, COSI, or SINI) ' +
+                  'not found')
         KOM = params['KOM']*np.pi/180  # longitude ascending node
 
         # Calculate pulsar velocity aligned with the line of nodes (Vx) and
