@@ -1,5 +1,8 @@
 # scintools
-Tools for analysing of pulsar scintillations 
+Tools for analysis of pulsar scintillations.
 
 
-Please note: This can be considered an "alpha" release, the code has not been fully tested, does not come with documentation, and comes with absolutely no warranty.
+Please note: This is currently considered a pre-release only. Code comes with absolutely no warranty.
+
+Limited documentation is available at https://scintools.readthedocs.io/en/latest/index.html
+Usage example iPython notebooks will be available in scintools/examples/
