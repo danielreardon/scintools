@@ -766,8 +766,8 @@ class Dynspec:
 
             if plot and iarc == 0:
                 plt.figure(figsize=figsize)
-                plt.plot(self.eta_array, self.norm_sspec_avg)
-                plt.plot(etaArray, norm_sspec_avg_filt)
+                plt.plot(self.eta_array[10:], self.norm_sspec_avg[10:])
+                plt.plot(etaArray[10:], norm_sspec_avg_filt[10:])
                 plt.plot(xdata, yfit, 'k')
                 plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
                             facecolor='C2', alpha=0.5)
