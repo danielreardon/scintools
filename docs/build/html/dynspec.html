@@ -1,532 +1,253 @@
 
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title>Dynspec class &#8212; scintools 0.1 documentation</title>
-    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
-    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    <script type="text/javascript" src="_static/documentation_options.js"></script>
-    <script type="text/javascript" src="_static/jquery.js"></script>
-    <script type="text/javascript" src="_static/underscore.js"></script>
-    <script type="text/javascript" src="_static/doctools.js"></script>
+<!DOCTYPE html>
+<html class="writer-html4" lang="en" >
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Dynspec class &mdash; scintools 0.2 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+
+  
+  
+  
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript">
+          var DOCUMENTATION_OPTIONS = {
+              URL_ROOT:'./',
+              VERSION:'0.2',
+              LANGUAGE:'None',
+              COLLAPSE_INDEX:false,
+              FILE_SUFFIX:'.html',
+              HAS_SOURCE:  true,
+              SOURCELINK_SUFFIX: '.txt'
+          };
+      </script>
+        <script type="text/javascript" src="_static/jquery.js"></script>
+        <script type="text/javascript" src="_static/underscore.js"></script>
+        <script type="text/javascript" src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="scint_models module" href="scint_models.html" />
-    <link rel="prev" title="Welcome to scintools’s documentation!" href="index.html" />
+    <link rel="next" title="Simulation class" href="simulation.html" />
+    <link rel="prev" title="Welcome to scintools’s documentation!" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
    
-  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
-  
-  
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
 
-  </head><body>
-  
+          
+            <a href="index.html" class="icon icon-home" alt="Documentation Home"> scintools
+          
 
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          <div class="body" role="main">
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Dynspec class</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#importing-dynamic-spectra">Importing dynamic spectra</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-plotting">Basic plotting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#processing">Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#secondary-spectra">Secondary spectra</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Simulation class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="acf.html">ACF class</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scint_models.html">scint_models module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scint_utils.html">scint_utils module</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">scintools</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Dynspec class</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/dynspec.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
             
   <div class="section" id="dynspec-class">
 <h1>Dynspec class<a class="headerlink" href="#dynspec-class" title="Permalink to this headline">¶</a></h1>
-<p>The scintools <code class="docutils literal notranslate"><span class="pre">Dynspec</span></code> class features tools for processing and plotting dynamic spectra, as well as computing corresponding autocorrelation functions, secondary spectra and physical scattered images, and fitting data to physical models.</p>
-<em class="property">class </em><code class="descclassname">scintools.</code><code class="descname">Dynspec</code><span class="sig-paren">(</span><em>filename=None, dyn=None, verbose=True, process=True, lamsteps=False</em><span class="sig-paren">)</span><dl class="docutils">
-<dt></dt>
-<dd><p class="first">Dynamic spectrum class.</p>
-<dl class="last docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>filename</strong> (<cite>str</cite>) - <cite>psrflux</cite>-format filename of the dynamic spectrum.</li>
-<li><strong>dyn</strong> (<cite>dynspec object</cite>) - compatable dynamic spectrum object.</li>
-<li><strong>process</strong> (<cite>bool, optional</cite>) - perform default processing. Involves trimming the edges, refilling, correction, and calculation of the ACF and secondary spectrum. If lamsteps is True, also scales the dynamic spectrum.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>verbose</strong> (<cite>bool, optional</cite>) - print dynamic spectrum information.</li>
-</ul>
-</dd>
-</dl>
-</dd>
-</dl>
+<p>This will serve as a list of features available within the Dynspec class, in dynspec.py</p>
 <div class="section" id="importing-dynamic-spectra">
 <h2>Importing dynamic spectra<a class="headerlink" href="#importing-dynamic-spectra" title="Permalink to this headline">¶</a></h2>
-<p>A Dynspec object can be loaded from a <cite>psrflux</cite>-format dynamic spectrum, a simulation object from either the Simulation class or from Matlab code by Coles <em>et al</em>. (2010), or a custom object.</p>
-<code class="descname">load_file</code><span class="sig-paren">(</span><em>filename, process=True, lamsteps=False, verbose=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Load a dynamic spectrum from <cite>psrflux</cite>-format file</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>filename</strong> (<cite>str</cite>) - <cite>psrflux</cite>-format filename of the dynamic spectrum.</li>
-<li><strong>process</strong> (<cite>bool, optional</cite>) - perform default processing. Involves trimming the edges, refilling, correction, and calculation of the ACF and secondary spectrum. If lamsteps is True, also scales the dynamic spectrum.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>verbose</strong> (<cite>bool, optional</cite>) - print dynamic spectrum information.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">load_dyn_obj</code><span class="sig-paren">(</span><em>dyn, process=True, lamsteps=False, verbose=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Load in a dynamic spectrum object of different type.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>dyn</strong> (<cite>dynspec object</cite>) - compatable dynamic spectrum object.</li>
-<li><strong>process</strong> (<cite>bool, optional</cite>) - perform default processing. Involves trimming the edges, refilling, correction, and calculation of the ACF and secondary spectrum. If lamsteps is True, also scales the dynamic spectrum.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>verbose</strong> (<cite>bool, optional</cite>) - print dynamic spectrum information.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-</div>
-<div class="section" id="processing">
-<h2>Processing<a class="headerlink" href="#processing" title="Permalink to this headline">¶</a></h2>
-<p>The dynamic spectrum can be cleaned, cropped, normalised, and resampled in several ways.</p>
-<code class="descname">cut_dyn</code><span class="sig-paren">(</span><em>tcuts=0, fcuts=0, lamsteps=False, plot=False, maxfdop=np.inf, display=True, figsize=(8, 13), filename=None</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Cuts the dynamic spectrum into (tcuts + 1) segments in time and (fcuts + 1) segments in frequency.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>tcuts</strong> (<cite>int</cite>) - number of cuts along the time axis. Produces (tcuts + 1) segments.</li>
-<li><strong>fcuts</strong> (<cite>int</cite>) - number of cuts along the frequency axis. Produces (fcuts + 1) segments.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - plots cut dynamic spectrum and resulting ACF and secondary spectrum in subplot.</li>
-<li><strong>maxfdop</strong> (<cite>float, optional</cite>) - maximum extent in doppler freqency to plot the secondary spectrum.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display plot.</li>
-<li><strong>figsize</strong> (<cite>tuple, optional</cite>) - subplot figure size.</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename for saving the plots.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">trim_edges</code><span class="sig-paren">(</span><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div>Finds and removes the band edges.</div></blockquote>
-<code class="descname">zap</code><span class="sig-paren">(</span><em>method='median', sigma=7, m=3</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Basic zapping of dynamic spectrum.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>method</strong> (<cite>{‘median’, medfilt}, str, optional</cite>) - method for zapping the dynamic spectrum. ‘median’ selects indices based on the median of the array while ‘medfilt’ uses the <code class="docutils literal notranslate"><span class="pre">scipy.signal.medfilt</span></code> method.</li>
-<li><strong>sigma</strong> (<cite>float, optional</cite>) - pixel value selection threshold.</li>
-<li><strong>m</strong> (<cite>int, optional</cite>) - kernel size for <code class="docutils literal notranslate"><span class="pre">medfilt</span></code> method.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">refill</code><span class="sig-paren">(</span><em>linear=True, zeros=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Replaces the nan values in array. Also replaces zeros by default.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>linear</strong> (<cite>bool, optional</cite>) - choose whether to perform linear interpolation.</li>
-<li><strong>zeros</strong> (<cite>bool, optional</cite>) - choose whether to replace the zeros in the array.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">correct_dyn</code><span class="sig-paren">(</span><em>svd=True, nmodes=1, frequency=False, time=True, lamsteps=False, nsmooth=5</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Correct for gain variations in time and frequency.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>svd</strong> (<cite>bool, optional</cite>) - choose whether to compute a singular-value decomposition model of the dynamic spectrum using the <code class="docutils literal notranslate"><span class="pre">scint_utils</span></code> function <code class="docutils literal notranslate"><span class="pre">svd_model</span></code>.</li>
-<li><strong>nmodes</strong> (<cite>int, optional</cite>) - number of singular values to compute up to.</li>
-<li><strong>frequency</strong> (<cite>bool, optional</cite>) - compute model using mean along frequency values.</li>
-<li><strong>time</strong> (<cite>bool, optional</cite>) - compute model using mean along time values.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>nsmooth</strong> (<cite>int, optional</cite>) - length of the filter window (i.e. the number of coefficients) for applying <code class="docutils literal notranslate"><span class="pre">scipy.signal.savgol_filter</span></code> to mean data. If used, must be a positive odd integer.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">crop_dyn</code><span class="sig-paren">(</span><em>fmin=0, fmax=np.inf, tmin=0, tmax=np.inf</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Crop dynamic spectrum in frequency and time.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>fmin</strong> (<cite>float, optional</cite>) - minimum extent in frequency to crop at.</li>
-<li><strong>fmax</strong> (<cite>float, optional</cite>) - maximum extent in frequency to crop at.</li>
-<li><strong>tmin</strong> (<cite>float, optional</cite>) - minimum extent in time to crop at.</li>
-<li><strong>tmax</strong> (<cite>float, optional</cite>) - maximum extent in time to crop at.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">scale_dyn</code><span class="sig-paren">(</span><em>scale='lambda', window='hanning', window_frac=0.1</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Crop dynamic spectrum in frequency and time.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>scale</strong> (<cite>{‘factor’, ‘lambda’, ‘trapezoid’}, str, optional</cite>) - scaling method.</li>
-<li><strong>window</strong> (<cite>{‘hanning’, ‘hamming’, ‘blackman’, ‘bartlett’}, str, optional</cite>) - numpy windowing method.</li>
-<li><strong>window_frac</strong> (<cite>float, optional</cite>) - windowing fraction.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">default_processing</code><span class="sig-paren">(</span><em>lamsteps=False</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Runs all the above processing methods with default parameters as well as calculating the ACF and secondary spectrum.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps. If True, scales the dynamic spectrum.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
+<p>A Dynspec object can be loaded from a <cite>psrflux</cite>-format dynamic spectrum, a simulation object, or …</p>
+<p>blah blah this is how you do things</p>
 </div>
 <div class="section" id="basic-plotting">
 <h2>Basic plotting<a class="headerlink" href="#basic-plotting" title="Permalink to this headline">¶</a></h2>
-<code class="descname">plot_dyn</code><span class="sig-paren">(</span><em>lamsteps=False, trap=False, input_dyn=None, input_x=None, input_y=None, filename=None, display=True</em><span class="sig-paren">)</span><p></p>
+<p>To view the dynamic spectrum, use</p>
 <blockquote>
-<div><p>Plot the dynamic spectrum</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps. If True, scales the dynamic spectrum.</li>
-<li><strong>trap</strong> (<cite>bool, optional</cite>) - option to use trapezoidal dynamic spectrum.</li>
-<li><strong>input_dyn</strong> (<cite>numpy 2D array, optional</cite>) - input dynamic spectrum rather than using currently initialized one.</li>
-<li><strong>input_x</strong> (<cite>list or numpy 1D array, optional</cite>) - time axis of the input dynamic spectrum.</li>
-<li><strong>input_y</strong> (<cite>list or numpy 1D array, optional</cite>) - frequency or wavelength axis of the input dynamic spectrum.</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
+<div>dyn.plot_dyn()</div></blockquote>
 </div>
-<div class="section" id="autocorrelation-function-acf">
-<h2>Autocorrelation function (ACF)<a class="headerlink" href="#autocorrelation-function-acf" title="Permalink to this headline">¶</a></h2>
-<p>The autocorrelation function of the dynamic spectrum can be calculated and analysed in several ways.</p>
-<code class="descname">calc_acf</code><span class="sig-paren">(</span><em>scale=False, input_dyn=None, plot=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Calculate the autocorrelation function</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>scale</strong> (<cite>bool, optional</cite>) -</li>
-<li><strong>input_dyn</strong> (<cite>numpy 2D array, optional</cite>) - input dynamic spectrum rather than using currently initialized one.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - option to plot the ACF.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">get_scint_params</code><span class="sig-paren">(</span><em>method="acf1d", alpha=5/3, nscale=3, mcmc=False, plot=False, full_frame=False, display=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Calculates the characteristic frequency and time scales,  and , of the ACF.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>method</strong> (<cite>{‘acf1d, ‘acf2d_approx’, ‘acf2d’, ‘sspec’}, optional</cite>) - method used to compute the model to fit to the ACF. ‘acf1d’ fits a 1D model through the center of the ACF in both axes, ‘acf2d_approx’ fits an approximate 2D model, ‘acf2d’ fits an analytical 2D model and is significantly slower, and ‘sspec’ fits a model based on the secondary spectrum.</li>
-<li><strong>alpha</strong> (<cite>float, optional</cite>) - exponent used in the exponential term of the 1D and approxmate 2D models. 5/3 is a Kolmogorov profile (default) while 2 is Gaussian. If no value is given, the model treats it as a parameter to fit.</li>
-<li><strong>nscale</strong> (<cite>float, optional</cite>) - the number of frequency and time scales, initially computed using the 1D model, to compute over. Crops the frame to more reliably fit a 2D model. If larger than the frame it is automatically lowered.</li>
-<li><strong>mcmc</strong> (<cite>bool, optional</cite>) - perform an additional Markov Chain-Monte Carlo algorithm using the fit parameters from the standard models as initial guesses.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - plots the ACF, the fitted model, and the residuals.</li>
-<li><strong>full_frame</strong> (<cite>bool, optional</cite>) - plots the entire frames of the 2D model fitting. If False, plots the cropped frames.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">get_acf_tilt</code><span class="sig-paren">(</span><em>tmax=None, fmax=None, plot=False</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Calculate the tilt of the ACF</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>tmax</strong> (<cite>float, optional</cite>) - maximum extent in time to find the peak power. If None then taken to be one third of the characteristic time scale determined by <code class="docutils literal notranslate"><span class="pre">get_scint_params()</span></code>.</li>
-<li><strong>fmax</strong> (<cite>float, optional</cite>) - maximum extent in frequency to find the peak power. If None then taken to be one fifth of the decorrelation frequency scale determined by <code class="docutils literal notranslate"><span class="pre">get_scint_params()</span></code>.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - option to plot the ACF with a fitted slope line.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">plot_acf</code><span class="sig-paren">(</span><em>fit=True, method='acf1d', alpha=5/3, nscale=3, contour=False, input_acf=None, input_t=None, input_f=None, mcmc=False, filename=None, display=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Plot the autocorrelation function</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>fit</strong> (<cite>bool, optional</cite>) - fits a model to the ACF using <code class="docutils literal notranslate"><span class="pre">get_scint_params()</span></code>.</li>
-<li><strong>method</strong> (<cite>{‘acf1d, ‘acf2d_approx’, ‘acf2d’, ‘sspec’}, optional</cite>) - method used to compute the model to fit to the ACF. ‘acf1d’ fits a 1D model through the center of the ACF in both axes, ‘acf2d_approx’ fits an approximate 2D model, ‘acf2d’ fits an analytical 2D model and is significantly slower, and ‘sspec’ fits a model based on the secondary spectrum.</li>
-<li><strong>alpha</strong> (<cite>float, optional</cite>) - exponent used in the exponential term of the 1D and approxmate 2D models. 5/3 is a Kolmogorov profile (default) while 2 is Gaussian. If no value is given, the model treats it as a parameter to fit.</li>
-<li><strong>nscale</strong> (<cite>float, optional</cite>) - the number of frequency and time scales, initially computed using the 1D model, to compute over. Crops the frame to more reliably fit a 2D model. If larger than the frame it is automatically lowered.</li>
-<li><strong>contour</strong> (<cite>bool, optional</cite>) - overlay contours</li>
-<li><strong>input_acf</strong> (<cite>numpy 2D array, optional</cite>) - input ACF rather than using currently initialized one.</li>
-<li><strong>input_t</strong> (<cite>numpy 1D array, optional</cite>) - input time axis.</li>
-<li><strong>input_f</strong> (<cite>numpy 1D array, optional</cite>) - input frequency axis.</li>
-<li><strong>mcmc</strong> (<cite>bool, optional</cite>) - perform an additional Markov Chain-Monte Carlo algorithm using the fit parameters from the standard models as initial guesses.</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
+<div class="section" id="processing">
+<h2>Processing<a class="headerlink" href="#processing" title="Permalink to this headline">¶</a></h2>
+<p>the dynamic spectrum can be cleaned, cropped, normalised, and resampled in several ways</p>
 </div>
 <div class="section" id="secondary-spectra">
 <h2>Secondary spectra<a class="headerlink" href="#secondary-spectra" title="Permalink to this headline">¶</a></h2>
-<p>The secondary spectrum of the dynamic spectrum can be calculated and analysed in several ways.</p>
-<code class="descname">calc_sspec</code><span class="sig-paren">(</span><em>prewhite=True, halve=True, lamsteps=False, input_dyn=None, input_x=None, input_y=None, trap=False, window='blackman', window_frac=0.1, plot=False</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Calculate the secondary spectrum</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>prewhite</strong> (<cite>bool, optional</cite>) - apply pre-whitening and post-darkening.</li>
-<li><strong>halve</strong> (<cite>bool, optional</cite>) - crop the secondary spectrum to positive  or . Removes the negative-curvature counterpart arc in the bottom half of the spectrum.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>input_dyn</strong> (<cite>numpy 2D array, optional</cite>) - input dynamic spectrum rather than using currently initialized one.</li>
-<li><strong>input_x</strong> (<cite>list or numpy 1D array, optional</cite>) - time axis of the input dynamic spectrum.</li>
-<li><strong>input_y</strong> (<cite>list or numpy 1D array, optional</cite>) - frequency or wavelength axis of the input dynamic spectrum.</li>
-<li><strong>trap</strong> (<cite>bool, optional</cite>) - use trapezoidal dynamic spectrum.</li>
-<li><strong>window</strong> (<cite>{‘hanning’, ‘hamming’, ‘blackman’, ‘bartlett’}, str, optional</cite>) - numpy windowing method.</li>
-<li><strong>window_frac</strong> (<cite>float, optional</cite>) - windowing fraction.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - option to plot the secondary spectrum.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">fit_arc</code><span class="sig-paren">(</span><em>method='norm_sspec', asymm=False, plot=False, delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True, etamax=None, etamin=None, low_power_diff=-3, high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf], nsmooth=5, filename=None, noise_error=True, display=True, log_parabola=False</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Fit parabolic arc along peak power</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>method</strong> (<cite>{‘norm_sspec’}, str, optional</cite>) - method for fitting the arc.</li>
-<li><strong>asymm</strong> (<cite>bool, optional</cite>) - specifiy whether there is asymmetry in the spectrum</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>numsteps</strong> (<cite>int, optional</cite>) - number of steps along eta.</li>
-<li><strong>startbin</strong> (<cite>int, optional</cite>) - Delay bin to start calculation at. Masks all preceding delay bins</li>
-<li><strong>cutmid</strong> (<cite>int, optional</cite>) - number of doppler bins away from the center to mask</li>
-<li><strong>etamax</strong> (<cite>float, optional</cite>) - upper-bound for the arc curvature</li>
-<li><strong>etamin</strong> (<cite>float, optional</cite>) - lower-bound for the arc curvature</li>
-<li><strong>low_power_diff</strong> (<cite>float, optional</cite>) - parabola is fit to the peak power curve down to eta corresponding to this decrease in power.</li>
-<li><strong>high_power_diff</strong> (<cite>float, optional</cite>) - parabola is fit to the peak power curve up to eta corresponding to this decrease in power.</li>
-<li><strong>ref_freq</strong> (<cite>float, optional</cite>) - reference frequency in MHz used to convert arc curvature between units of  and .</li>
-<li><strong>constraint</strong> (<cite>length 2 list or tuple, optional</cite>) - constrain the arc fitting to a curvature range [eta min, eta max].</li>
-<li><strong>nsmooth</strong> (<cite>int, optional</cite>) - length of the filter window (i.e. the number of coefficients) for applying <code class="docutils literal notranslate"><span class="pre">scipy.signal.savgol_filter</span></code> to mean data. If used, must be a positive odd integer.</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>noise_error</strong> (<cite>bool, optional</cite>) - get error from the noise in secondary spectra instead of integrated power profile.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-<li><strong>log_parabola</strong> (<cite>bool, optional</cite>) - fit logarithmic parabola to peak power curve in power spectrum.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - option to plot the secondary spectrum.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">norm_sspec</code><span class="sig-paren">(</span><em>eta=None, delmax=None, plot=False, startbin=1, maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=False, scrunched=True, plot_fit=True, ref_freq=1400, numsteps=None, filename=None, display=True, unscrunched=True, powerspec=False</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Normalise  axis using arc curvature</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>eta</strong> (<cite>float, optional</cite>) - arc curvature in units corresponding to entered value for <code class="docutils literal notranslate"><span class="pre">lamsteps</span></code></li>
-<li><strong>delmax</strong> (<cite>float, optional</cite>) - maximum extent in delay to compute to. If None, computes over whole  or .</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>numsteps</strong> (<cite>int, optional</cite>) - number of steps along eta.</li>
-<li><strong>startbin</strong> (<cite>int, optional</cite>) - Delay bin to start calculation at. Masks all preceding delay bins</li>
-<li><strong>cutmid</strong> (<cite>int, optional</cite>) - number of doppler bins away from the center to mask</li>
-<li><strong>maxnormfac</strong> (<cite>float, optional</cite>) - factor for normalizing </li>
-<li><strong>minnormfac</strong> (<cite>float, optional</cite>) - threshold lower-bound for </li>
-<li><strong>scrunched</strong> (<cite>bool, optional</cite>) - plots delay-scrunched “power profile”</li>
-<li><strong>plot_fit</strong> (<cite>bool, optional</cite>) - overlay arc</li>
-<li><strong>ref_freq</strong> (<cite>float, optional</cite>) - reference frequency in MHz used to convert arc curvature between units of  and .</li>
-<li><strong>unscrunched</strong> (<cite>bool, optional</cite>) - plots unscrunched normalized secondary spectrum</li>
-<li><strong>powerspec</strong> (<cite>bool, optional</cite>) - plots the power spectrum</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - option to plot the secondary spectrum.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">plot_sspec</code><span class="sig-paren">(</span><em>lamsteps=False, input_sspec=None, filename=None, input_x=None, input_y=None, trap=False, prewhite=True, plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400, cutmid=0, startbin=0, display=True, colorbar=True, title=None</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Plot the secondary spectrum</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>delmax</strong> (<cite>float, optional</cite>) - maximum extent in delay to compute to. If None, computes over whole  or .</li>
-<li><strong>input_sspec</strong> (<cite>numpy 2D array, optional</cite>) - input secondary spectrum rather than use currently initialized one.</li>
-<li><strong>input_x</strong> (<cite>list or numpy 1D array, optional</cite>) -  axis of the input secondary spectrum.</li>
-<li><strong>input_y</strong> (<cite>list or numpy 1D array, optional</cite>) -  or  axis of the input secondary spectrum.</li>
-<li><strong>trap</strong> (<cite>bool, optional</cite>) - use trapezoidal dynamic spectrum.</li>
-<li><strong>prewhite</strong> (<cite>bool, optional</cite>) - apply pre-whitening and post-darkening.</li>
-<li><strong>plotarc</strong> (<cite>bool, optional</cite>) - plot the fitted arc.</li>
-<li><strong>maxfdop</strong> (<cite>bool, optional</cite>) - maximum  to plot to</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>startbin</strong> (<cite>int, optional</cite>) - Delay bin to start calculation at. Masks all preceding delay bins</li>
-<li><strong>cutmid</strong> (<cite>int, optional</cite>) - number of doppler bins away from the center to mask</li>
-<li><strong>ref_freq</strong> (<cite>float, optional</cite>) - reference frequency in MHz used to convert arc curvature between units of  and .</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-<li><strong>colorbar</strong> (<cite>bool, optional</cite>) - option to display a color bar alongside the plot.</li>
-<li><strong>title</strong> (<cite>bool, optional</cite>) - title of the plot.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-</div>
-<div class="section" id="scattered-image">
-<h2>Scattered image<a class="headerlink" href="#scattered-image" title="Permalink to this headline">¶</a></h2>
-<p>This class also contains methods to calculate and plot the physical scattered image of the pulsar.</p>
-<code class="descname">calc_scat_im</code><span class="sig-paren">(</span><em>input_sspec=None, input_eta=None, input_x=None, input_y=None, sampling=64, lamsteps=False, trap=False, ref_freq=1400, clean=True, s=None, veff=None, d=None, fit_arc=True, plotarc=False, plot_fit=False, plot=False, plot_log=True, use_angle=False, use_spatial=False</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Calculate the scattered image</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>input_sspec</strong> (<cite>numpy 2D array, optional</cite>) - input secondary spectrum rather than use currently initialized one.</li>
-<li><strong>input_eta</strong> (<cite>float, optional</cite>) - input arc curvature in units corresponding to entered value for <code class="docutils literal notranslate"><span class="pre">lamsteps</span></code></li>
-<li><strong>input_x</strong> (<cite>list or numpy 1D array, optional</cite>) -  axis of the input secondary spectrum.</li>
-<li><strong>input_y</strong> (<cite>list or numpy 1D array, optional</cite>) -  or  axis of the input secondary spectrum.</li>
-<li><strong>trap</strong> (<cite>bool, optional</cite>) - use trapezoidal dynamic spectrum.</li>
-<li><strong>sampling</strong> (<cite>int, optional</cite>) - order of  sampling.</li>
-<li><strong>fit_arc</strong> (<cite>bool, optional</cite>) - fit an arc to the secondary spectrum.</li>
-<li><strong>plotarc</strong> (<cite>bool, optional</cite>) - plot the fitted arc.</li>
-<li><strong>plot_fit</strong> (<cite>bool, optional</cite>) - plot secondary spectrum with fitted arc overlayed</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>ref_freq</strong> (<cite>float, optional</cite>) - reference frequency in MHz used to convert arc curvature between units of  and .</li>
-<li><strong>clean</strong> (<cite>bool, optional</cite>) - fill in nans and zeros in the secondary spectrum.</li>
-<li><strong>s</strong> (<cite>float, optional</cite>) - fractional screen distance. Must be in the range [0, 1].</li>
-<li><strong>veff</strong> (<cite>float, optional</cite>) - the effective velocity during the observation in km/s.</li>
-<li><strong>d</strong> (<cite>float, optional</cite>) - distance to the pulsar in kiloparsecs.</li>
-<li><strong>use_angle</strong> (<cite>bool, optional</cite>) - use angle on the sky as the axes. Requires <code class="docutils literal notranslate"><span class="pre">s</span></code> and <code class="docutils literal notranslate"><span class="pre">veff</span></code>.</li>
-<li><strong>use_spatial</strong> (<cite>bool, optional</cite>) - use spatial distance at the location of the screen as the axes. Requires <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">veff</span></code>, and <code class="docutils literal notranslate"><span class="pre">d</span></code>.</li>
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - plot the scattered image.</li>
-<li><strong>plot_log</strong> (<cite>bool, optional</cite>) - plot the scattered image in log scale.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">plot_scat_im</code><span class="sig-paren">(</span><em>display=True, plot_log=True, colorbar=True, title=None, input_scat_im=None, input_fdop=None, lamsteps=False, trap=False, clean=True, use_angle=False, use_spatial=False, s=None, veff=None, d=None, filename=None</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Plot the scattered image</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>input_scat_im</strong> (<cite>numpy 2D array, optional</cite>) - input scattered image rather than use currently initialized one.</li>
-<li><strong>input_fdop</strong> (<cite>list or numpy 1D array, optional</cite>) -  axis of the input secondary spectrum.</li>
-<li><strong>trap</strong> (<cite>bool, optional</cite>) - use trapezoidal dynamic spectrum.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>clean</strong> (<cite>bool, optional</cite>) - fill in nans and zeros in the secondary spectrum.</li>
-<li><strong>s</strong> (<cite>float, optional</cite>) - fractional screen distance. Must be in the range [0, 1].</li>
-<li><strong>veff</strong> (<cite>float, optional</cite>) - the effective velocity during the observation in km/s.</li>
-<li><strong>d</strong> (<cite>float, optional</cite>) - distance to the pulsar in kiloparsecs.</li>
-<li><strong>use_angle</strong> (<cite>bool, optional</cite>) - use angle on the sky as the axes. Requires <code class="docutils literal notranslate"><span class="pre">s</span></code> and <code class="docutils literal notranslate"><span class="pre">veff</span></code>.</li>
-<li><strong>use_spatial</strong> (<cite>bool, optional</cite>) - use spatial distance at the location of the screen as the axes. Requires <code class="docutils literal notranslate"><span class="pre">s</span></code>, <code class="docutils literal notranslate"><span class="pre">veff</span></code>, and <code class="docutils literal notranslate"><span class="pre">d</span></code>.</li>
-<li><strong>plot_log</strong> (<cite>bool, optional</cite>) - plot the scattered image in log scale.</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-<li><strong>colorbar</strong> (<cite>bool, optional</cite>) - option to display a color bar alongside the plot.</li>
-<li><strong>title</strong> (<cite>bool, optional</cite>) - title of the plot.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-</div>
-<div class="section" id="other">
-<h2>Other<a class="headerlink" href="#other" title="Permalink to this headline">¶</a></h2>
-<code class="descname">plot_all</code><span class="sig-paren">(</span><em>dyn=1, acf=2, sspec=3, norm_sspec=4, colorbar=True, lamsteps=False, filename=None, display=True</em><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div><p>Plot the dynamic spectrum, ACF, secondary spectrum, and normalized secondary spectrum in one plot</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>dyn</strong> (<cite>int, optional</cite>) - position of the dynamic spectrum in the subplot</li>
-<li><strong>acf</strong> (<cite>int, optional</cite>) - position of the ACF in the subplot</li>
-<li><strong>sspec</strong> (<cite>int, optional</cite>) - position of the secondary spectrum in the subplot</li>
-<li><strong>norm_sspec</strong> (<cite>int, optional</cite>) - position of the normalized secondary spectrum in the subplot</li>
-<li><strong>colorbar</strong> (<cite>bool, optional</cite>) - option to display a color bar alongside the plot.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
-<li><strong>filename</strong> (<cite>str, optional</cite>) - filename to save the plot as. If None then plot is not saved.</li>
-<li><strong>display</strong> (<cite>bool, optional</cite>) - option to display the plot.</li>
-</ul>
-</dd>
-</dl>
-</div></blockquote>
-<code class="descname">info</code><span class="sig-paren">(</span><span class="sig-paren">)</span><p></p>
-<blockquote>
-<div>Print the dynamic spectrum information.</div></blockquote>
+<p>Calculation of the secondary spectrum. Includes pre-whitening and post-darkening by default ….</p>
+<p>arcs are cool</p>
 </div>
 </div>
 
 
+           </div>
+           
           </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="simulation.html" class="btn btn-neutral float-right" title="Simulation class" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral float-left" title="Welcome to scintools’s documentation!" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        
+        &copy; Copyright 2019, Daniel J. Reardon
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper">
-  <h3><a href="index.html">Table Of Contents</a></h3>
-  <ul>
-<li><a class="reference internal" href="#">Dynspec class</a><ul>
-<li><a class="reference internal" href="#importing-dynamic-spectra">Importing dynamic spectra</a></li>
-<li><a class="reference internal" href="#processing">Processing</a></li>
-<li><a class="reference internal" href="#basic-plotting">Basic plotting</a></li>
-<li><a class="reference internal" href="#autocorrelation-function-acf">Autocorrelation function (ACF)</a></li>
-<li><a class="reference internal" href="#secondary-spectra">Secondary spectra</a></li>
-<li><a class="reference internal" href="#scattered-image">Scattered image</a></li>
-<li><a class="reference internal" href="#other">Other</a></li>
-</ul>
-</li>
-</ul>
-<div class="relations">
-<h3>Related Topics</h3>
-<ul>
-  <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="index.html" title="previous chapter">Welcome to scintools’s documentation!</a></li>
-      <li>Next: <a href="scint_models.html" title="next chapter">scint_models module</a></li>
-  </ul></li>
-</ul>
-</div>
-  <div role="note" aria-label="source link">
-    <h3>This Page</h3>
-    <ul class="this-page-menu">
-      <li><a href="_sources/dynspec.rst.txt"
-            rel="nofollow">Show Source</a></li>
-    </ul>
-   </div>
-<div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
-    <div class="searchformwrapper">
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" />
-      <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
-    </form>
-    </div>
-</div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
-        </div>
-      </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="footer">
-      &copy;2019, Daniel J. Reardon.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.4</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
-      
-      |
-      <a href="_sources/dynspec.rst.txt"
-          rel="nofollow">Page source</a>
-    </div>
 
-    
+    </section>
 
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
     
-  </body>
+   
+
+</body>
 </html>

@@ -11,14 +11,15 @@ Welcome to scintools's documentation!
    :caption: Contents:
    
    dynspec
-
-   scint_models
-
-   scint_utils
    
    simulation
-
+   
    acf
+   
+   scint_models
+   
+   scint_utils
+
 
 
 Indices and tables
