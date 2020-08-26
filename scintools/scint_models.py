@@ -471,7 +471,10 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
 
     s = params['s']  # fractional screen distance
     d = params['d']  # pulsar distance (kpc)
-    kappa = params['kappa']
+    if 'kappa' in params.keys():
+        kappa = params['kappa']
+    else:
+        kappa = 1
 
     veff_ra, veff_dec, vp_ra, vp_dec = \
         effective_velocity_annual(params, true_anomaly,
