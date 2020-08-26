@@ -94,6 +94,24 @@ def write_results(filename, dyn=None):
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
 
+    if hasattr(dyn, 'ar'):  # Axial ratio
+        header += ",ar,arerr"
+        write_string += ",{0},{1}".format(dyn.ar, dyn.arerr)
+
+    if hasattr(dyn, 'sigma_x'):  # Phase gradient in x,y
+        header += ",sigma_x,sigma_xerr,sigma_y,sigma_yerr"
+        write_string += ",{0},{1},{2},{3}".format(dyn.sigma_x,
+                                                  dyn.sigma_xerr,
+                                                  dyn.sigma_y,
+                                                  dyn.sigma_yerr)
+
+    if hasattr(dyn, 'v_x'):  # Velocity in x,y
+        header += ",v_x,v_xerr,v_y,v_yerr"
+        write_string += ",{0},{1},{2},{3}".format(dyn.v_x,
+                                                  dyn.v_xerr,
+                                                  dyn.v_y,
+                                                  dyn.v_yerr)
+
     if hasattr(dyn, 'acf_tilt'):  # Tilt in the ACF (MHz/min)
         header += ",acf_tilt,acf_tilt_err"
         write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
@@ -187,6 +205,14 @@ def float_array_from_dict(dictionary, key):
     Convert an array stored in dictionary to a numpy array
     """
     return np.array(list(map(float, dictionary[key]))).squeeze()
+
+def save_fits(dyn):
+
+    from astropy.io import fits
+
+    hdu = fits.PrimaryHDU(np.flip(np.transpose(np.flip(dyn.dyn, axis=1)), axis=0))
+    hdul = fits.HDUList([hdu])
+    hdul.writeto(dyn.name + '.fits')
 
 
 def get_ssb_delay(mjds, raj, decj):

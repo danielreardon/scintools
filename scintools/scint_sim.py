@@ -404,13 +404,6 @@ class Simulation():
         plt.show()
 
 
-"""
-The code below is unfinished, but will eventually allow one to compute the ACF
-analytically, including a phase gradient. A dynamic spectrum with phase
-gradients (beyond those that arise naturally) can be simulated from this.
-"""
-
-
 class ACF():
 
     def __init__(self, s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3,
@@ -430,7 +423,6 @@ class ACF():
         phasegrad_y - phase gradient in y direction
         Vx - Effective velocity in x direction
         Vy - Effective velocity in y direction
-
 
         If ISS spectrum is a Kolmogorov power-law with no inner or outer scale,
         alpha=5/3
@@ -528,7 +520,6 @@ class ACF():
 
         if sigxn == 0 and sigyn == 0:
             # calculate only one quadrant tn >= 0
-            print('Calculating ACF... w/ one quad')
             gammitv = np.zeros((int(ns/2), int(nf/2)))
             # equally spaced t array t= tn*S0
             tn = np.arange(0.0, spmax/Vmag, dsp/Vmag)
@@ -582,7 +573,6 @@ class ACF():
 
         else:
             # calculate two quadrants -tmax t < tmax
-            print('Calculating ACF... w/ two quad')
             if self.use_t:
                 # equally spaced t array t = tn*S0
                 tn = np.linspace(-spmax, spmax, ns)

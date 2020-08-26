@@ -22,12 +22,12 @@ A library of scintillation models to use with lmfit
 from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import numpy as np
-from scint_sim import ACF
+from scintools.scint_sim import ACF
 from lmfit import Minimizer
 
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
-           steps=1000, burn=0.2):
+           steps=1000, burn=0.2, progress=True):
 
     # Do fit
     func = Minimizer(model, params, fcn_args=args)
@@ -35,8 +35,8 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
     if mcmc:
         func = Minimizer(model, results.params, fcn_args=args)
         mcmc_results = func.emcee(nwalkers=nwalkers, steps=steps,
-                                  burn=int(burn*steps), pos=pos,
-                                  is_weighted=True)
+                                  burn=int(burn * steps), pos=pos,
+                                  is_weighted=True, progress=progress)
         results = mcmc_results
     return results
 
@@ -389,7 +389,7 @@ def fit_log_parabola(x, y):
 
 
 def arc_curvature(params, ydata, weights, true_anomaly,
-                  vearth_ra, vearth_dec):
+                  vearth_ra, vearth_dec, anisotropy=True):
     """
     arc curvature model
 
@@ -408,21 +408,14 @@ def arc_curvature(params, ydata, weights, true_anomaly,
 
     # Other parameters in lower-case
     d = params['d']  # pulsar distance in kpc
-    d = d * kmpkpc  # kms
+    dkm = d * kmpkpc  # kms
     s = params['s']  # fractional screen distance
 
     veff_ra, veff_dec, vp_ra, vp_dec = \
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
-    # Model to toggle between isotropic and anisotropic
-    if 'nmodel' in params.keys():
-        nmodel = params['nmodel']
-    else:
-        if 'psi' in params.keys():
-            nmodel = 1
-        else:
-            nmodel = 0
+    nmodel = params['nmodel']
 
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
@@ -432,14 +425,18 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         vism_dec = 0
 
     if nmodel > 0.5:  # anisotropic
-        psi = params['psi']*np.pi/180  # anisotropy angle
-        vism_psi = params['vism_psi']  # vism in direction of anisotropy
-        veff2 = (veff_ra*np.sin(psi) + veff_dec*np.cos(psi) - vism_psi)**2
+        psi = params['psi'] * np.pi / 180  # anisotropy angle
+        if 'vism_psi' in params.keys():  # anisotropic case
+            vism_psi = params['vism_psi']  # vism in direction of anisotropy
+            veff2 = (veff_ra*np.sin(psi) + veff_dec*np.cos(psi) - vism_psi)**2
+        else:
+            veff2 = ((veff_ra - vism_ra) * np.sin(psi) +
+                     (veff_dec - vism_dec) * np.cos(psi)) ** 2
     else:  # isotropic
         veff2 = (veff_ra - vism_ra)**2 + (veff_dec - vism_dec)**2
 
     # Calculate curvature model
-    model = d * s * (1 - s)/(2 * veff2)  # in 1/(km * Hz**2)
+    model = dkm * s * (1 - s)/(2 * veff2)  # in 1/(km * Hz**2)
     # Convert to 1/(m * mHz**2) for beta in 1/m and fdop in mHz
     model = model/1e9
 
@@ -450,30 +447,31 @@ def arc_curvature(params, ydata, weights, true_anomaly,
 
 
 def veff_thin_screen(params, ydata, weights, true_anomaly,
-                     vearth_ra, vearth_dec, D):
+                     vearth_ra, vearth_dec):
     """
-    Effective velocity thin screen model
+    Effective velocity thin screen model.
+    Uses Eq. 4 from Rickett et al. (2014) for anisotropy coefficients.
 
         ydata: arc curvature
     """
 
     # ensure dimensionality of arrays makes sense
-    if hasattr(ydata,  "__len__"):
+    if hasattr(ydata, "__len__"):
         ydata = ydata.squeeze()
         weights = weights.squeeze()
         true_anomaly = true_anomaly.squeeze()
         vearth_ra = vearth_ra.squeeze()
         vearth_dec = vearth_dec.squeeze()
 
-    # Other parameters in lower-case
-    d = params['d']  # pulsar distance in kpc
-    kmpkpc = 3.085677581e16
-    d = d * kmpkpc  # kms for transverse velocity calculation
     s = params['s']  # fractional screen distance
+    d = params['d']  # pulsar distance (kpc)
+    kappa = params['kappa']
 
     veff_ra, veff_dec, vp_ra, vp_dec = \
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
+
+    nmodel = params['nmodel']
 
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
@@ -482,17 +480,31 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
         vism_ra = 0
         vism_dec = 0
 
-    veff = np.sqrt((veff_ra - vism_ra)**2 + (veff_dec - vism_dec)**2)
-    vlos = veff/s  # LOS velocity defined at Earth
+    veff_ra -= vism_ra
+    veff_dec -= vism_dec
 
-    # Scale model according for thin screen Aiss in Cordes & Rickett (1998)
-    model = vlos / np.sqrt(2*(1-s)/s)  # Assumes Aiss = 2.78*10**4
+    if nmodel > 0.5:  # anisotropic
+        R = params['R']  # axial ratio parameter
+        psi = params['psi'] * np.pi / 180  # anisotropy angle
 
-    # scale data according to the model distance
-    ydata *= np.sqrt((d/kmpkpc)/D)
+        gamma = psi
+        cosa = np.cos(2 * gamma)
+        sina = np.sin(2 * gamma)
 
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
+        # quadratic coefficients
+        a = (1 - R * cosa) / np.sqrt(1 - R**2)
+        b = (1 + R * cosa) / np.sqrt(1 - R**2)
+        c = -2 * R * sina / np.sqrt(1 - R**2)
+
+    else:
+        a, b, c = 1, 1, 0
+
+    # coefficient to match model with data
+    coeff = 1 / np.sqrt(2 * d * (1 - s) / s)
+
+    veff = kappa * (np.sqrt(a*veff_dec**2 + b*veff_ra**2 +
+                            c*veff_ra*veff_dec))
+    model = coeff * veff / s
 
     return (ydata - model) * weights
 
