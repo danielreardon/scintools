@@ -423,7 +423,6 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         else:
             nmodel = 0
 
-
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
         vism_dec = params['vism_dec']
@@ -478,7 +477,7 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
-   if 'nmodel' in params.keys():
+    if 'nmodel' in params.keys():
         nmodel = params['nmodel']
     else:
         if 'psi' in params.keys():
