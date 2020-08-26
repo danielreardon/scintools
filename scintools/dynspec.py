@@ -257,14 +257,15 @@ class Dynspec:
     def plot_acf(self, method='acf1d', alpha=5/3, contour=False, filename=None,
                  input_acf=None, input_t=None, input_f=None, fit=True,
                  mcmc=False, display=True, crop=None, tlim=None, flim=None,
-                 figsize=(9, 9)):
+                 figsize=(9, 9), verbose=False):
         """
         Plot the ACF
         """
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau') and input_acf is None and fit:
-            self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc)
+            self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc,
+                                  verbose=verbose)
         if input_acf is None:
             arr = self.acf
             tspan = self.tobs
@@ -1198,8 +1199,6 @@ class Dynspec:
         xdata = np.array(np.concatenate((xdata_t, xdata_f)))
         ydata = np.array(np.concatenate((ydata_t, ydata_f)))
 
-        weights = np.ones(np.shape(ydata))
-
         # Get initial parameter values from 1d fit
         # Estimate amp and white noise level
         wn = max([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
@@ -1229,7 +1228,7 @@ class Dynspec:
             chisqr = np.inf
             for itr in range(nitr):
                 results = fitter(scint_acf_model, params,
-                                 (xdata, ydata, weights))
+                                 (xdata, ydata, None), mcmc=mcmc)
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
@@ -1238,7 +1237,7 @@ class Dynspec:
             if verbose:
                 print("\nDoing 1D fit to initialize fit values")
             results = fitter(scint_acf_model, params,
-                             (xdata, ydata, weights))
+                             (xdata, ydata, None), mcmc=mcmc)
 
             params = results.params
 
@@ -1328,11 +1327,10 @@ class Dynspec:
                 tdata = tticks
                 fdata = fticks
 
-            weights_2d = np.ones(np.shape(ydata_2d))
-
             if method == 'acf2d_approx':
 
                 params.add('tobs', value=self.tobs, vary=False)
+                params.add('bw', value=self.bw, vary=False)
                 params.add('freq', value=self.freq, vary=False)
                 params.add('phasegrad', value=1e-10, vary=True,
                            min=-np.Inf, max=np.Inf)
@@ -1342,7 +1340,8 @@ class Dynspec:
                 chisqr = np.inf
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d_approx, params,
-                                     (tdata, fdata, ydata_2d, weights_2d))
+                                     (tdata, fdata, ydata_2d, None),
+                                     mcmc=mcmc)
                     if results.chisqr < chisqr:
                         chisqr = results.chisqr
                         params = results.params
@@ -1404,7 +1403,7 @@ class Dynspec:
                 chisqr = np.inf
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d, params,
-                                     (ydata_2d, weights_2d), mcmc=mcmc,
+                                     (ydata_2d, None), mcmc=mcmc,
                                      pos=pos, nwalkers=nwalkers, steps=steps,
                                      burn=burn, progress=progress)
                     if results.chisqr < chisqr:
@@ -1438,6 +1437,9 @@ class Dynspec:
             # params = results.params
             # results = fitter(scint_sspec_model, params,
             #                  (xdata, ydata, weights))
+        else:
+            print('Method not understood, please choose from:\n',
+                  'acf1d, acf2d_approx, or acf2d')
 
         # Done fitting - now define results
         self.tau = results.params['tau'].value
@@ -1496,21 +1498,41 @@ class Dynspec:
             if method == 'acf1d':
                 # Get tau model
                 t_residuals = tau_acf_model(results.params, xdata_t, ydata_t,
-                                            weights[:nt])
-                tmodel = ydata_t - t_residuals/weights[:nt]
+                                            None)
+                tmodel = ydata_t - t_residuals
                 # Get dnu model
                 f_residuals = dnu_acf_model(results.params, xdata_f, ydata_f,
-                                            weights[nt:])
-                fmodel = ydata_f - f_residuals/weights[nt:]
+                                            None)
+                fmodel = ydata_f - f_residuals
 
+                plt.figure(figsize=(9, 6))
                 plt.subplot(2, 1, 1)
-                plt.plot(xdata_t, ydata_t)
-                plt.plot(xdata_t, tmodel)
+                plt.plot(xdata_t, ydata_t/np.max(ydata_t))
+                plt.plot(xdata_t, tmodel/np.max(ydata_t))
+                # plot 95% white noise level assuming no correlation
+                xl = plt.xlim()
+                plt.plot([xl[0], xl[1]], [0, 0], 'k--')
+                plt.plot([xl[0], xl[1]],
+                         [1/np.sqrt(self.nsub), 1/np.sqrt(self.nsub)],
+                         ':', color='crimson')
+                plt.plot([xl[0], xl[1]],
+                         [-1/np.sqrt(self.nsub), -1/np.sqrt(self.nsub)],
+                         ':', color='crimson')
                 plt.xlabel('Time lag (s)')
                 plt.subplot(2, 1, 2)
-                plt.plot(xdata_f, ydata_f)
-                plt.plot(xdata_f, fmodel)
+                plt.plot(xdata_f, ydata_f/np.max(ydata_f))
+                plt.plot(xdata_f, fmodel/np.max(ydata_f))
+                # plot 95% white noise level assuming no correlation
+                xl = plt.xlim()
+                plt.plot([xl[0], xl[1]], [0, 0], 'k--')
+                plt.plot([xl[0], xl[1]],
+                         [1/np.sqrt(self.nchan), 1/np.sqrt(self.nchan)],
+                         ':', color='crimson')
+                plt.plot([xl[0], xl[1]],
+                         [-1/np.sqrt(self.nchan), -1/np.sqrt(self.nchan)],
+                         ':', color='crimson')
                 plt.xlabel('Frequency lag (MHz)')
+                plt.tight_layout()
                 plt.show()
 
             elif method == 'acf2d_approx' or method == 'acf2d':
@@ -1532,6 +1554,7 @@ class Dynspec:
 
                 else:
                     ydata = ydata_2d
+                    weights_2d = np.ones(np.shape(ydata))
                     if method == 'acf2d_approx':
                         residuals = scint_acf_model_2d_approx(results.params,
                                                               tdata, fdata,
@@ -2031,6 +2054,7 @@ class Dynspec:
         arr = np.fft.ifft2(arr)
         arr = np.fft.fftshift(arr)
         arr = np.real(arr)  # real component, just in case
+        arr /= np.max(arr)
         if input_dyn is None:
             self.acf = arr
         else:

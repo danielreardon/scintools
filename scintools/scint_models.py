@@ -140,9 +140,6 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     Fit an approximate 2D ACF function
     """
 
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
-
     parvals = params.valuesdict()
 
     amp = parvals['amp']
@@ -152,6 +149,7 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     phasegrad = parvals['phasegrad']
     freq = parvals['freq']
     tobs = parvals['tobs']
+    bw = parvals['bw']
     wn = parvals['wn']
     nt = len(tdata)
     nf = len(fdata)
@@ -165,10 +163,16 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
                          abs(fdata / (dnu / np.log(2)))**(3 / 2))**(2 / 3))
     # multiply by triangle function
     model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
+    model = np.multiply(model, 1-np.divide(abs(fdata), bw))
+    model = np.transpose(model)
+
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+        # weights = 1/model
+
     model = np.fft.fftshift(model)
     model[1, 1] = model[1, 1] + wn  # add white noise spike
     model = np.fft.fftshift(model)
-    model = np.transpose(model)
 
     return (ydata - model) * weights
 
@@ -177,9 +181,6 @@ def scint_acf_model_2d(params, ydata, weights):
     """
     Fit an analytical 2D ACF function
     """
-
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
 
     parvals = params.valuesdict()
 
@@ -215,9 +216,6 @@ def scint_acf_model_2d(params, ydata, weights):
     acf.calc_acf()
     model = acf.acf
 
-    # add white noise spike
-    model[int(nf_crop / 2) + 1, int(nt_crop / 2) + 1] += wn
-
     triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-nt_crop*dt/2,
                                                           nt_crop*dt/2,
                                                           nt_crop)),
@@ -229,6 +227,13 @@ def scint_acf_model_2d(params, ydata, weights):
                                            (nt_crop, 1)), bw))
     triangle = np.multiply(triangle_t, triangle_f)
     model = np.multiply(model, triangle)  # multiply by triangle function
+
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
+        # weights = 1/model
+
+    # add white noise spike
+    model[int(nf_crop / 2) + 1, int(nt_crop / 2) + 1] += wn
 
     return (ydata - model) * weights
 

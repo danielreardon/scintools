@@ -606,7 +606,8 @@ class ACF():
 
             # scale by amplitude and crop to match data
             gam3 = amp * gam3[1:nf-cf+1, 1:ns-ct+1]
-            f2 = np.transpose(np.block([[np.flip(-dnun[:]), dnun]])).flatten()
+            f2 = np.transpose(np.block([[np.flip(-dnun[:],
+                                                 axis=0), dnun]])).flatten()
             f2 = f2[1:nf-cf+1]
             t2 = tn[1:ns-ct+1]
             s2 = t2 * Vmag
