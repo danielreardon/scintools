@@ -1224,7 +1224,8 @@ class Dynspec:
             params.add('alpha', value=alpha, vary=False)
 
         if method == 'acf1d':
-            print("\nPerforming least-squares fit to 1D ACF model")
+            if verbose:
+                print("\nPerforming least-squares fit to 1D ACF model")
             chisqr = np.inf
             for itr in range(nitr):
                 results = fitter(scint_acf_model, params,
@@ -1234,7 +1235,8 @@ class Dynspec:
                     params = results.params
 
         if method == 'acf2d_approx' or method == 'acf2d':
-            print("\nDoing 1D fit to initialize fit values")
+            if verbose:
+                print("\nDoing 1D fit to initialize fit values")
             results = fitter(scint_acf_model, params,
                              (xdata, ydata, weights))
 
@@ -1242,9 +1244,9 @@ class Dynspec:
 
             dnu = params['dnu']
             tau = params['tau']
-
-            print('Initial tau estimate:', tau,
-                  '\nInitial dnu estimate:', dnu)
+            if verbose:
+                print('Initial tau estimate:', tau,
+                      '\nInitial dnu estimate:', dnu)
 
             ydata = np.copy(self.acf)
             tticks = np.linspace(-self.tobs, self.tobs, len(ydata[0, :]))
@@ -1255,20 +1257,22 @@ class Dynspec:
                 ndnu = nscale
                 while ntau > (self.tobs / tau):
                     ntau = ntau - 1
-                    if ntau == 1:
-                        print('tau larger than half of frame,',
-                              'switching to full frame')
-                    else:
-                        print('nscale too large for time axis, decreasing to',
-                              ntau)
+                    if verbose:
+                        if ntau == 1:
+                            print('tau larger than half of frame,',
+                                  'switching to full frame')
+                        else:
+                            print('nscale too large for time axis, ' +
+                                  'decreasing to', ntau)
                 while ndnu > (self.bw / dnu):
                     ndnu = ndnu - 1
-                    if ntau == 1:
-                        print('dnu larger than half of frame,',
-                              'switching to full frame')
-                    else:
-                        print('nscale too large for frequency axis, ' +
-                              'decreasing to', ndnu)
+                    if verbose:
+                        if ntau == 1:
+                            print('dnu larger than half of frame,',
+                                  'switching to full frame')
+                        else:
+                            print('nscale too large for frequency axis, ' +
+                                  'decreasing to', ndnu)
 
                 if ntau == 1 and ndnu == 1:
                     ydata_2d = ydata
@@ -1332,9 +1336,9 @@ class Dynspec:
                 params.add('freq', value=self.freq, vary=False)
                 params.add('phasegrad', value=1e-10, vary=True,
                            min=-np.Inf, max=np.Inf)
-
-                print("\nPerforming least-squares fit to approximate 2D " +
-                      "ACF model")
+                if verbose:
+                    print("\nPerforming least-squares fit to approximate 2D " +
+                          "ACF model")
                 chisqr = np.inf
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d_approx, params,
@@ -1390,12 +1394,13 @@ class Dynspec:
                 else:
                     pos = None
 
-                if mcmc:
-                    print("\nPerforming mcmc posterior sample for analytical",
-                          "2D ACF model")
-                else:
-                    print("\nPerforming least-squares fit to analytical",
-                          "2D ACF model")
+                if verbose:
+                    if mcmc:
+                        print("\nPerforming mcmc posterior sample for " +
+                              "analytical", "2D ACF model")
+                    else:
+                        print("\nPerforming least-squares fit to analytical",
+                              "2D ACF model")
                 chisqr = np.inf
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d, params,
@@ -1553,7 +1558,7 @@ class Dynspec:
                 sspec plotting routine
                 '''
 
-            if mcmc and method == "acf2d":
+            if mcmc and method == "acf2d" and plot:
                 corner.corner(results.flatchain,
                               labels=results.var_names,
                               truths=list(results.params.valuesdict().
