@@ -277,7 +277,7 @@ class Dynspec:
         wn = arr[0][0] - arr[0][1]  # subtract the white noise spike
         arr[0][0] = arr[0][0] - wn  # Set the noise spike to zero for plotting
         arr = np.fft.fftshift(arr)
-        
+
         if crop == 'auto' or crop == 'manual':
             if crop == 'auto':
                 if not fit:
@@ -287,7 +287,7 @@ class Dynspec:
                 if tlim > self.tobs / 60:
                     tlim = self.tobs / 60
                     flim = self.bw
-            
+
             tfactor = tlim * 60 / tspan
             tspan = tlim * 60
             tmin = int((0.5 - tfactor/2) * len(arr[0]))
@@ -299,11 +299,11 @@ class Dynspec:
             fmax = int((0.5 + ffactor/2) * len(arr))
 
             arr = arr[fmin:fmax, tmin:tmax]
-        
+
         elif crop is not None:
             print('\n', "Unrecognized cropping mode. Please specify 'auto',",
-                  "'manual' or None.", "'auto' requires selecting a fitting method.",
-                  '\n')
+                  "'manual' or None.", "'auto' requires selecting a fitting " +
+                  "method. \n")
 
         t_delays = np.linspace(-tspan/60, tspan/60, np.shape(arr)[1])
         f_shifts = np.linspace(-fspan, fspan, np.shape(arr)[0])
@@ -1245,11 +1245,11 @@ class Dynspec:
 
             print('Initial tau estimate:', tau,
                   '\nInitial dnu estimate:', dnu)
-            
+
             ydata = np.copy(self.acf)
             tticks = np.linspace(-self.tobs, self.tobs, len(ydata[0, :]))
             fticks = np.linspace(-self.bw, self.bw, len(ydata[:, 0]))
-            
+
             if nscale is not None and not full_frame:
                 ntau = nscale
                 ndnu = nscale
@@ -1267,21 +1267,21 @@ class Dynspec:
                         print('dnu larger than half of frame,',
                               'switching to full frame')
                     else:
-                        print('nscale too large for frequency axis, decreasing to',
-                              ndnu)
-                
-                if ntau == 1 and ndnu == 1:    
+                        print('nscale too large for frequency axis, ' +
+                              'decreasing to', ndnu)
+
+                if ntau == 1 and ndnu == 1:
                     ydata_2d = ydata
                     tdata = tticks
                     fdata = fticks
-                    
+
                 elif ntau == 1:
                     fmin = int(np.ceil(self.nchan - ndnu * (dnu / self.df)))
                     fmax = int(np.floor(self.nchan + ndnu * (dnu / self.df)))
-        
+
                     if (fmax - fmin) % 2 == 0:
                         fmax -= 1
-                    
+
                     fdata = fticks[fmin-1:fmax]
                     if len(tticks) % 2 == 0:
                         ydata_2d = ydata[fmin-1:fmax, :-1]
@@ -1289,14 +1289,14 @@ class Dynspec:
                     else:
                         ydata_2d = ydata[fmin-1:fmax, :]
                         tdata = tticks
-                    
+
                 elif ndnu == 1:
                     tmin = int(np.ceil(self.nsub - ntau * (tau / self.dt)))
                     tmax = int(np.floor(self.nsub + ntau * (tau / self.dt)))
-                    
+
                     if (tmax - tmin) % 2 == 0:
                         tmax -= 1
-                    
+
                     tdata = tticks[tmin-1:tmax]
                     if len(fticks) % 2 == 0:
                         ydata_2d = ydata[:-1, tmin-1:tmax]
@@ -1304,18 +1304,18 @@ class Dynspec:
                     else:
                         ydata_2d = ydata[:, tmin-1:tmax]
                         fdata = fticks
-                
+
                 else:
                     fmin = int(np.ceil(self.nchan - ndnu * (dnu / self.df)))
                     fmax = int(np.floor(self.nchan + ndnu * (dnu / self.df)))
                     tmin = int(np.ceil(self.nsub - ntau * (tau / self.dt)))
                     tmax = int(np.floor(self.nsub + ntau * (tau / self.dt)))
-                    
+
                     if (fmax - fmin) % 2 == 0:
                         fmax -= 1
                     if (tmax - tmin) % 2 == 0:
                         tmax -= 1
-        
+
                     ydata_2d = ydata[fmin-1:fmax, tmin-1:tmax]
                     tdata = tticks[tmin-1:tmax]
                     fdata = fticks[fmin-1:fmax]
@@ -1323,7 +1323,7 @@ class Dynspec:
                 ydata_2d = ydata
                 tdata = tticks
                 fdata = fticks
-            
+
             weights_2d = np.ones(np.shape(ydata_2d))
 
             if method == 'acf2d_approx':
@@ -1333,7 +1333,8 @@ class Dynspec:
                 params.add('phasegrad', value=1e-10, vary=True,
                            min=-np.Inf, max=np.Inf)
 
-                print("\nPerforming least-squares fit to approximate 2D ACF model")
+                print("\nPerforming least-squares fit to approximate 2D " +
+                      "ACF model")
                 chisqr = np.inf
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d_approx, params,
@@ -1362,25 +1363,27 @@ class Dynspec:
                     for i in range(nwalkers):
                         pos_i = []
                         pos_i.append(np.random.normal(loc=params['tau'].value,
-                                         scale=params['tau'].value))  # tau
+                                     scale=params['tau'].value))  # tau
                         pos_i.append(np.random.normal(loc=params['dnu'].value,
-                                         scale=params['dnu'].value))  # dnu
+                                     scale=params['dnu'].value))  # dnu
                         pos_i.append(np.random.normal(loc=params['amp'].value,
-                                         scale=params['amp'].value))  # amp
+                                     scale=params['amp'].value))  # amp
                         pos_i.append(np.random.normal(loc=params['wn'].value,
-                                         scale=params['wn'].value))  # wn
+                                     scale=params['wn'].value))  # wn
                         if alpha is None:
-                            pos_i.append(np.random.normal(loc=params['alpha'].value,
-                                            scale=params['alpha'].value))
+                            pos_i.append(np.random.normal(loc=params['alpha'].
+                                                          value,
+                                         scale=params['alpha'].value))
                         # ar
-                        pos_i.append(1 + np.abs(np.random.normal(loc=0, scale=2)))
+                        pos_i.append(1 + np.abs(np.random.normal(loc=0,
+                                                                 scale=2)))
                         pos_i.append(np.random.normal(loc=0, scale=1))  # phs_x
                         pos_i.append(np.random.normal(loc=0, scale=1))  # phs_y
                         pos_i.append(np.random.normal(loc=0, scale=1))  # v_ra
                         pos_i.append(np.random.normal(loc=0, scale=1))  # v_dec
                         if lnsigma:
                             pos_i.append(np.random.uniform(low=0, high=10))
-                        
+
                         pos_array.append(pos_i)
 
                     pos = np.array(pos_array)
@@ -1396,9 +1399,9 @@ class Dynspec:
                 chisqr = np.inf
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d, params,
-                                     (ydata_2d, weights_2d), mcmc=mcmc, pos=pos,
-                                     nwalkers=nwalkers, steps=steps, burn=burn,
-                                     progress=progress)
+                                     (ydata_2d, weights_2d), mcmc=mcmc,
+                                     pos=pos, nwalkers=nwalkers, steps=steps,
+                                     burn=burn, progress=progress)
                     if results.chisqr < chisqr:
                         chisqr = results.chisqr
                         params = results.params
@@ -1468,8 +1471,8 @@ class Dynspec:
             print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
                   err=self.talphaerr))
             if method == 'acf2d_approx':
-                print("phase grad:\t\t{val} +/- {err}".format(val=self.phasegrad,
-                      err=self.phasegraderr))
+                print("phase grad:\t\t{val} +/- {err}".
+                      format(val=self.phasegrad, err=self.phasegraderr))
             elif method == 'acf2d':
                 print("ar:\t\t{val} +/- {err}".format(val=self.ar,
                       err=self.arerr))
@@ -1481,8 +1484,6 @@ class Dynspec:
                       err=self.v_xerr))
                 print("v_y:\t\t{val} +/- {err}".format(val=self.v_y,
                       err=self.v_yerr))
-                #print("psi:\t\t{val} +/- {err}".format(val=self.psi,
-                      #err=self.psierr))
             print('\n', 'redchi:', results.redchi)
 
         if plot:
@@ -1842,12 +1843,13 @@ class Dynspec:
                 newarr = np.ravel(array[~array.mask])
 
                 sspec = griddata((x1, y1), newarr, (xx, yy),
-                                    method='linear')
+                                 method='linear')
 
                 # fill nans with the mean
                 meanval = np.mean(sspec[is_valid(sspec)])
                 sspec[np.isnan(sspec)] = meanval
-            except:
+            except Exception as e:
+                print(e)
                 print('Cleaning failed. Continuing with uncleaned spectrum.')
 
         max_fd = max(fdop)

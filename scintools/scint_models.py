@@ -389,7 +389,7 @@ def fit_log_parabola(x, y):
 
 
 def arc_curvature(params, ydata, weights, true_anomaly,
-                  vearth_ra, vearth_dec, anisotropy=True):
+                  vearth_ra, vearth_dec):
     """
     arc curvature model
 
@@ -415,7 +415,14 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
-    nmodel = params['nmodel']
+    if 'nmodel' in params.keys():
+        nmodel = params['nmodel']
+    else:
+        if 'psi' in params.keys():
+            nmodel = 1
+        else:
+            nmodel = 0
+
 
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
@@ -471,7 +478,13 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
-    nmodel = params['nmodel']
+   if 'nmodel' in params.keys():
+        nmodel = params['nmodel']
+    else:
+        if 'psi' in params.keys():
+            nmodel = 1
+        else:
+            nmodel = 0
 
     if 'vism_ra' in params.keys():
         vism_ra = params['vism_ra']
