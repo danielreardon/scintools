@@ -1091,7 +1091,8 @@ class Dynspec:
 
         return
 
-    def get_acf_tilt(self, plot=False, tmax=None, fmax=None):
+    def get_acf_tilt(self, plot=False, tmax=None, fmax=None, display=True,
+                     filename=None, nscale=0.5, nscaleplot=2):
         """
         Estimates the tilt in the ACF, which is proportional to the phase
             gradient parallel to Veff
@@ -1102,11 +1103,11 @@ class Dynspec:
             self.get_scint_params()
 
         if tmax is None:
-            tmax = self.tau/60/3
+            tmax = nscale*self.tau/60
         else:
             tmax = tmax
         if fmax is None:
-            fmax = self.dnu/5
+            fmax = nscale*self.dnu
         else:
             fmax = fmax
 
@@ -1150,29 +1151,38 @@ class Dynspec:
         if plot:
             plt.errorbar(peak_array, y_array,
                          xerr=np.array(peakerr_array).squeeze(),
-                         marker='.', alpha=0.3)
-            plt.plot(peak_array, yfit, alpha=0.5)
+                         marker='.')
+            plt.plot(peak_array, yfit)
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
             plt.title('Peak measurements, and weighted fit')
-            plt.show()
+            if display:
+                plt.show()
 
             plt.pcolormesh(t_delays, f_shifts, acf, linewidth=0,
                            rasterized=True)
-            plt.plot(peak_array, y_array, 'r', alpha=0.2)
-            plt.plot(peak_array, yfit, 'k', alpha=0.2)
+            plt.plot(peak_array, y_array, 'r', alpha=0.5)
+            plt.plot(peak_array, yfit, 'k', alpha=0.5)
+            yl = plt.ylim()
+            if yl[1] > nscaleplot*self.dnu:
+                plt.ylim([-nscaleplot*self.dnu, nscaleplot*self.dnu])
+            xl = plt.xlim()
+            if xl[1] > nscaleplot*self.tau:
+                plt.xlim([-nscaleplot*self.tau, nscaleplot*self.tau])
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
             plt.title(r'Tilt = {0} $\pm$ {1} (MHz/min)'.format(
-                    round(self.acf_tilt, 2), round(self.acf_tilt_err, 1)))
-            plt.show()
+                    round(self.acf_tilt, 2), round(self.acf_tilt_err, 2)))
+            if display:
+                plt.show()
 
         return
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, nscale=4,
                          nwalkers=50, steps=50, burn=0.2, nitr=1,
-                         lnsigma=True, verbose=False, progress=True):
+                         lnsigma=True, verbose=False, progress=True,
+                         display=True, filename=None):
         """
         Measure the scintillation timescale
             Method:
@@ -1334,6 +1344,10 @@ class Dynspec:
                 params.add('freq', value=self.freq, vary=False)
                 params.add('phasegrad', value=1e-10, vary=True,
                            min=-np.Inf, max=np.Inf)
+                if hasattr(self, 'acf_tilt'):
+                    params['phasegrad'].value = \
+                        self.acf_tilt * self.tau/60 / self.dnu / 2 / \
+                        (self.dnu/self.freq)**(1/6)
                 if verbose:
                     print("\nPerforming least-squares fit to approximate 2D " +
                           "ACF model")
@@ -1505,7 +1519,8 @@ class Dynspec:
                                             None)
                 fmodel = ydata_f - f_residuals
 
-                plt.figure(figsize=(9, 6))
+                if display or filename is not None:
+                    plt.figure(figsize=(9, 6))
                 plt.subplot(2, 1, 1)
                 plt.plot(xdata_t, ydata_t/np.max(ydata_t))
                 plt.plot(xdata_t, tmodel/np.max(ydata_t))
@@ -1533,7 +1548,8 @@ class Dynspec:
                          ':', color='crimson')
                 plt.xlabel('Frequency lag (MHz)')
                 plt.tight_layout()
-                plt.show()
+                if display:
+                    plt.show()
 
             elif method == 'acf2d_approx' or method == 'acf2d':
                 # Get tau model
@@ -1569,12 +1585,20 @@ class Dynspec:
                 data = [(ydata, 'data'), (model, 'model'),
                         (residuals, 'residuals')]
                 for d in data:
-                    plt.pcolormesh(tdata/60, fdata, d[0], linewidth=0,
+
+                    # subtract the white noise spike
+                    arr = np.fft.ifftshift(d[0])
+                    wn = arr[1][1] - arr[1][0]
+                    arr[1][1] = arr[1][1] - wn
+                    arr = np.fft.fftshift(arr)
+
+                    plt.pcolormesh(tdata/60, fdata, arr, linewidth=0,
                                    rasterized=True)
                     plt.title(d[1])
                     plt.xlabel('Time lag (mins)')
                     plt.ylabel('Frequency lag (MHz)')
-                    plt.show()
+                    if display:
+                        plt.show()
 
             elif method == 'sspec':
                 '''
@@ -1586,7 +1610,8 @@ class Dynspec:
                               labels=results.var_names,
                               truths=list(results.params.valuesdict().
                                           values()))
-                plt.show()
+                if display:
+                    plt.show()
 
         return results.params
 

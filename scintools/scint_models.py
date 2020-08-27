@@ -161,6 +161,7 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
                                ((dnu / np.log(2)) / freq)**(1 / 6) *
                                (fdata / (dnu / np.log(2))))**(3 * alpha / 2) +
                          abs(fdata / (dnu / np.log(2)))**(3 / 2))**(2 / 3))
+
     # multiply by triangle function
     model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
     model = np.multiply(model, 1-np.divide(abs(fdata), bw))
