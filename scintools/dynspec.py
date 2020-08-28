@@ -25,6 +25,7 @@ from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
 from lmfit import Parameters
+from lmfit.printfuncs import report_ci
 import corner
 
 
@@ -1228,6 +1229,10 @@ class Dynspec:
         params.add('dnu', value=dnu, vary=True, min=0.0, max=np.inf)
         params.add('amp', value=amp, vary=True, min=0.0, max=np.inf)
         params.add('wn', value=wn, vary=True, min=0.0, max=np.inf)
+        if 'sim:mb2=' in self.name:
+            # No white noise in simulation. Don't fit or conf. int. will break
+            params['wn'].value = 0
+            params['wn'].vary = False
         params.add('nt', value=nt, vary=False)
         params.add('nf', value=nf, vary=False)
         if alpha is None:
@@ -1244,8 +1249,8 @@ class Dynspec:
                 print("\nPerforming least-squares fit to 1D ACF model")
             chisqr = np.inf
             for itr in range(nitr):
-                results = fitter(scint_acf_model, params,
-                                 (xdata, ydata, None))
+                results, ci = fitter(scint_acf_model, params,
+                                     (xdata, ydata, None), get_ci=True)
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
@@ -1340,44 +1345,44 @@ class Dynspec:
                 tdata = tticks
                 fdata = fticks
 
-            if method == 'acf2d_approx':
-
-                params.add('tobs', value=self.tobs, vary=False)
-                params.add('bw', value=self.bw, vary=False)
-                params.add('freq', value=self.freq, vary=False)
-                params.add('phasegrad', value=1e-10, vary=True,
-                           min=-np.Inf, max=np.Inf)
-                if hasattr(self, 'acf_tilt'):
-                    params['phasegrad'].value = \
-                        self.acf_tilt * self.tau/60 / self.dnu / 2 / \
-                        (self.dnu/self.freq)**(1/6)
+            if method == 'acf2d':
                 if verbose:
-                    print("\nPerforming least-squares fit to approximate 2D " +
-                          "ACF model")
-                chisqr = np.inf
+                    print("\nDoing 2D fit to initialize fit values")
 
-                for itr in range(nitr):
-                    results = fitter(scint_acf_model_2d_approx, params,
+            params.add('tobs', value=self.tobs, vary=False)
+            params.add('bw', value=self.bw, vary=False)
+            params.add('freq', value=self.freq, vary=False)
+            params.add('phasegrad', value=1e-10, vary=True,
+                       min=-np.Inf, max=np.Inf)
+            if hasattr(self, 'acf_tilt'):
+                params['phasegrad'].value = \
+                    self.acf_tilt * self.tau/60 / self.dnu / 2 / \
+                    (self.dnu/self.freq)**(1/6)
+            if verbose:
+                print("\nPerforming least-squares fit to approximate 2D " +
+                      "ACF model")
+            chisqr = np.inf
+
+            for itr in range(nitr):
+                results, ci = fitter(scint_acf_model_2d_approx, params,
                                      (tdata, fdata, ydata_2d, None),
-                                     mcmc=mcmc)
-                    if results.chisqr < chisqr:
-                        chisqr = results.chisqr
-                        params = results.params
+                                     mcmc=mcmc, get_ci=True)
+                if results.chisqr < chisqr:
+                    chisqr = results.chisqr
+                    params = results.params
 
-            elif method == 'acf2d':
+            if method == 'acf2d':
 
-                params.add('tobs', value=self.tobs, vary=False)
-                params.add('bw', value=self.bw, vary=False)
                 params.add('ar', value=1,
-                           vary=True, min=1, max=10)
-                params.add('phasegrad_x', value=0.01, vary=True,
-                           min=-5, max=5)
-                params.add('phasegrad_y', value=0.01, vary=True,
-                           min=-5, max=5)
-                params.add('v_x', value=np.random.normal(loc=0, scale=1),
-                           vary=True, min=-10, max=10)
-                params.add('v_y', value=np.random.normal(loc=0, scale=1),
-                           vary=True, min=-10, max=10)
+                           vary=True, min=1, max=np.inf)
+                params.add('phasegrad_x', value=params['phasegrad'].value,
+                           vary=True, min=-np.inf, max=np.inf)
+                params.add('phasegrad_y', value=1e-10, vary=True,
+                           min=-np.inf, max=np.inf)
+                params.add('v_x', value=0.1,
+                           vary=True, min=-np.inf, max=np.inf)
+                params.add('v_y', value=0.1,
+                           vary=True, min=-np.inf, max=np.inf)
 
                 if mcmc:
                     pos_array = []
@@ -1420,10 +1425,11 @@ class Dynspec:
                               "2D ACF model")
                 chisqr = np.inf
                 for itr in range(nitr):
-                    results = fitter(scint_acf_model_2d, params,
-                                     (ydata_2d, None), mcmc=mcmc,
-                                     pos=pos, nwalkers=nwalkers, steps=steps,
-                                     burn=burn, progress=progress)
+                    results, ci = fitter(scint_acf_model_2d, params,
+                                         (ydata_2d, None), mcmc=mcmc,
+                                         pos=pos, nwalkers=nwalkers,
+                                         steps=steps, burn=burn,
+                                         progress=progress, get_ci=True)
                     if results.chisqr < chisqr:
                         chisqr = results.chisqr
                         params = results.params
@@ -1464,8 +1470,11 @@ class Dynspec:
         self.tauerr = results.params['tau'].stderr
         self.dnu = results.params['dnu'].value
         self.dnuerr = results.params['dnu'].stderr
-        self.wn = results.params['wn'].value
-        self.wnerr = results.params['wn'].stderr
+        if 'sim:mb2=' not in self.name:
+            self.wn = results.params['wn'].value
+            self.wnerr = results.params['wn'].stderr
+        else:
+            self.wn = 0
         if method == 'acf2d_approx':
             self.phasegrad = results.params['phasegrad'].value
             self.phasegraderr = results.params['phasegrad'].stderr
@@ -1511,7 +1520,10 @@ class Dynspec:
                       err=self.v_xerr))
                 print("v_y:\t\t{val} +/- {err}".format(val=self.v_y,
                       err=self.v_yerr))
-            print('\n', 'redchi:', results.redchi)
+            # print('\n', 'redchi:', results.redchi)
+
+            if ci != '':
+                report_ci(ci)
 
         if plot:
             # get models:
