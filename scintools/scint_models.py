@@ -166,7 +166,7 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
     model = np.multiply(model, 1-np.divide(abs(fdata), bw))
     model = np.fft.fftshift(model)
-    model[1, 1] = model[1, 1] + wn  # add white noise spike
+    model[0, 0] = model[0, 0] + wn  # add white noise spike
     model = np.fft.fftshift(model)
     model = np.transpose(model)
 
@@ -233,7 +233,9 @@ def scint_acf_model_2d(params, ydata, weights):
         # weights = 1/model
 
     # add white noise spike
-    model[int(nf_crop / 2) + 1, int(nt_crop / 2) + 1] += wn
+    model = np.fft.fftshift(model)
+    model[0, 0] = model[0, 0] + wn
+    model = np.fft.fftshift(model)
 
     return (ydata - model) * weights
 

@@ -1261,8 +1261,10 @@ class Dynspec:
                       '\nInitial dnu estimate:', dnu)
 
             ydata = np.copy(self.acf)
-            tticks = np.linspace(-self.tobs, self.tobs, len(ydata[0, :]))
-            fticks = np.linspace(-self.bw, self.bw, len(ydata[:, 0]))
+            tticks = np.linspace(-self.tobs + self.dt/2,
+                                 self.tobs, len(ydata[0, :] + 1))
+            fticks = np.linspace(-self.bw + self.df/2,
+                                 self.bw, len(ydata[:, 0] + 1))
 
             if nscale is not None and not full_frame:
                 ntau = nscale
@@ -1298,12 +1300,12 @@ class Dynspec:
                     if (fmax - fmin) % 2 == 0:
                         fmax -= 1
 
-                    fdata = fticks[fmin-1:fmax]
+                    fdata = fticks[fmin+1:fmax]
                     if len(tticks) % 2 == 0:
-                        ydata_2d = ydata[fmin-1:fmax, :-1]
+                        ydata_2d = ydata[fmin+1:fmax, :-1]
                         tdata = tticks[:-1]
                     else:
-                        ydata_2d = ydata[fmin-1:fmax, :]
+                        ydata_2d = ydata[fmin+1:fmax, :]
                         tdata = tticks
 
                 elif ndnu == 1:
@@ -1313,12 +1315,12 @@ class Dynspec:
                     if (tmax - tmin) % 2 == 0:
                         tmax -= 1
 
-                    tdata = tticks[tmin-1:tmax]
+                    tdata = tticks[tmin+1:tmax]
                     if len(fticks) % 2 == 0:
-                        ydata_2d = ydata[:-1, tmin-1:tmax]
+                        ydata_2d = ydata[:-1, tmin+1:tmax]
                         fdata = fticks[:-1]
                     else:
-                        ydata_2d = ydata[:, tmin-1:tmax]
+                        ydata_2d = ydata[:, tmin+1:tmax]
                         fdata = fticks
 
                 else:
@@ -1332,9 +1334,9 @@ class Dynspec:
                     if (tmax - tmin) % 2 == 0:
                         tmax -= 1
 
-                    ydata_2d = ydata[fmin-1:fmax, tmin-1:tmax]
-                    tdata = tticks[tmin-1:tmax]
-                    fdata = fticks[fmin-1:fmax]
+                    ydata_2d = ydata[fmin+1:fmax, tmin+1:tmax]
+                    tdata = tticks[tmin:tmax-1]
+                    fdata = fticks[fmin:fmax-1]
             else:
                 ydata_2d = ydata
                 tdata = tticks
@@ -1355,6 +1357,7 @@ class Dynspec:
                     print("\nPerforming least-squares fit to approximate 2D " +
                           "ACF model")
                 chisqr = np.inf
+
                 for itr in range(nitr):
                     results = fitter(scint_acf_model_2d_approx, params,
                                      (tdata, fdata, ydata_2d, None),
@@ -1463,6 +1466,8 @@ class Dynspec:
         self.tauerr = results.params['tau'].stderr
         self.dnu = results.params['dnu'].value
         self.dnuerr = results.params['dnu'].stderr
+        self.wn = results.params['wn'].value
+        self.wnerr = results.params['wn'].stderr
         if method == 'acf2d_approx':
             self.phasegrad = results.params['phasegrad'].value
             self.phasegraderr = results.params['phasegrad'].stderr
@@ -1589,14 +1594,18 @@ class Dynspec:
                         (residuals, 'residuals')]
                 for d in data:
 
-                    # subtract the white noise spike
-                    arr = np.fft.ifftshift(d[0])
-                    wn = arr[1][1] - arr[1][0]
-                    arr[1][1] = arr[1][1] - wn
-                    arr = np.fft.fftshift(arr)
+                    if d[1] != 'residuals':
+                        # subtract the white noise spike from data and model
+                        arr = np.fft.ifftshift(d[0])
+                        arr[0][0] -= self.wn
+                        arr = np.fft.fftshift(arr)
+                    else:
+                        arr = d[0]
 
                     plt.pcolormesh(tdata/60, fdata, arr, linewidth=0,
                                    rasterized=True)
+                    if d[1] == 'residuals':
+                        plt.clim(vmin=-1, vmax=1)  # fractional error
                     plt.title(d[1])
                     plt.xlabel('Time lag (mins)')
                     plt.ylabel('Frequency lag (MHz)')
