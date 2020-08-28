@@ -322,12 +322,12 @@ class Dynspec:
             if fit:
                 ax2 = ax1.twinx()
                 ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-                ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.
+                ax2.set_ylabel(r'Frequency lag / (dnu$_d = {0}$)'.
                                format(round(self.dnu, 2)))
                 ax3 = ax1.twiny()
                 minx, maxx = ax1.get_xlim()
                 ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-                ax3.set_xlabel('Time lag/(tau_d={0})'.format(round(
+                ax3.set_xlabel(r'Time lag/(tau$_d={0}$)'.format(round(
                                                              self.tau/60, 2)))
             fig.colorbar(im, pad=0.15)
         else:  # just plot acf without scales
@@ -1092,7 +1092,7 @@ class Dynspec:
         return
 
     def get_acf_tilt(self, plot=False, tmax=None, fmax=None, display=True,
-                     filename=None, nscale=0.5, nscaleplot=2):
+                     filename=None, nscale=0.5, nscaleplot=2, nmin=5):
         """
         Estimates the tilt in the ACF, which is proportional to the phase
             gradient parallel to Veff
@@ -1118,9 +1118,13 @@ class Dynspec:
 
         # just the peak
         xdata_inds = np.argwhere(abs(t_delays) <= tmax)
+        if len(xdata_inds) < nmin:
+            xdata_inds = np.argwhere(abs(t_delays) <= nmin*self.dt)
         xdata = np.array(t_delays[xdata_inds]).squeeze()
 
         inds = np.argwhere(abs(f_shifts) <= fmax)
+        if len(inds) < nmin:
+            inds = np.argwhere(abs(f_shifts) <= nmin*self.df)
         peak_array = []
         peakerr_array = []
         y_array = []
@@ -1145,7 +1149,7 @@ class Dynspec:
         for i in range(len(params)):  # for each parameter
             errors.append(np.absolute(pcov[i][i])**0.5)
 
-        self.acf_tilt = float(params[0].squeeze())
+        self.acf_tilt = -float(params[0].squeeze())  # take -ve
         self.acf_tilt_err = float(errors[0].squeeze())
 
         if plot:
@@ -1242,8 +1246,7 @@ class Dynspec:
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
-
-        if method == 'acf2d_approx' or method == 'acf2d':
+        elif method == 'acf2d_approx' or method == 'acf2d':
             if verbose:
                 print("\nDoing 1D fit to initialize fit values")
             results = fitter(scint_acf_model, params,

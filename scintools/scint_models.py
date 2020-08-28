@@ -165,15 +165,14 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     # multiply by triangle function
     model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
     model = np.multiply(model, 1-np.divide(abs(fdata), bw))
+    model = np.fft.fftshift(model)
+    model[1, 1] = model[1, 1] + wn  # add white noise spike
+    model = np.fft.fftshift(model)
     model = np.transpose(model)
 
     if weights is None:
         weights = np.ones(np.shape(ydata))
         # weights = 1/model
-
-    model = np.fft.fftshift(model)
-    model[1, 1] = model[1, 1] + wn  # add white noise spike
-    model = np.fft.fftshift(model)
 
     return (ydata - model) * weights
 
