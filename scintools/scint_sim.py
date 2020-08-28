@@ -496,8 +496,8 @@ class ACF():
 
         alph2 = self.alpha/2
 
-        cf = 5
-        ct = 5
+        cf = 3
+        ct = 3
 
         nf = self.nf + cf  # make odd, compute oversized frame
         ns = self.ns + ct

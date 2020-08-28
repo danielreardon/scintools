@@ -1236,23 +1236,21 @@ class Dynspec:
         else:
             params.add('alpha', value=alpha, vary=False)
 
-        if method == 'acf1d':
-            if verbose:
+        if method == 'acf1d' or method == 'acf2d_approx' or method == 'acf2d':
+            if method == 'acf2d_approx' or method == 'acf2d':
+                if verbose:
+                    print("\nDoing 1D fit to initialize fit values")
+            elif verbose:
                 print("\nPerforming least-squares fit to 1D ACF model")
             chisqr = np.inf
             for itr in range(nitr):
                 results = fitter(scint_acf_model, params,
-                                 (xdata, ydata, None), mcmc=mcmc)
+                                 (xdata, ydata, None))
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
-        elif method == 'acf2d_approx' or method == 'acf2d':
-            if verbose:
-                print("\nDoing 1D fit to initialize fit values")
-            results = fitter(scint_acf_model, params,
-                             (xdata, ydata, None), mcmc=mcmc)
 
-            params = results.params
+        if method == 'acf2d_approx' or method == 'acf2d':
 
             dnu = params['dnu']
             tau = params['tau']
@@ -1270,23 +1268,23 @@ class Dynspec:
                 ntau = nscale
                 ndnu = nscale
                 while ntau > (self.tobs / tau):
-                    ntau = ntau - 1
                     if verbose:
                         if ntau == 1:
                             print('tau larger than half of frame,',
                                   'switching to full frame')
                         else:
                             print('nscale too large for time axis, ' +
-                                  'decreasing to', ntau)
+                                  'decreasing to', ntau - 1)
+                    ntau = ntau - 1
                 while ndnu > (self.bw / dnu):
-                    ndnu = ndnu - 1
                     if verbose:
                         if ntau == 1:
                             print('dnu larger than half of frame,',
                                   'switching to full frame')
                         else:
                             print('nscale too large for frequency axis, ' +
-                                  'decreasing to', ndnu)
+                                  'decreasing to', ndnu - 1)
+                        ndnu = ndnu - 1
 
                 if ntau == 1 and ndnu == 1:
                     ydata_2d = ydata
