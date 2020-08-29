@@ -176,7 +176,7 @@ class Dynspec:
         self.bw = dyn.bw  # obs bw
         self.df = dyn.df  # channel bw
         self.freq = dyn.freq
-        self.tobs = dyn.tobs  # initial estimate of tobs
+        self.tobs = dyn.tobs
         self.dt = dyn.dt
         self.mjd = dyn.mjd
         self.dyn = dyn.dyn
@@ -203,7 +203,7 @@ class Dynspec:
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
-                 figsize=(9, 9)):
+                 figsize=(9, 9), dpi=200):
         """
         Plot the dynamic spectrum
         """
@@ -249,7 +249,7 @@ class Dynspec:
                            linewidth=0, rasterized=True)
 
         if filename is not None:
-            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
                         pad_inches=0.1)
             plt.close()
         elif input_dyn is None and display:
@@ -258,7 +258,7 @@ class Dynspec:
     def plot_acf(self, method='acf1d', alpha=5/3, contour=False, filename=None,
                  input_acf=None, input_t=None, input_f=None, fit=True,
                  mcmc=False, display=True, crop=None, tlim=None, flim=None,
-                 figsize=(9, 9), verbose=False):
+                 figsize=(9, 9), verbose=False, dpi=200):
         """
         Plot the ACF
         """
@@ -341,7 +341,7 @@ class Dynspec:
             plt.xlabel('Time lag (mins)')
 
         if filename is not None:
-            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
                         pad_inches=0.1)
             plt.close()
         elif input_acf is None and display:
@@ -352,7 +352,7 @@ class Dynspec:
                    plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
                    cutmid=0, startbin=0, display=True, colorbar=True,
                    title=None, figsize=(9, 9), subtract_artefacts=False,
-                   overplot_curvature=None):
+                   overplot_curvature=None, dpi=200):
         """
         Plot the secondary spectrum
         """
@@ -435,7 +435,7 @@ class Dynspec:
             plt.title(title)
 
         if filename is not None:
-            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
                         pad_inches=0.1)
             plt.close()
         elif input_sspec is None and display:
@@ -445,7 +445,7 @@ class Dynspec:
                      title=None, input_scat_im=None, input_fdop=None,
                      lamsteps=False, trap=False, clean=True, use_angle=False,
                      use_spatial=False, s=None, veff=None, d=None,
-                     filename=None):
+                     filename=None, dpi=200):
         """
         Plot the scattered image
         """
@@ -502,7 +502,7 @@ class Dynspec:
         if colorbar:
             plt.colorbar()
         if filename is not None:
-            plt.savefig(filename, dpi=300, papertype='a4', bbox_inches='tight',
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
                         pad_inches=0.1)
         if display:
             plt.show()
@@ -550,7 +550,7 @@ class Dynspec:
                 ref_freq=1400, constraint=[0, np.inf], nsmooth=5,
                 filename=None, noise_error=True, display=True,
                 log_parabola=False, logsteps=False, plot_spec=False,
-                fit_spectrum=False, subtract_artefacts=False):
+                fit_spectrum=False, subtract_artefacts=False, dpi=200):
         """
         Find the arc curvature with maximum power along it
 
@@ -811,7 +811,7 @@ class Dynspec:
                             alpha=0.3)
             if plot and iarc == len(etamin_array)-1:
                 if filename is not None:
-                    plt.savefig(filename, dpi=300,
+                    plt.savefig(filename, dpi=dpi,
                                 bbox_inches='tight', pad_inches=0.1)
                     plt.close()
                 elif display:
@@ -823,7 +823,7 @@ class Dynspec:
                    numsteps=None,  filename=None, display=True,
                    unscrunched=True, logsteps=False, powerspec=True,
                    interp_nan=False, fit_spectrum=False, powerspec_cut=False,
-                   figsize=(9, 9), subtract_artefacts=False):
+                   figsize=(9, 9), subtract_artefacts=False, dpi=200):
         """
         Normalise fdop axis using arc curvature
         """
@@ -1023,7 +1023,7 @@ class Dynspec:
                         filename_name = filename_name.split('+')[0]
                     filename_extension = filename.split('.')[-1]
                     plt.savefig(filename_name + '_1d.' + filename_extension,
-                                bbox_inches='tight', pad_inches=0.1)
+                                bbox_inches='tight', pad_inches=0.1, dpi=dpi)
                     plt.close()
                 elif display:
                     plt.show()
@@ -1047,7 +1047,8 @@ class Dynspec:
                 plt.ylim(bottom, top)
                 plt.colorbar()
                 if filename is not None:
-                    plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+                    plt.savefig(filename, bbox_inches='tight', pad_inches=0.1,
+                                dpi=dpi)
                     plt.close()
                 elif display:
                     plt.show()
@@ -1085,7 +1086,7 @@ class Dynspec:
                         filename_name = filename_name.split('+')[0]
                     filename_extension = filename.split('.')[-1]
                     plt.savefig(filename_name + '_power.' + filename_extension,
-                                bbox_inches='tight', pad_inches=0.1)
+                                bbox_inches='tight', pad_inches=0.1, dpi=dpi)
                     plt.close()
                 elif display:
                     plt.show()
@@ -1093,7 +1094,7 @@ class Dynspec:
         return
 
     def get_acf_tilt(self, plot=False, tmax=None, fmax=None, display=True,
-                     filename=None, nscale=0.5, nscaleplot=2, nmin=5):
+                     filename=None, nscale=0.5, nscaleplot=2, nmin=5, dpi=200):
         """
         Estimates the tilt in the ACF, which is proportional to the phase
             gradient parallel to Veff
@@ -1161,7 +1162,14 @@ class Dynspec:
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
             plt.title('Peak measurements, and weighted fit')
-            if display:
+            if filename is not None:
+                filename_name = filename.split('.')[0]
+                filename_extension = filename.split('.')[-1]
+                plt.savefig(filename_name + '_tilt_fit.' + filename_extension,
+                            dpi=dpi, bbox_inches='tight',
+                            pad_inches=0.1)
+                plt.close()
+            elif display:
                 plt.show()
 
             plt.pcolormesh(t_delays, f_shifts, acf, linewidth=0,
@@ -1178,7 +1186,14 @@ class Dynspec:
             plt.xlabel('Time lag (mins)')
             plt.title(r'Tilt = {0} $\pm$ {1} (MHz/min)'.format(
                     round(self.acf_tilt, 2), round(self.acf_tilt_err, 2)))
-            if display:
+            if filename is not None:
+                filename_name = filename.split('.')[0]
+                filename_extension = filename.split('.')[-1]
+                plt.savefig(filename_name + '_tilt_acf.' + filename_extension,
+                            dpi=dpi, bbox_inches='tight',
+                            pad_inches=0.1)
+                plt.close()
+            elif display:
                 plt.show()
 
         return
@@ -1187,7 +1202,7 @@ class Dynspec:
                          mcmc=False, full_frame=False, nscale=4,
                          nwalkers=50, steps=50, burn=0.2, nitr=1,
                          lnsigma=True, verbose=False, progress=True,
-                         display=True, filename=None):
+                         display=True, filename=None, dpi=200):
         """
         Measure the scintillation timescale
             Method:
@@ -1225,10 +1240,10 @@ class Dynspec:
 
         # Define fit parameters
         params = Parameters()
-        params.add('tau', value=tau, vary=True, min=0.0, max=np.inf)
-        params.add('dnu', value=dnu, vary=True, min=0.0, max=np.inf)
-        params.add('amp', value=amp, vary=True, min=0.0, max=np.inf)
-        params.add('wn', value=wn, vary=True, min=0.0, max=np.inf)
+        params.add('tau', value=tau, vary=True, min=-np.inf, max=np.inf)
+        params.add('dnu', value=dnu, vary=True, min=-np.inf, max=np.inf)
+        params.add('amp', value=amp, vary=True, min=-np.inf, max=np.inf)
+        params.add('wn', value=wn, vary=True, min=-np.inf, max=np.inf)
         if 'sim:mb2=' in self.name:
             # No white noise in simulation. Don't fit or conf. int. will break
             params['wn'].value = 0
@@ -1249,8 +1264,8 @@ class Dynspec:
                 print("\nPerforming least-squares fit to 1D ACF model")
             chisqr = np.inf
             for itr in range(nitr):
-                results, ci = fitter(scint_acf_model, params,
-                                     (xdata, ydata, None), get_ci=True)
+                results = fitter(scint_acf_model, params,
+                                 (xdata, ydata, None))
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
@@ -1364,9 +1379,13 @@ class Dynspec:
             chisqr = np.inf
 
             for itr in range(nitr):
-                results, ci = fitter(scint_acf_model_2d_approx, params,
-                                     (tdata, fdata, ydata_2d, None),
-                                     mcmc=mcmc, get_ci=True)
+                nfit = 5
+                # max_nfev = 2000 * (nfit + 1)  # lmfit default
+                max_nfev = 10000 * (nfit + 1)
+                results = fitter(scint_acf_model_2d_approx, params,
+                                 (tdata, fdata, ydata_2d, None),
+                                 mcmc=mcmc, max_nfev=max_nfev,
+                                 nan_policy='propagate')
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
@@ -1374,7 +1393,7 @@ class Dynspec:
             if method == 'acf2d':
 
                 params.add('ar', value=1,
-                           vary=True, min=1, max=np.inf)
+                           vary=True, min=-np.inf, max=np.inf)
                 params.add('phasegrad_x', value=params['phasegrad'].value,
                            vary=True, min=-np.inf, max=np.inf)
                 params.add('phasegrad_y', value=1e-10, vary=True,
@@ -1405,8 +1424,8 @@ class Dynspec:
                                                                  scale=2)))
                         pos_i.append(np.random.normal(loc=0, scale=1))  # phs_x
                         pos_i.append(np.random.normal(loc=0, scale=1))  # phs_y
-                        pos_i.append(np.random.normal(loc=0, scale=1))  # v_ra
-                        pos_i.append(np.random.normal(loc=0, scale=1))  # v_dec
+                        pos_i.append(np.random.normal(loc=0, scale=1))  # v_x
+                        pos_i.append(np.random.normal(loc=0, scale=1))  # v_y
                         if lnsigma:
                             pos_i.append(np.random.uniform(low=0, high=10))
 
@@ -1425,11 +1444,15 @@ class Dynspec:
                               "2D ACF model")
                 chisqr = np.inf
                 for itr in range(nitr):
-                    results, ci = fitter(scint_acf_model_2d, params,
-                                         (ydata_2d, None), mcmc=mcmc,
-                                         pos=pos, nwalkers=nwalkers,
-                                         steps=steps, burn=burn,
-                                         progress=progress, get_ci=True)
+                    nfit = 9
+                    # max_nfev = 2000 * (nfit + 1)  # lmfit default
+                    max_nfev = 10000 * (nfit + 1)
+                    results = fitter(scint_acf_model_2d, params,
+                                     (ydata_2d, None), mcmc=mcmc,
+                                     pos=pos, nwalkers=nwalkers,
+                                     steps=steps, burn=burn,
+                                     progress=progress,
+                                     max_nfev=max_nfev, nan_policy='propagate')
                     if results.chisqr < chisqr:
                         chisqr = results.chisqr
                         params = results.params
@@ -1461,9 +1484,6 @@ class Dynspec:
             # params = results.params
             # results = fitter(scint_sspec_model, params,
             #                  (xdata, ydata, weights))
-        else:
-            print('Method not understood, please choose from:\n',
-                  'acf1d, acf2d_approx, or acf2d')
 
         # Done fitting - now define results
         self.tau = results.params['tau'].value
@@ -1520,10 +1540,6 @@ class Dynspec:
                       err=self.v_xerr))
                 print("v_y:\t\t{val} +/- {err}".format(val=self.v_y,
                       err=self.v_yerr))
-            # print('\n', 'redchi:', results.redchi)
-
-            if ci != '':
-                report_ci(ci)
 
         if plot:
             # get models:
@@ -1566,7 +1582,14 @@ class Dynspec:
                          ':', color='crimson')
                 plt.xlabel('Frequency lag (MHz)')
                 plt.tight_layout()
-                if display:
+                if filename is not None:
+                    filename_name = filename.split('.')[0]
+                    filename_extension = filename.split('.')[-1]
+                    plt.savefig(filename_name + '_1Dfit.' + filename_extension,
+                                dpi=dpi, bbox_inches='tight',
+                                pad_inches=0.1)
+                    plt.close()
+                elif display:
                     plt.show()
 
             elif method == 'acf2d_approx' or method == 'acf2d':
@@ -1619,7 +1642,14 @@ class Dynspec:
                     plt.title(d[1])
                     plt.xlabel('Time lag (mins)')
                     plt.ylabel('Frequency lag (MHz)')
-                    if display:
+                    if filename is not None:
+                        filename_name = filename.split('.')[0]
+                        filename_extension = filename.split('.')[-1]
+                        plt.savefig(filename_name + '_2Dfit_{0}.'.format(d[1])
+                                    + filename_extension, dpi=dpi,
+                                    bbox_inches='tight', pad_inches=0.1)
+                        plt.close()
+                    elif display:
                         plt.show()
 
             elif method == 'sspec':
@@ -1632,12 +1662,19 @@ class Dynspec:
                               labels=results.var_names,
                               truths=list(results.params.valuesdict().
                                           values()))
-                if display:
+                if filename is not None:
+                    filename_name = filename.split('.')[0]
+                    filename_extension = filename.split('.')[-1]
+                    plt.savefig(filename_name + '_corner.'
+                                + filename_extension, dpi=dpi,
+                                bbox_inches='tight', pad_inches=0.1)
+                    plt.close()
+                elif display:
                     plt.show()
 
         return results.params
 
-    def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None,
+    def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None, dpi=200,
                 lamsteps=False, maxfdop=np.inf, figsize=(8, 13), display=True):
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
@@ -1707,7 +1744,7 @@ class Dynspec:
                 filename_name = filename.split('.')[0]
                 filename_extension = filename.split('.')[1]
                 plt.savefig(filename_name + '_dynspec.' + filename_extension,
-                            figsize=(9, 15), dpi=300, bbox_inches='tight',
+                            figsize=(9, 15), dpi=dpi, bbox_inches='tight',
                             pad_inches=0.1)
                 plt.close()
             elif display:
@@ -1715,7 +1752,7 @@ class Dynspec:
             plt.figure(2)
             if filename is not None:
                 plt.savefig(filename_name + '_acf.' + filename_extension,
-                            figsize=(9, 15), dpi=300, bbox_inches='tight',
+                            figsize=(9, 15), dpi=dpi, bbox_inches='tight',
                             pad_inches=0.1)
                 plt.close()
             elif display:
@@ -1723,7 +1760,7 @@ class Dynspec:
             plt.figure(3)
             if filename is not None:
                 plt.savefig(filename_name + '_sspec.' + filename_extension,
-                            figsize=(9, 15), dpi=300, bbox_inches='tight',
+                            figsize=(9, 15), dpi=dpi, bbox_inches='tight',
                             pad_inches=0.1)
                 plt.close()
             elif display:
@@ -2325,7 +2362,7 @@ class SimDyn():
     Imports Simulation() object from scint_sim to Dynspec class
     """
 
-    def __init__(self, sim, freq=1400, dt=0.5, mjd=50000):
+    def __init__(self, sim):
 
         self.name =\
             'sim:mb2={0},ar={1},psi={2},dlam={3}'.format(sim.mb2, sim.ar,
@@ -2337,8 +2374,9 @@ class SimDyn():
         self.dyn = sim.spi
         dlam = sim.dlam
 
-        self.dt = dt
-        self.freq = freq
+        self.dt = sim.dt
+        self.freq = sim.freq
+        self.mjd = sim.mjd
         self.nsub = int(np.shape(self.dyn)[0])
         self.nchan = int(np.shape(self.dyn)[1])
         lams = np.linspace(1, 1+dlam, self.nchan)
@@ -2348,8 +2386,7 @@ class SimDyn():
         self.bw = max(self.freqs) - min(self.freqs)
         self.times = self.dt*np.arange(0, self.nsub)
         self.df = self.bw/self.nchan
-        self.tobs = float(self.times[-1] - self.times[0])
-        self.mjd = mjd
+        self.tobs = self.nsub * self.dt
         self.dyn = np.transpose(self.dyn)
         return
 

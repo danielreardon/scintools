@@ -27,10 +27,14 @@ from lmfit import Minimizer, conf_interval
 
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
-           steps=1000, burn=0.2, progress=True, get_ci=False):
+           steps=1000, burn=0.2, progress=True, get_ci=False,
+           nan_policy='raise', max_nfev=None):
 
     # Do fit
-    func = Minimizer(model, params, fcn_args=args)
+    maxfev = [0 if max_nfev is None else max_nfev]
+    maxfev = int(maxfev[0])
+    func = Minimizer(model, params, fcn_args=args, nan_policy=nan_policy,
+                     maxfev=maxfev)
     results = func.minimize()
     if mcmc:
         func = Minimizer(model, results.params, fcn_args=args)
@@ -180,7 +184,6 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
 
     if weights is None:
         weights = np.ones(np.shape(ydata))
-        # weights = 1/model
 
     return (ydata - model) * weights
 
