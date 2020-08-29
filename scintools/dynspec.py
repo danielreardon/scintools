@@ -1265,7 +1265,7 @@ class Dynspec:
             chisqr = np.inf
             for itr in range(nitr):
                 results = fitter(scint_acf_model, params,
-                                 (xdata, ydata, None))
+                                 (xdata, ydata, None), nan_policy='propagate')
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params

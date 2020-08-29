@@ -204,13 +204,20 @@ def float_array_from_dict(dictionary, key):
     """
     Convert an array stored in dictionary to a numpy array
     """
+    ind = np.argwhere(np.array(dictionary[key]) == 'None').squeeze()
+
+    if ind.size != 0:
+        dictionary[key][ind] = 'nan'
+
     return np.array(list(map(float, dictionary[key]))).squeeze()
+
 
 def save_fits(dyn):
 
     from astropy.io import fits
 
-    hdu = fits.PrimaryHDU(np.flip(np.transpose(np.flip(dyn.dyn, axis=1)), axis=0))
+    hdu = fits.PrimaryHDU(np.flip(np.transpose(np.flip(dyn.dyn, axis=1)),
+                                  axis=0))
     hdul = fits.HDUList([hdu])
     hdul.writeto(dyn.name + '.fits')
 
