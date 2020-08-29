@@ -1279,82 +1279,47 @@ class Dynspec:
                       '\nInitial dnu estimate:', dnu)
 
             ydata = np.copy(self.acf)
-            tticks = np.linspace(-self.tobs + self.dt/2,
-                                 self.tobs, len(ydata[0, :] + 1))
-            fticks = np.linspace(-self.bw + self.df/2,
-                                 self.bw, len(ydata[:, 0] + 1))
+            tticks = np.linspace(-self.tobs, self.tobs,
+                                 len(ydata[0, :]) + 1)[:-1]
+            fticks = np.linspace(-self.bw, self.bw,
+                                 len(ydata[:, 0]) + 1)[:-1]
 
             if nscale is not None and not full_frame:
                 ntau = nscale
                 ndnu = nscale
-                while ntau > (self.tobs / tau):
-                    if verbose:
-                        if ntau == 1:
-                            print('tau larger than half of frame,',
-                                  'switching to full frame')
-                        else:
+
+                if (self.tobs / tau) > 2:
+                    while ntau > (self.tobs / tau):
+                        ntau = ntau - 1
+                        if verbose:
                             print('nscale too large for time axis, ' +
-                                  'decreasing to', ntau - 1)
-                    ntau = ntau - 1
-                while ndnu > (self.bw / dnu):
-                    if verbose:
-                        if ntau == 1:
-                            print('dnu larger than half of frame,',
-                                  'switching to full frame')
-                        else:
-                            print('nscale too large for frequency axis, ' +
-                                  'decreasing to', ndnu - 1)
-                        ndnu = ndnu - 1
+                                  'decreasing to', ntau)
 
-                if ntau == 1 and ndnu == 1:
-                    ydata_2d = ydata
-                    tdata = tticks
-                    fdata = fticks
-
-                elif ntau == 1:
-                    fmin = int(np.ceil(self.nchan - ndnu * (dnu / self.df)))
-                    fmax = int(np.floor(self.nchan + ndnu * (dnu / self.df)))
-
-                    if (fmax - fmin) % 2 == 0:
-                        fmax -= 1
-
-                    fdata = fticks[fmin+1:fmax]
-                    if len(tticks) % 2 == 0:
-                        ydata_2d = ydata[fmin+1:fmax, :-1]
-                        tdata = tticks[:-1]
-                    else:
-                        ydata_2d = ydata[fmin+1:fmax, :]
-                        tdata = tticks
-
-                elif ndnu == 1:
-                    tmin = int(np.ceil(self.nsub - ntau * (tau / self.dt)))
-                    tmax = int(np.floor(self.nsub + ntau * (tau / self.dt)))
-
-                    if (tmax - tmin) % 2 == 0:
-                        tmax -= 1
-
-                    tdata = tticks[tmin+1:tmax]
-                    if len(fticks) % 2 == 0:
-                        ydata_2d = ydata[:-1, tmin+1:tmax]
-                        fdata = fticks[:-1]
-                    else:
-                        ydata_2d = ydata[:, tmin+1:tmax]
-                        fdata = fticks
+                    tmin = int(round(self.nsub - ntau * (tau / self.dt)))
+                    tmax = int(round(self.nsub + ntau * (tau / self.dt)))
 
                 else:
-                    fmin = int(np.ceil(self.nchan - ndnu * (dnu / self.df)))
-                    fmax = int(np.floor(self.nchan + ndnu * (dnu / self.df)))
-                    tmin = int(np.ceil(self.nsub - ntau * (tau / self.dt)))
-                    tmax = int(np.floor(self.nsub + ntau * (tau / self.dt)))
+                    tmin = 0
+                    tmax = len(tticks)
 
-                    if (fmax - fmin) % 2 == 0:
-                        fmax -= 1
-                    if (tmax - tmin) % 2 == 0:
-                        tmax -= 1
+                if (self.bw / dnu) > 2:
+                    while ndnu > (self.bw / dnu):
+                        ndnu = ndnu - 1
+                        if verbose:
+                            print('nscale too large for frequency axis, ' +
+                                  'decreasing to', ndnu)
 
-                    ydata_2d = ydata[fmin+1:fmax, tmin+1:tmax]
-                    tdata = tticks[tmin:tmax-1]
-                    fdata = fticks[fmin:fmax-1]
+                    fmin = int(round(self.nchan - ndnu * (dnu / self.df)))
+                    fmax = int(round(self.nchan + ndnu * (dnu / self.df)))
+
+                else:
+                    fmin = 0
+                    fmax = len(fticks)
+
+                ydata_2d = ydata[fmin:fmax, tmin:tmax]
+                tdata = tticks[tmin:tmax]
+                fdata = fticks[fmin:fmax]
+
             else:
                 ydata_2d = ydata
                 tdata = tticks
@@ -1524,8 +1489,9 @@ class Dynspec:
                   err=self.tauerr))
             print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu,
                   err=self.dnuerr))
-            print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
-                  err=self.talphaerr))
+            if alpha is None:
+                print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
+                      err=self.talphaerr))
             if method == 'acf2d_approx':
                 print("phase grad:\t\t{val} +/- {err}".
                       format(val=self.phasegrad, err=self.phasegraderr))
