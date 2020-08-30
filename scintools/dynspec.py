@@ -1252,7 +1252,7 @@ class Dynspec:
         params.add('nf', value=nf, vary=False)
         if alpha is None:
             params.add('alpha', value=5/3, vary=True,
-                       min=1, max=3)
+                       min=-np.inf, max=np.inf)
         else:
             params.add('alpha', value=alpha, vary=False)
 

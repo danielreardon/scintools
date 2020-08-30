@@ -636,12 +636,9 @@ class ACF():
         Plots the simulated ACF
         """
 
-        if not hasattr(self, 'acf'):
-            self.calc_acf()
-
         plt.pcolormesh(self.tn, self.fn, self.acf)
-        plt.xlabel('Time lag (s)')
-        plt.ylabel('Frequency lag (MHz)')
+        plt.xlabel('Time lag (t/tau)')
+        plt.ylabel('Frequency lag (f/dnu)')
         if display:
             plt.show()
 
