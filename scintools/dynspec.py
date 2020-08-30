@@ -25,7 +25,6 @@ from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
 from lmfit import Parameters
-from lmfit.printfuncs import report_ci
 import corner
 
 
@@ -1151,8 +1150,9 @@ class Dynspec:
         for i in range(len(params)):  # for each parameter
             errors.append(np.absolute(pcov[i][i])**0.5)
 
-        self.acf_tilt = -float(params[0].squeeze())  # take -ve
-        self.acf_tilt_err = float(errors[0].squeeze())
+        self.acf_tilt = -1/(float(params[0].squeeze()))  # take -ve
+        self.acf_tilt_err = float(errors[0].squeeze()) * \
+            1/float(params[0].squeeze())**2
 
         if plot:
             plt.errorbar(peak_array, y_array,
@@ -1184,7 +1184,7 @@ class Dynspec:
                 plt.xlim([-nscaleplot*self.tau, nscaleplot*self.tau])
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
-            plt.title(r'Tilt = {0} $\pm$ {1} (MHz/min)'.format(
+            plt.title(r'Tilt = {0} $\pm$ {1} (min/MHz)'.format(
                     round(self.acf_tilt, 2), round(self.acf_tilt_err, 2)))
             if filename is not None:
                 filename_name = filename.split('.')[0]
@@ -1371,10 +1371,9 @@ class Dynspec:
                        min=-np.Inf, max=np.Inf)
             if hasattr(self, 'acf_tilt'):  # if have a confident measurement
                 if self.acf_tilt_err is not None:
-                    if self.acf_tilt_err < 0.2*np.abs(self.acf_tilt):
-                        params['phasegrad'].value = \
-                            self.acf_tilt * self.tau/60 / self.dnu / 2 / \
-                            (self.dnu/self.freq)**(1/6)
+                    params['phasegrad'].value = \
+                        self.acf_tilt / (self.tau/60) * self.dnu / 2 / \
+                        (self.dnu/self.freq)**(1/6)
             if verbose:
                 print("\nPerforming least-squares fit to approximate 2D " +
                       "ACF model")

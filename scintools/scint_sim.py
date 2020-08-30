@@ -404,11 +404,18 @@ class Simulation():
         plt.show()
 
 
+"""
+The code below is unfinished, but will eventually allow one to compute the ACF
+analytically, including a phase gradient. A dynamic spectrum with phase
+gradients (beyond those that arise naturally) can be simulated from this.
+"""
+
+
 class ACF():
 
     def __init__(self, s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3,
                  phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1,
-                 use_t=True):
+                 use_t=True, plot=False, display=True):
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
@@ -440,6 +447,8 @@ class ACF():
         self.use_t = use_t
         # self.psi = psi
         self.amp = amp
+        if plot:
+            self.plot_acf(display=display)
 
         return
 
@@ -622,7 +631,7 @@ class ACF():
 
         return
 
-    def plot_acf(self):
+    def plot_acf(self, display=True):
         """
         Plots the simulated ACF
         """
@@ -630,10 +639,10 @@ class ACF():
         if not hasattr(self, 'acf'):
             self.calc_acf()
 
-        plt.figure(1)
         plt.pcolormesh(self.tn, self.fn, self.acf)
         plt.xlabel('Time lag (s)')
         plt.ylabel('Frequency lag (MHz)')
-        plt.show()
+        if display:
+            plt.show()
 
         return

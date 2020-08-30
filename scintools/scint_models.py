@@ -28,7 +28,7 @@ from lmfit import Minimizer, conf_interval
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
            steps=1000, burn=0.2, progress=True, get_ci=False,
-           nan_policy='raise', max_nfev=None):
+           nan_policy='raise', max_nfev=None, thin=10):
 
     # Do fit
     maxfev = [0 if max_nfev is None else max_nfev]
@@ -40,7 +40,8 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
         func = Minimizer(model, results.params, fcn_args=args)
         mcmc_results = func.emcee(nwalkers=nwalkers, steps=steps,
                                   burn=int(burn * steps), pos=pos,
-                                  is_weighted=True, progress=progress)
+                                  is_weighted=True, progress=progress,
+                                  thin=thin)
         results = mcmc_results
 
     if get_ci:
