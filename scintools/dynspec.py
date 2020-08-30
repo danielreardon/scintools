@@ -1369,10 +1369,12 @@ class Dynspec:
             params.add('freq', value=self.freq, vary=False)
             params.add('phasegrad', value=1e-10, vary=True,
                        min=-np.Inf, max=np.Inf)
-            if hasattr(self, 'acf_tilt'):
-                params['phasegrad'].value = \
-                    self.acf_tilt * self.tau/60 / self.dnu / 2 / \
-                    (self.dnu/self.freq)**(1/6)
+            if hasattr(self, 'acf_tilt'):  # if have a confident measurement
+                if self.acf_tilt_err is not None:
+                    if self.acf_tilt_err < 0.2*np.abs(self.acf_tilt):
+                        params['phasegrad'].value = \
+                            self.acf_tilt * self.tau/60 / self.dnu / 2 / \
+                            (self.dnu/self.freq)**(1/6)
             if verbose:
                 print("\nPerforming least-squares fit to approximate 2D " +
                       "ACF model")
