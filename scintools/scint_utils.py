@@ -204,10 +204,13 @@ def float_array_from_dict(dictionary, key):
     """
     Convert an array stored in dictionary to a numpy array
     """
-    ind = np.argwhere(np.array(dictionary[key]) == 'None').squeeze()
+    ind = np.argwhere(np.array(dictionary[key]) == 'None').ravel()
 
     if ind.size != 0:
-        dictionary[key][ind] = 'nan'
+        arr = dictionary[key]
+        for i in ind:
+            arr[i] = 'nan'
+        dictionary[key] = arr
 
     return np.array(list(map(float, dictionary[key]))).squeeze()
 
