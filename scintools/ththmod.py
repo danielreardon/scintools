@@ -163,7 +163,7 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
         tau2=tau
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
-    w,V=eigsh(thth_red,1)
+    w,V=eigsh(thth_red,1,which='LA')
     w=w[0]
     V=V[:,0]
     ##Use larges eigenvector/value as model
@@ -185,7 +185,7 @@ def Eval_calc(SS, tau, fd, eta, edges):
     ##Find first eigenvector and value
     v0=thth_red[thth_red.shape[0]//2,:]
     v0/=np.sqrt((np.abs(v0)**2).sum())
-    w,V=eigsh(thth_red,1,v0=v0)
+    w,V=eigsh(thth_red,1,v0=v0,which='LA')
     return(np.abs(w[0]))
 
 def G_revmap(w,V,eta,edges,tau,fd):
@@ -478,7 +478,7 @@ def VLBI_chunk_retrieval(params):
             idx=int(((n_dish*(n_dish+1))//2)-(((n_dish-d1)*(n_dish-d1+1))//2)+d2)
             thth_comp[d1*thth_size:(d1+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=thth_red[idx]
             thth_comp[(d1+d2)*thth_size:(d1+d2+1)*thth_size,d1*thth_size:(d1+1)*thth_size]=np.conjugate(thth_red[idx].T)
-    w,V=eigsh(thth_comp,1)
+    w,V=eigsh(thth_comp,1,which='LA')
     w=w[0]
     V=V[:,0]
     thth_temp=np.zeros((thth_size,thth_size),dtype=complex)
