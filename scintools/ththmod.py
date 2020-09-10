@@ -252,6 +252,7 @@ def single_search(params):
 
     etas = np.linspace(eta_low, eta_high, 100) * u.us / u.mHz**2
 
+
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
 
@@ -271,8 +272,10 @@ def single_search(params):
     try:
         etas=etas[np.isfinite(eigs)]
         eigs=eigs[np.isfinite(eigs)]
+
         etas_fit = etas[np.abs(etas - etas[eigs == eigs.max()]) < fw * etas[eigs == eigs.max()]]
         eigs_fit = eigs[np.abs(etas - etas[eigs == eigs.max()]) < fw * etas[eigs == eigs.max()]]
+
         C = eigs_fit.max()
         x0 = etas_fit[eigs_fit == C][0].value
         if x0 == etas_fit[0].value:
