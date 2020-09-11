@@ -215,14 +215,30 @@ def float_array_from_dict(dictionary, key):
     return np.array(list(map(float, dictionary[key]))).squeeze()
 
 
-def save_fits(dyn):
+def save_fits(filename, dyn):
 
     from astropy.io import fits
 
     hdu = fits.PrimaryHDU(np.flip(np.transpose(np.flip(dyn.dyn, axis=1)),
                                   axis=0))
     hdul = fits.HDUList([hdu])
-    hdul.writeto(dyn.name + '.fits')
+    hdul.writeto(filename)
+
+
+def difference(x):
+    """
+    unlike np.diff, computes differences between centres of elements in x,
+        returns numpy array same size as x
+    """
+    dx = []
+    for i in range(0, len(x)):
+        if i == 0:
+            dx.append((x[i+1] - x[i])/2)
+        elif i == len(x)-1:
+            dx.append((x[i] - x[i-1])/2)
+        else:
+            dx.append((x[i+1] - x[i-1])/2)
+    return np.array(dx).squeeze()
 
 
 def get_ssb_delay(mjds, raj, decj):
