@@ -448,10 +448,6 @@ class ACF():
         self.use_t = use_t
         # self.psi = psi
         self.amp = amp
-        self.calc_acf()
-        self.calc_sspec()
-        if plot:
-            self.plot_acf(display=display)
 
         return
 
@@ -508,13 +504,10 @@ class ACF():
 
         alph2 = self.alpha/2
 
-        cf = 3
-        ct = 3
-
-        nf = self.nf + cf  # make odd, compute oversized frame
-        ns = self.ns + ct
-        spmax = self.s_max * (ns / self.ns)
-        dnumax = self.dnu_max * (nf / self.nf)
+        nf = self.nf
+        ns = self.ns
+        spmax = self.s_max
+        dnumax = self.dnu_max
         sigxn = self.phasegrad_x
         sigyn = self.phasegrad_y
         V_x = self.V_x
@@ -523,11 +516,12 @@ class ACF():
 
         Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
 
-        dsp = spmax / ns
+        dsp = 2 * spmax / (ns)
+        ddnun = 2 * dnumax / nf
 
         sqrtar = np.sqrt(self.ar)
         # equally spaced dnu array dnu = dnun * nuhalf
-        dnun = np.linspace(0, dnumax, int((nf + 1) / 2))
+        dnun = np.linspace(0, dnumax, int(np.ceil(nf/2)))
         ndnun = len(dnun)
 
         if sigxn == 0 and sigyn == 0:
@@ -597,13 +591,13 @@ class ACF():
             gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 +
                             (SNPY * sqrtar)**2)**alph2)  # ACF of E-field
             # compute dnun = 0 first
-            gammitv = np.zeros((int(ns), int((nf + 1) / 2)))
+            gammitv = np.zeros((int(ns), int(np.ceil(nf / 2))))
             gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 +
                                    (sny * sqrtar)**2)**alph2)
-            for idn in range(1, ndnun):
+            for idn in range(1, int(np.ceil(nf/2))):
                 snxt = snx - 2 * sigxn * dnun[idn]
                 snyt = sny - 2 * sigyn * dnun[idn]
-                for isn in range(len(snx)):
+                for isn in range(ns):
                     temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 +
                                                  (SNPY - snyt[isn])**2) /
                                            (2 * dnun[idn]))
@@ -612,16 +606,12 @@ class ACF():
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
-            gam3 = np.flipud(np.transpose(
-                                np.conj(np.block([np.fliplr(np.flipud(
-                                              gammitv[:, 1:])), gammitv]))))
+            gam3 = amp * np.transpose(np.conj(np.hstack((np.fliplr(np.flipud(gammitv[:, 1:])), 
+                                                         gammitv))))
 
             # scale by amplitude and crop to match data
-            gam3 = amp * gam3[1:nf-cf+1, 1:ns-ct+1]
-            f2 = np.transpose(np.block([[np.flip(-dnun[:],
-                                                 axis=0), dnun]])).flatten()
-            f2 = f2[1:nf-cf+1]
-            t2 = tn[1:ns-ct+1]
+            f2 = np.hstack((np.flip(-dnun[1:]), dnun))
+            t2 = tn
             s2 = t2 * Vmag
 
         self.fn = f2

@@ -1275,131 +1275,99 @@ class Dynspec:
 
         if method == 'acf2d_approx' or method == 'acf2d':
 
-            dnu = params['dnu']
-            tau = params['tau']
+            dnu = params['dnu'].value
+            tau = params['tau'].value
             if verbose:
-                print('Initial tau estimate:', tau,
-                      '\nInitial dnu estimate:', dnu)
+                print('1D tau estimate:', tau,
+                      '\n1D dnu estimate:', dnu)
 
             ydata = np.copy(self.acf)
-#            tticks = np.linspace(-self.tobs + self.dt/2,
-#                                 self.tobs, len(ydata[0, :] + 1))
-#            fticks = np.linspace(-self.bw + self.df/2,
-#                                 self.bw, len(ydata[:, 0] + 1))
             tticks = np.linspace(-self.tobs, self.tobs,
                                  len(ydata[0, :]) + 1)[:-1]
             fticks = np.linspace(-self.bw, self.bw,
                                  len(ydata[:, 0]) + 1)[:-1]
 
+            wn_loc = np.unravel_index(np.argmax(ydata, axis=None),
+                                      ydata.shape)
+
+            fleft = wn_loc[0]
+            fright = np.shape(ydata)[0] - wn_loc[0] - 1
+            fmin = wn_loc[0] - min(fleft, fright)
+            fmax = wn_loc[0] + min(fleft, fright) + 1
+
+            tleft = wn_loc[1]
+            tright = np.shape(ydata)[1] - wn_loc[1] - 1
+            tmin = wn_loc[1] - min(tleft, tright)
+            tmax = wn_loc[1] + min(tleft, tright) + 1
+
+            ydata_centered = ydata[fmin:fmax, tmin:tmax]
+            tdata_centered = tticks[tmin:tmax]
+            fdata_centered = fticks[fmin:fmax]
+
             if nscale is not None and not full_frame:
                 ntau = nscale
                 ndnu = nscale
-#                while ntau > (self.tobs / tau):
-#                    if verbose:
-#                        if ntau == 1:
-#                            print('tau larger than half of frame,',
-#                                  'switching to full frame')
-#                        else:
-#                            print('nscale too large for time axis, ' +
-#                                  'decreasing to', ntau - 1)
-#                    ntau = ntau - 1
-#                while ndnu > (self.bw / dnu):
-#                    if verbose:
-#                        if ntau == 1:
-#                            print('dnu larger than half of frame,',
-#                                  'switching to full frame')
-#                        else:
-#                            print('nscale too large for frequency axis, ' +
-#                                  'decreasing to', ndnu - 1)
-#                        ndnu = ndnu - 1
-#
-#                if ntau == 1 and ndnu == 1:
-#                    ydata_2d = ydata
-#                    tdata = tticks
-#                    fdata = fticks
+
                 if (self.tobs / tau) > 2:
                     while ntau > (self.tobs / tau):
                         ntau = ntau - 1
                         if verbose:
                             print('nscale too large for time axis, ' +
                                   'decreasing to', ntau)
-#                elif ntau == 1:
-#                    fmin = int(np.ceil(self.nchan - ndnu * (dnu / self.df)))
-#                    fmax = int(np.floor(self.nchan + ndnu * (dnu / self.df)))
-                    tmin = int(round(self.nsub - ntau * (tau / self.dt)))
-                    tmax = int(round(self.nsub + ntau * (tau / self.dt)))
-#                    if (fmax - fmin) % 2 == 0:
-#                        fmax -= 1
+
+                    tframe = int(round(ntau * (tau / self.dt)))
+                    tmin = int(np.floor(np.shape(ydata_centered)[1] / 2)) - \
+                                                    tframe
+                    tmax = int(np.floor(np.shape(ydata_centered)[1] / 2)) + \
+                                                    tframe + 1
+
                 else:
                     tmin = 0
                     tmax = len(tticks)
-#                    fdata = fticks[fmin+1:fmax]
-#                    if len(tticks) % 2 == 0:
-#                        ydata_2d = ydata[fmin+1:fmax, :-1]
-#                        tdata = tticks[:-1]
-#                    else:
-#                        ydata_2d = ydata[fmin+1:fmax, :]
-#                        tdata = tticks
+
                 if (self.bw / dnu) > 2:
                     while ndnu > (self.bw / dnu):
                         ndnu = ndnu - 1
                         if verbose:
                             print('nscale too large for frequency axis, ' +
                                   'decreasing to', ndnu)
-#                elif ndnu == 1:
-#                    tmin = int(np.ceil(self.nsub - ntau * (tau / self.dt)))
-#                    tmax = int(np.floor(self.nsub + ntau * (tau / self.dt)))
-                    fmin = int(round(self.nchan - ndnu * (dnu / self.df)))
-                    fmax = int(round(self.nchan + ndnu * (dnu / self.df)))
-#                    if (tmax - tmin) % 2 == 0:
-#                        tmax -= 1
+
+                    fframe = int(round(ndnu * (dnu / self.df)))
+                    fmin = int(np.floor(np.shape(ydata_centered)[0] / 2)) - \
+                                                    fframe
+                    fmax = int(np.floor(np.shape(ydata_centered)[0] / 2)) + \
+                                                fframe + 1
+
                 else:
                     fmin = 0
                     fmax = len(fticks)
-#                    tdata = tticks[tmin+1:tmax]
-#                    if len(fticks) % 2 == 0:
-#                        ydata_2d = ydata[:-1, tmin+1:tmax]
-#                        fdata = fticks[:-1]
-#                    else:
-#                        ydata_2d = ydata[:, tmin+1:tmax]
-#                        fdata = fticks
-                ydata_2d = ydata[fmin:fmax, tmin:tmax]
-                tdata = tticks[tmin:tmax]
-                fdata = fticks[fmin:fmax]
-#                else:
-#                    fmin = int(np.ceil(self.nchan - ndnu * (dnu / self.df)))
-#                    fmax = int(np.floor(self.nchan + ndnu * (dnu / self.df)))
-#                    tmin = int(np.ceil(self.nsub - ntau * (tau / self.dt)))
-#                    tmax = int(np.floor(self.nsub + ntau * (tau / self.dt)))
-#
-#                    if (fmax - fmin) % 2 == 0:
-#                        fmax -= 1
-#                    if (tmax - tmin) % 2 == 0:
-#                        tmax -= 1
-#
-#                    ydata_2d = ydata[fmin+1:fmax, tmin+1:tmax]
-#                    tdata = tticks[tmin:tmax-1]
-#                    fdata = fticks[fmin:fmax-1]
-            else:
-                ydata_2d = ydata
-                tdata = tticks
-                fdata = fticks
 
-            if method == 'acf2d':
-                if verbose:
-                    print("\nDoing 2D fit to initialize fit values")
+                ydata_2d = ydata_centered[fmin:fmax, tmin:tmax]
+                tdata = tdata_centered[tmin:tmax]
+                fdata = fdata_centered[fmin:fmax]
+            else:
+                ydata_2d = ydata_centered
+                tdata = tdata_centered
+                fdata = fdata_centered
+
+            plt.pcolormesh(ydata_2d)
+            plt.show()
 
             params.add('tobs', value=self.tobs, vary=False)
             params.add('bw', value=self.bw, vary=False)
             params.add('freq', value=self.freq, vary=False)
-            params.add('phasegrad', value=1e-10, vary=True,
+            params.add('phasegrad', value=0.1, vary=True,
                        min=-np.Inf, max=np.Inf)
             if hasattr(self, 'acf_tilt'):  # if have a confident measurement
                 if self.acf_tilt_err is not None:
                     params['phasegrad'].value = \
                         self.acf_tilt / (self.tau/60) * self.dnu / 2 / \
                         (self.dnu/self.freq)**(1/6)
-            if verbose:
+            if method == 'acf2d':
+                if verbose:
+                    print("\nDoing approximate 2D fit to initialize fit",
+                          "values")
+            elif verbose:
                 print("\nPerforming least-squares fit to approximate 2D " +
                       "ACF model")
             chisqr = np.inf
@@ -1418,58 +1386,75 @@ class Dynspec:
 
             if method == 'acf2d':
 
-                params.add('ar', value=1,
-                           vary=True, min=-np.inf, max=np.inf)
-                params.add('phasegrad_x', value=params['phasegrad'].value,
-                           vary=True, min=-np.inf, max=np.inf)
-                params.add('phasegrad_y', value=1e-10, vary=True,
-                           min=-np.inf, max=np.inf)
-                params.add('v_x', value=0.1,
-                           vary=True, min=-np.inf, max=np.inf)
-                params.add('v_y', value=0.1,
-                           vary=True, min=-np.inf, max=np.inf)
-
-                if mcmc:
-                    pos_array = []
-                    for i in range(nwalkers):
-                        pos_i = []
-                        pos_i.append(np.random.normal(loc=params['tau'].value,
-                                     scale=params['tau'].value))  # tau
-                        pos_i.append(np.random.normal(loc=params['dnu'].value,
-                                     scale=params['dnu'].value))  # dnu
-                        pos_i.append(np.random.normal(loc=params['amp'].value,
-                                     scale=params['amp'].value))  # amp
-                        pos_i.append(np.random.normal(loc=params['wn'].value,
-                                     scale=params['wn'].value))  # wn
-                        if alpha is None:
-                            pos_i.append(np.random.normal(loc=params['alpha'].
-                                                          value,
-                                         scale=params['alpha'].value))
-                        # ar
-                        pos_i.append(1 + np.abs(np.random.normal(loc=0,
-                                                                 scale=2)))
-                        pos_i.append(np.random.normal(loc=0, scale=1))  # phs_x
-                        pos_i.append(np.random.normal(loc=0, scale=1))  # phs_y
-                        pos_i.append(np.random.normal(loc=0, scale=1))  # v_x
-                        pos_i.append(np.random.normal(loc=0, scale=1))  # v_y
-                        if lnsigma:
-                            pos_i.append(np.random.uniform(low=0, high=10))
-
-                        pos_array.append(pos_i)
-
-                    pos = np.array(pos_array)
-                else:
-                    pos = None
-
+                dnu = params['dnu'].value
+                tau = params['tau'].value
                 if verbose:
-                    if mcmc:
-                        print("\nPerforming mcmc posterior sample for " +
-                              "analytical", "2D ACF model")
-                    else:
-                        print("\nPerforming least-squares fit to analytical",
-                              "2D ACF model")
+                    print('2D tau estimate:', tau,
+                          '\n2D dnu estimate:', dnu)
+
                 chisqr = np.inf
                 for itr in range(nitr):
+                    params.add('ar', value=1,
+                                vary=True, min=-np.inf, max=np.inf)
+                    params.add('phasegrad_x', value=params['phasegrad'].value,
+                                vary=True, min=-np.inf, max=np.inf)
+                    params.add('phasegrad_y', value=0.1, vary=True,
+                                min=-np.inf, max=np.inf)
+                    params.add('v_x', value=0.1,
+                                vary=True, min=-np.inf, max=np.inf)
+                    params.add('v_y', value=0.1,
+                                vary=True, min=-np.inf, max=np.inf)
+
+                    from lmfit import Parameter
+
+                    params['nf'] = Parameter(name='nf',
+                                             value=np.shape(ydata_centered)[0],
+                                             vary=False)
+                    params['nt'] = Parameter(name='nt',
+                                             value=np.shape(ydata_centered)[1],
+                                             vary=False)
+
+                    if mcmc:
+                        pos_array = []
+                        for i in range(nwalkers):
+                            pos_i = []
+                            pos_i.append(np.random.normal(loc=params['tau'].value,
+                                         scale=params['tau'].value))  # tau
+                            pos_i.append(np.random.normal(loc=params['dnu'].value,
+                                         scale=params['dnu'].value))  # dnu
+                            pos_i.append(np.random.normal(loc=params['amp'].value,
+                                          scale=params['amp'].value))  # amp
+                            pos_i.append(np.random.normal(loc=params['wn'].value,
+                                          scale=params['wn'].value))  # wn
+                            if alpha is None:
+                                pos_i.append(np.random.normal(loc=params['alpha'].
+                                                              value,
+                                              scale=params['alpha'].value))
+                            pos_i.append(np.random.normal(loc=0, scale=1))  # phs
+                            # ar
+                            pos_i.append(1 + np.abs(np.random.normal(loc=0,
+                                                                      scale=2)))
+                            pos_i.append(np.random.normal(loc=0, scale=1))  # phs_x
+                            pos_i.append(np.random.normal(loc=0, scale=1))  # phs_y
+                            pos_i.append(np.random.normal(loc=0, scale=1))  # v_x
+                            pos_i.append(np.random.normal(loc=0, scale=1))  # v_y
+                            if lnsigma:
+                                pos_i.append(np.random.uniform(low=0, high=10))
+
+                            pos_array.append(pos_i)
+
+                        pos = np.array(pos_array)
+                        print(np.shape(pos))
+                    else:
+                        pos = None
+
+                    if verbose:
+                        if mcmc:
+                            print("\nPerforming mcmc posterior sample for " +
+                                  "analytical", "2D ACF model")
+                        else:
+                            print("\nPerforming least-squares fit to analytical",
+                                  "2D ACF model")
                     nfit = 9
                     # max_nfev = 2000 * (nfit + 1)  # lmfit default
                     max_nfev = 10000 * (nfit + 1)
@@ -1478,7 +1463,8 @@ class Dynspec:
                                      pos=pos, nwalkers=nwalkers,
                                      steps=steps, burn=burn,
                                      progress=progress,
-                                     max_nfev=max_nfev, nan_policy='propagate')
+                                     max_nfev=max_nfev, nan_policy='propagate',
+                                     is_weighted=(not lnsigma))
                     if results.chisqr < chisqr:
                         chisqr = results.chisqr
                         params = results.params
@@ -1620,37 +1606,26 @@ class Dynspec:
                     plt.show()
 
             elif method == 'acf2d_approx' or method == 'acf2d':
-                # Get tau model
-                if full_frame:
-                    ydata = np.copy(self.acf)
-                    tdata = tticks
-                    fdata = fticks
-                    weights = np.ones(np.shape(ydata))
-                    if method == 'acf2d_approx':
-                        residuals = scint_acf_model_2d_approx(results.params,
-                                                              tdata, fdata,
-                                                              ydata, weights)
-                    else:
-                        residuals = scint_acf_model_2d(results.params, ydata,
-                                                       weights)
 
-                    model = (ydata - residuals) / weights
-
+                weights = np.ones(np.shape(ydata_centered))
+                if method == 'acf2d_approx':
+                    model = -scint_acf_model_2d_approx(results.params,
+                                                       tdata_centered,
+                                                       fdata_centered,
+                                                       np.zeros(np.shape(
+                                                           ydata_centered)),
+                                                       np.ones(np.shape(
+                                                           weights)))
                 else:
-                    ydata = ydata_2d
-                    weights_2d = np.ones(np.shape(ydata))
-                    if method == 'acf2d_approx':
-                        residuals = scint_acf_model_2d_approx(results.params,
-                                                              tdata, fdata,
-                                                              ydata,
-                                                              weights_2d)
-                    else:
-                        residuals = scint_acf_model_2d(results.params, ydata,
-                                                       weights_2d)
+                    model = -scint_acf_model_2d(results.params, np.zeros(
+                                                    np.shape(ydata_centered)),
+                                                    np.ones(np.shape(weights)))
+                residuals = (ydata_centered - model) * weights
+                if nscale is not None and not full_frame:
+                    model = model[fmin:fmax, tmin:tmax]
+                    residuals = residuals[fmin:fmax, tmin:tmax]
 
-                    model = (ydata - residuals) / weights_2d
-
-                data = [(ydata, 'data'), (model, 'model'),
+                data = [(ydata_2d, 'data'), (model, 'model'),
                         (residuals, 'residuals')]
                 for d in data:
 

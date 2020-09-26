@@ -28,7 +28,7 @@ from lmfit import Minimizer, conf_interval
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
            steps=1000, burn=0.2, progress=True, get_ci=False,
-           nan_policy='raise', max_nfev=None, thin=10):
+           nan_policy='raise', max_nfev=None, thin=10, is_weighted=True):
 
     # Do fit
     maxfev = [0 if max_nfev is None else max_nfev]
@@ -40,7 +40,7 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
         func = Minimizer(model, results.params, fcn_args=args)
         mcmc_results = func.emcee(nwalkers=nwalkers, steps=steps,
                                   burn=int(burn * steps), pos=pos,
-                                  is_weighted=True, progress=progress,
+                                  is_weighted=is_weighted, progress=progress,
                                   thin=thin)
         results = mcmc_results
 
@@ -179,8 +179,8 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
     model = np.multiply(model, 1-np.divide(abs(fdata), bw))
     model = np.fft.fftshift(model)
-    model[0, 0] = model[0, 0] + wn  # add white noise spike
-    model = np.fft.fftshift(model)
+    model[-1, -1] += wn  # add white noise spike
+    model = np.fft.ifftshift(model)
     model = np.transpose(model)
 
     if weights is None:
@@ -196,10 +196,10 @@ def scint_acf_model_2d(params, ydata, weights):
 
     parvals = params.valuesdict()
 
-    tau = parvals['tau']
-    dnu = parvals['dnu']
+    tau = np.abs(parvals['tau'])
+    dnu = np.abs(parvals['dnu'])
     alpha = parvals['alpha']
-    ar = parvals['ar']
+    ar = np.abs(parvals['ar'])
     phasegrad_x = parvals['phasegrad_x']
     phasegrad_y = parvals['phasegrad_y']
     wn = parvals['wn']
@@ -211,10 +211,8 @@ def scint_acf_model_2d(params, ydata, weights):
 
     tobs = parvals['tobs']
     bw = parvals['bw']
-    nt = 2 * parvals['nt']
-    nf = 2 * parvals['nf']
-    dt = 2 * tobs / nt
-    df = 2 * bw / nf
+    nt = parvals['nt']
+    nf = parvals['nf']
 
     nt_crop = len(ydata[0])
     nf_crop = len(ydata)
@@ -228,13 +226,13 @@ def scint_acf_model_2d(params, ydata, weights):
     acf.calc_acf()
     model = acf.acf
 
-    triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-nt_crop*dt/2,
-                                                          nt_crop*dt/2,
+    triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-taumax*tau,
+                                                          taumax*tau,
                                                           nt_crop)),
                                        (nf_crop, 1)), tobs)
     triangle_f = \
-        np.transpose(1 - np.divide(np.tile(np.abs(np.linspace(-nf_crop*df/2,
-                                                              nf_crop*df/2,
+        np.transpose(1 - np.divide(np.tile(np.abs(np.linspace(-dnumax*dnu,
+                                                              dnumax*dnu,
                                                               nf_crop)),
                                            (nt_crop, 1)), bw))
     triangle = np.multiply(triangle_t, triangle_f)
@@ -246,9 +244,9 @@ def scint_acf_model_2d(params, ydata, weights):
 
     # add white noise spike
     model = np.fft.fftshift(model)
-    model[0, 0] = model[0, 0] + wn
-    model = np.fft.fftshift(model)
-
+    model[-1, -1] += wn
+    model = np.fft.ifftshift(model)
+    
     return (ydata - model) * weights
 
 
@@ -270,14 +268,14 @@ def tau_sspec_model(params, xdata, ydata, weights):
     alpha = params['alpha']
     wn = params['wn']
 
-    model = amp*np.exp(-np.divide(xdata, tau)**(alpha))
-    model[0] = model[0] + wn  # add white noise spike
+    model = amp * np.exp(-np.divide(xdata, tau)**alpha)
+    model[0] += wn  # add white noise spike
     # Multiply by triangle function
-    model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
+    model = np.multiply(model, 1 - np.divide(xdata, max(xdata)))
 
     model_flipped = model[::-1]
     model = np.concatenate((model, model_flipped))
-    model = model[0:2*len(xdata)-1]
+    model = model[0:2 * len(xdata) - 1]
     # Get Fourier model
     model = np.fft.fft(model)
     model = np.real(model)
@@ -301,14 +299,14 @@ def dnu_sspec_model(params, xdata, ydata, weights):
     dnu = params['dnu']
     wn = params['wn']
 
-    model = amp*np.exp(-np.divide(xdata, dnu/np.log(2)))
-    model[0] = model[0] + wn  # add white noise spike
+    model = amp * np.exp(-np.divide(xdata, dnu / np.log(2)))
+    model[0] += wn  # add white noise spike
     # Multiply by triangle function
-    model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
+    model = np.multiply(model, 1 - np.divide(xdata, max(xdata)))
 
     model_flipped = model[::-1]
     model = np.concatenate((model, model_flipped))
-    model = model[0:2*len(xdata)-1]
+    model = model[0:2 * len(xdata) - 1]
     # Get Fourier model
     model = np.fft.fft(model)
     model = np.real(model)
