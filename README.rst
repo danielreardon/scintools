@@ -1,5 +1,5 @@
 ===============================
-scintools
+Scintools
 ===============================
 
 SCINTOOLS (SCINtillation TOOLS)
