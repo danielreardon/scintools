@@ -7,7 +7,16 @@ is a package for the analysis and simulation of pulsar scintillation data. This 
 
 * This is currently considered a pre-release only
 * Comes with absolutely no warranty
-* Free software: MIT license
-* Limited documentation: https://scintools.readthedocs.io/en/latest/index.html
-* Usage examples located in ./scintools/examples
+* Free software under MIT license
+* `Limited documentation available here <https://scintools.readthedocs.io/en/latest/index.html>`_
+* Usage examples located in scintools/examples
 
+===============================
+Referencing
+===============================
+
+If your work makes use of Scintools, please cite `Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_ and provide a url link to this github page.
+
+Below is a list of papers that use Scintools\:
+
+* `"Precision orbital dynamics from interstellar scintillation arcs for PSR J0437-4715", Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_
