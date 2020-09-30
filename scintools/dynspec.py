@@ -1316,10 +1316,10 @@ class Dynspec:
                                   'decreasing to', ntau)
 
                     tframe = int(round(ntau * (tau / self.dt)))
-                    tmin = int(np.floor(np.shape(ydata_centered)[1] / 2)) - \
-                                                    tframe
-                    tmax = int(np.floor(np.shape(ydata_centered)[1] / 2)) + \
-                                                    tframe + 1
+                    tmin = int(np.floor(
+                        np.shape(ydata_centered)[1] / 2)) - tframe
+                    tmax = int(np.floor(
+                        np.shape(ydata_centered)[1] / 2)) + tframe + 1
 
                 else:
                     tmin = 0
@@ -1333,10 +1333,10 @@ class Dynspec:
                                   'decreasing to', ndnu)
 
                     fframe = int(round(ndnu * (dnu / self.df)))
-                    fmin = int(np.floor(np.shape(ydata_centered)[0] / 2)) - \
-                                                    fframe
-                    fmax = int(np.floor(np.shape(ydata_centered)[0] / 2)) + \
-                                                fframe + 1
+                    fmin = int(np.floor(
+                        np.shape(ydata_centered)[0] / 2)) - fframe
+                    fmax = int(np.floor(
+                        np.shape(ydata_centered)[0] / 2)) + fframe + 1
 
                 else:
                     fmin = 0
@@ -1395,15 +1395,15 @@ class Dynspec:
                 chisqr = np.inf
                 for itr in range(nitr):
                     params.add('ar', value=1,
-                                vary=True, min=-np.inf, max=np.inf)
+                               vary=True, min=-np.inf, max=np.inf)
                     params.add('phasegrad_x', value=params['phasegrad'].value,
-                                vary=True, min=-np.inf, max=np.inf)
-                    params.add('phasegrad_y', value=0.1, vary=True,
-                                min=-np.inf, max=np.inf)
+                               vary=True, min=-np.inf, max=np.inf)
+                    params.add('phasegrad_y', value=0.1,
+                               vary=True, min=-np.inf, max=np.inf)
                     params.add('v_x', value=0.1,
-                                vary=True, min=-np.inf, max=np.inf)
+                               vary=True, min=-np.inf, max=np.inf)
                     params.add('v_y', value=0.1,
-                                vary=True, min=-np.inf, max=np.inf)
+                               vary=True, min=-np.inf, max=np.inf)
 
                     from lmfit import Parameter
 
@@ -1418,28 +1418,38 @@ class Dynspec:
                         pos_array = []
                         for i in range(nwalkers):
                             pos_i = []
-                            pos_i.append(np.random.normal(loc=params['tau'].value,
-                                         scale=params['tau'].value))  # tau
-                            pos_i.append(np.random.normal(loc=params['dnu'].value,
-                                         scale=params['dnu'].value))  # dnu
-                            pos_i.append(np.random.normal(loc=params['amp'].value,
-                                          scale=params['amp'].value))  # amp
-                            pos_i.append(np.random.normal(loc=params['wn'].value,
-                                          scale=params['wn'].value))  # wn
+                            pos_i.append(np.random.normal(
+                                            loc=params['tau'].value,
+                                            scale=params['tau'].value))  # tau
+                            pos_i.append(np.random.normal(
+                                            loc=params['dnu'].value,
+                                            scale=params['dnu'].value))  # dnu
+                            pos_i.append(np.random.normal(
+                                            loc=params['amp'].value,
+                                            scale=params['amp'].value))  # amp
+                            pos_i.append(np.random.normal(
+                                            loc=params['wn'].value,
+                                            scale=params['wn'].value))  # wn
                             if alpha is None:
-                                pos_i.append(np.random.normal(loc=params['alpha'].
-                                                              value,
-                                              scale=params['alpha'].value))
-                            pos_i.append(np.random.normal(loc=0, scale=1))  # phs
-                            # ar
-                            pos_i.append(1 + np.abs(np.random.normal(loc=0,
-                                                                      scale=2)))
-                            pos_i.append(np.random.normal(loc=0, scale=1))  # phs_x
-                            pos_i.append(np.random.normal(loc=0, scale=1))  # phs_y
-                            pos_i.append(np.random.normal(loc=0, scale=1))  # v_x
-                            pos_i.append(np.random.normal(loc=0, scale=1))  # v_y
+                                pos_i.append(np.random.normal(
+                                             loc=params['alpha'].value,
+                                             scale=params['alpha'].value))
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # phs
+                            pos_i.append(
+                                1 + np.abs(np.random.normal(loc=0,
+                                                            scale=2)))  # ar
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # phs_x
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # phs_y
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # v_x
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # v_y
                             if lnsigma:
-                                pos_i.append(np.random.uniform(low=0, high=10))
+                                pos_i.append(np.random.uniform(low=0,
+                                                               high=10))
 
                             pos_array.append(pos_i)
 
@@ -1450,11 +1460,11 @@ class Dynspec:
 
                     if verbose:
                         if mcmc:
-                            print("\nPerforming mcmc posterior sample for " +
+                            print("\nPerforming mcmc posterior sample for",
                                   "analytical", "2D ACF model")
                         else:
-                            print("\nPerforming least-squares fit to analytical",
-                                  "2D ACF model")
+                            print("\nPerforming least-squares fit to",
+                                  "analytical 2D ACF model")
                     nfit = 9
                     # max_nfev = 2000 * (nfit + 1)  # lmfit default
                     max_nfev = 10000 * (nfit + 1)
@@ -1618,8 +1628,8 @@ class Dynspec:
                                                            weights)))
                 else:
                     model = -scint_acf_model_2d(results.params, np.zeros(
-                                                    np.shape(ydata_centered)),
-                                                    np.ones(np.shape(weights)))
+                                                np.shape(ydata_centered)),
+                                                np.ones(np.shape(weights)))
                 residuals = (ydata_centered - model) * weights
                 if nscale is not None and not full_frame:
                     model = model[fmin:fmax, tmin:tmax]

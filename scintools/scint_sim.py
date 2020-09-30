@@ -606,8 +606,8 @@ class ACF():
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
-            gam3 = amp * np.transpose(np.conj(np.hstack((np.fliplr(np.flipud(gammitv[:, 1:])), 
-                                                         gammitv))))
+            gam3 = amp * np.transpose(np.conj(np.hstack((np.fliplr(np.flipud(
+                                                gammitv[:, 1:])), gammitv))))
 
             # scale by amplitude and crop to match data
             f2 = np.hstack((np.flip(-dnun[1:]), dnun))

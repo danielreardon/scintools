@@ -246,7 +246,7 @@ def scint_acf_model_2d(params, ydata, weights):
     model = np.fft.fftshift(model)
     model[-1, -1] += wn
     model = np.fft.ifftshift(model)
-    
+
     return (ydata - model) * weights
 
 

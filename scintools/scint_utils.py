@@ -510,6 +510,35 @@ def svd_model(arr, nmodes=1):
     return arr, model
 
 
+def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
+    """
+    Calculate scintillation velocity from ACF frequency and time scales
+    """
+
+    freq = freq / 1e3   # convert to GHz
+    if params is not None:
+        d = params['d']
+        d_err = params['derr']
+        s = params['s']
+        s_err = params['serr']
+
+        coeff = a * np.sqrt(2 * d * (1 - s) / s)  # thin screen coefficient
+        coeff_err = (dnu / s) * ((1 - s) * d_err**2 / (2 * d) +
+                                 (d * s_err**2 / (2 * s**2 * (1 - s))))
+    else:
+        coeff, coeff_err = a, 0  # thin screen coefficient for fitting
+
+    viss = coeff * np.sqrt(dnu) / (freq * tau)
+
+    if (dnuerr is not None) and (tauerr is not None):
+        viss_err = (1 / (freq * tau)) * \
+            np.sqrt(coeff**2 * ((dnuerr**2 / (4 * dnu)) +
+                                (dnu * tauerr**2 / tau**2)) + coeff_err)
+        return viss, viss_err
+    else:
+        return viss
+
+
 def interp_nan_2d(array):
     """
     Fill in NaN values of a 2D array using linear interpolation
