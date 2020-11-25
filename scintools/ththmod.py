@@ -208,6 +208,9 @@ def len_arc(x,eta):
     return((a*x*np.sqrt((a*x)**2 + 1) +np.arcsinh(a*x))/(2.*a))
 
 def arc_edges(eta,dfd,dtau,fd_max,n):
+    '''
+    
+    '''
     x_max=fd_max/dfd
     eta_ul=dfd**2*eta/dtau
     l_max=len_arc(x_max.value,eta_ul.value)
@@ -220,6 +223,13 @@ def arc_edges(eta,dfd,dtau,fd_max,n):
     return(edges) 
 
 def ext_find(x, y):
+    '''
+    Determine extent for imshow to center bins at given coordinates
+
+    x -- x coordinates of data
+    y -- y coordiantes of data
+
+    '''
     dx = np.diff(x).mean()
     dy = np.diff(y).mean()
     ext = [(x[0] - dx / 2).value, (x[-1] + dx / 2).value,
@@ -227,6 +237,14 @@ def ext_find(x, y):
     return (ext)
 
 def fft_axis(x, unit, pad=0):
+    '''
+    Calculates fourier space coordinates from data space coordinates.
+
+    Arguments
+    x -- Astropy 
+    unit -- desired unit for fourier coordinates
+    pad -- integer giving how many additional copies of the data are padded in this direction
+    '''
     fx = np.fft.fftshift(
         np.fft.fftfreq((pad+1) * x.shape[0], x[1] - x[0]).to_value(unit)) * unit
     return (fx)
@@ -459,6 +477,13 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.tight_layout()
 
 def VLBI_chunk_retrieval(params):
+        '''
+    Performs phase retrieval on a single time/frequency chunk using multiple dynamic spectra and visibilities.
+    Designed for use in parallel phase retreival code
+
+    Arguments
+    params -- tuple of relevant parameters
+    '''
     dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,npad,n_dish = params
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
     fd = fft_axis(time2, u.mHz, npad)
@@ -497,6 +522,13 @@ def VLBI_chunk_retrieval(params):
     return(model_E,idx_f,idx_t)
 
 def single_chunk_retrieval(params):
+    '''
+    Performs phase retrieval on a single time/frequency chunk.
+    Designed for use in parallel phase retreival code
+
+    Arguments
+    params -- tuple of relevant parameters
+    '''
     dspec2,edges,time2,freq2,eta,idx_t,idx_f,npad = params
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
     fd = fft_axis(time2, u.mHz, npad)
