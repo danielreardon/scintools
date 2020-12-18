@@ -557,3 +557,31 @@ def single_chunk_retrieval(params):
         model_E=np.zeros(dspec2.shape,dtype=complex)
     return(model_E,idx_f,idx_t)
 
+def mask_func(w):
+    x=np.linspace(0,w-1,w)
+    return(np.sin((np.pi/2)*x/w)**2)
+
+def mosaic(chunks):
+    nct=chunks.shape[1]
+    ncf=chunks.shape[0]
+    cwf=chunks.shape[2]
+    cwt=chunks.shape[3]
+    E_recov=np.zeros(((ncf-1)*(cwf//2)+cwf,(nct-1)*(cwt//2)+cwt),dtype=complex)
+
+    for cf in range(ncf):
+        for ct in range(nct):
+            chunk_new=chunks[cf,ct,:,:]
+            chunk_old=E_recov[cf*cwf//2:cf*cwf//2+cwf,ct*cwt//2:ct*cwt//2+cwt]
+            mask=np.ones(chunk_new.shape)
+            if cf>0:
+                mask[:cwf//2,:]*=mask_func(cwf//2)[:,np.newaxis]
+            if cf<ncf-1:
+                mask[cwf//2:,:]*=1-mask_func(cwf//2)[:,np.newaxis]
+            if ct>0:
+                mask[:,:cwt//2]*=mask_func(cwt//2)
+            if ct<nct-1:
+                mask[:,cwt//2:]*=1-mask_func(cwt//2)
+            rot=np.angle((chunk_old*np.conjugate(chunk_new)*mask).mean())
+            E_recov[cf*cwf//2:cf*cwf//2+cwf,ct*cwt//2:ct*cwt//2+cwt]+=chunk_new*mask*np.exp(1j*rot)
+    return(E_recov)
+
