@@ -20,3 +20,5 @@ If your work makes use of Scintools, please cite `Reardon et al. (2020) <https:/
 Below is a list of papers that use Scintools\:
 
 * `"Precision orbital dynamics from interstellar scintillation arcs for PSR J0437-4715", Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_
+* `"Interstellar Interferometry: Precise Curvature Measurement from Pulsar Secondary Spectra", Baker et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021arXiv210104646B>`_
+
