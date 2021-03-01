@@ -10,7 +10,7 @@ from setuptools import setup
 
 setup(
     name='scintools',
-    version='0.1',
+    version='0.2',
     description='Tools for analysing pulsar scintillation.',
     long_description="See: `github.com/danielreardon/scintools \
                       <https://github.com/danielreardon/scintools>`_.",
@@ -29,7 +29,7 @@ setup(
     author_email='dreardon@swin.edu.au',
     license='MIT',
     packages=['scintools'],
-    install_requires=['numpy', 'scipy', 'matplotlib', 'corner', 'lmfit', 'astropy'],
+    install_requires=['numpy', 'scipy', 'matplotlib', 'corner', 'lmfit', 'astropy', 'emcee'],
     include_package_data=True,
     zip_safe=False,
 )

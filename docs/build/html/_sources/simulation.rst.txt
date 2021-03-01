@@ -1,177 +1,22 @@
 Simulation class
 ================
 
-The scintools ``Simulation`` class, found in the ``scint_sim`` module, features tools for simulating dynamic spectra and related profiles. Based on original MATLAB code by `Coles et al. (2010) <https://iopscience.iop.org/article/10.1088/0004-637X/717/2/1206/>`_.
-
-.. raw:: html
-
-	<em class="property">class </em><code class="descclassname">scintools.</code><code class="descname">Simulation</code><span class="sig-paren">(</span><em>mb2=2, rf=1, ds=0.01, alpha=5/3, ar=1, psi=0, inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False, seed=None, nx=None, ny=None, dx=None, dy=None, plot=False, verbose=False, freq=1400, dt=30, mjd=50000, nsub=None, efield=False</em><span class="sig-paren">)</span>
-
-\
-		Simulation class.
-
-		**Parameters:** 
-				*   **mb2** (`float, optional`) - Max Born parameter for strength of scattering.
-				*   **rf** (`float, optional`) - Fresnel scale
-				*   **ds** (`float, optional`) - Spatial step sizes with respect to rf
-				*   **alpha** (`float, optional`) - structure function exponent. 5/3 is a Kolmogorov profile (default) while 2 is Gaussian.
-				*   **ar** (`float, optional`) - Axial ratio of anisotropy
-				*   **psi** (`float, optional`) - Orientation of anisotropy in degrees
-				*   **inner** (`float, optional`) - Inner scale with respect to rf. Should generally be smaller than ds.
-				*   **ns** (`int, optional`) - Number of spatial steps
-				*   **nf** (`int, optional`) - Number of frequency steps.
-				*   **dlam** (`float, optional`) - Fractional bandwidth relative to centre frequency
-				*   **lamsteps** (`bool, optional`) - option to use wavelength steps instead of default frequency steps.
-				*   **seed** (`int, optional`) - Seed number. Use "-1" to shuffle
-				*   **nx** (`int, optional`) - Number of spatial steps in the x direction.
-				*   **ny** (`int, optional`) - Number of spatial steps in the y direction.
-				*   **dx** (`float, optional`) - Spatial step sizes with respect to rf in the x direction
-				*   **dy** (`float, optional`) - Spatial step sizes with respect to rf in the y direction
-				*   **plot** (`bool, optional`) - display all plots
-				*   **freq** (`float, optional`) - Frequency
-				*   **dt** (`float, optional`) - Time step (sub-integration) sizes
-				*   **mjd** (`float, optional`) - Modified Julian Date
-				*   **nsub** (`int, optional`) - Number of sub-integrations
-				*   **efield** (`bool, optional`) - use electric field
-				*   **verbose** (`bool, optional`) - print additional information regarding the computations.
-
-
-Simulating spectra
-------------------
-
-.. raw:: html
-
-	<code class="descname">set_constants</code><span class="sig-paren">(</span><span class="sig-paren">)</span>
-
-\
-
-        	Set constants
-
-.. raw:: html
-
-	<code class="descname">get_screen</code><span class="sig-paren">(</span><span class="sig-paren">)</span>
-
-\
-
-        	Get phase screen in x and y
-
-.. raw:: html
-
-	<code class="descname">get_intensity</code><span class="sig-paren">(</span><em>verbose=True</em><span class="sig-paren">)</span>
-
-\
-
-        	Calculate the intensity profile
-
-		**Parameters:** 
-				*   **verbose** (`bool, optional`) - print progress information.
-
-.. raw:: html
-
-	<code class="descname">get_dynspec</code><span class="sig-paren">(</span><span class="sig-paren">)</span>
-
-\
-
-        	Calculate the dynamic spectrum
-
-.. raw:: html
-
-	<code class="descname">get_pulse</code><span class="sig-paren">(</span><span class="sig-paren">)</span>
-
-\
-
-        	Compute the pulse shape as a function of distance x from spe
-
-		**Note:** you usually need a spectral window because the leading edge of the
-		pulse response is very steep. it is also attractive to pad the spe file
-		with zeros before FT of course this correlates adjacent samples in the
-		pulse response.
-
-.. raw:: html
-
-	<code class="descname">swdsp</code><span class="sig-paren">(</span><em>kx=0, ky=0</em><span class="sig-paren">)</span>
-
-\
-
-        	swdsp
-
-		**Parameters:** 
-				*   **kx** (`float, optional`) - kx
-				*   **ky** (`float, optional`) - ky
-
-.. raw:: html
-
-	<code class="descname">frfilt3</code><span class="sig-paren">(</span><em>xye, scale</em><span class="sig-paren">)</span>
-
-\
-
-        	frfilt3
-
-		**Parameters:** 
-				*   **xye** (`float, optional`) - some spectrum
-				*   **scale** (`float, optional`) - idfk
-
-
-Plotting
---------
-
-.. raw:: html
-
-	<code class="descname">plot_screen</code><span class="sig-paren">(</span><em>subplot=False</em><span class="sig-paren">)</span>
-
-\
-
-        	Plot the scattering screen.
-
-.. raw:: html
-
-	<code class="descname">plot_intensity</code><span class="sig-paren">(</span><em>subplot=False</em><span class="sig-paren">)</span>
-
-\
-
-        	Plot the intensity profile.
-
-.. raw:: html
-
-	<code class="descname">plot_dynspec</code><span class="sig-paren">(</span><em>subplot=False</em><span class="sig-paren">)</span>
-
-\
-
-        	Plot the dynamic spectrum.
-
-.. raw:: html
-
-	<code class="descname">plot_efield</code><span class="sig-paren">(</span><em>subplot=False</em><span class="sig-paren">)</span>
-
-\
-
-        	Plot the electric field.
-
-.. raw:: html
-
-	<code class="descname">plot_delay</code><span class="sig-paren">(</span><em>subplot=False</em><span class="sig-paren">)</span>
-
-\
-
-        	Plot delay.
-
-.. raw:: html
-
-	<code class="descname">plot_pulse</code><span class="sig-paren">(</span><em>subplot=False</em><span class="sig-paren">)</span>
-
-\
-
-        	Plot the pulse profile.
-
-		**Parameters:** 
-				*   **subplot** (`bool, optional`) - subplot option for ``plot_all`` method.
-
-.. raw:: html
-
-	<code class="descname">plot_all</code><span class="sig-paren">(</span><em></em><span class="sig-paren">)</span>
-
-\
-
-        	Plot all the above.
-
-
+This will serve as a list of features available within the Simulation class, scint_sim.py
+
+This is based on original MATLAB code by Coles et al. (2010) "Scattering of pulsar radio emission by the interstellar plasma":
+
+Simulating a dynamic spectrum from turbulence
+---------------------------------------------
+
+Input parameters:
+
+    mb2: 
+    dlam:
+    ar:
+    psi:
+    ns:
+    nf:
+    
+    Optional parameters for physical units:
+    freq:
+    dt:

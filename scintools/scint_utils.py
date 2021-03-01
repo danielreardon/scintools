@@ -11,10 +11,13 @@ from __future__ import (absolute_import, division,
 
 import numpy as np
 import os
+import sys
 import csv
 from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
 from scipy.interpolate import griddata
+import pickle
+from astropy.time import Time
 
 
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
@@ -91,6 +94,24 @@ def write_results(filename, dyn=None):
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
 
+    if hasattr(dyn, 'ar'):  # Axial ratio
+        header += ",ar,arerr"
+        write_string += ",{0},{1}".format(dyn.ar, dyn.arerr)
+
+    if hasattr(dyn, 'sigma_x'):  # Phase gradient in x,y
+        header += ",sigma_x,sigma_xerr,sigma_y,sigma_yerr"
+        write_string += ",{0},{1},{2},{3}".format(dyn.sigma_x,
+                                                  dyn.sigma_xerr,
+                                                  dyn.sigma_y,
+                                                  dyn.sigma_yerr)
+
+    if hasattr(dyn, 'v_x'):  # Velocity in x,y
+        header += ",v_x,v_xerr,v_y,v_yerr"
+        write_string += ",{0},{1},{2},{3}".format(dyn.v_x,
+                                                  dyn.v_xerr,
+                                                  dyn.v_y,
+                                                  dyn.v_yerr)
+
     if hasattr(dyn, 'acf_tilt'):  # Tilt in the ACF (MHz/min)
         header += ",acf_tilt,acf_tilt_err"
         write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
@@ -107,10 +128,32 @@ def write_results(filename, dyn=None):
         header += ",betaeta,betaetaerr"
         write_string += ",{0},{1}".format(dyn.betaeta, dyn.betaetaerr)
 
+    if hasattr(dyn, 'eta_left'):  # Arc curvature
+        header += ",eta_left,etaerr_left"
+        write_string += ",{0},{1}".format(dyn.eta_left, dyn.etaerr_left)
+
+    if hasattr(dyn, 'betaeta_left'):  # Beta arc curvature
+        header += ",betaeta_left,betaetaerr_left"
+        write_string += ",{0},{1}".format(dyn.betaeta_left,
+                                          dyn.betaetaerr_left)
+
+    if hasattr(dyn, 'eta_right'):  # Arc curvature
+        header += ",eta_right,etaerr_right"
+        write_string += ",{0},{1}".format(dyn.eta_right, dyn.etaerr_right)
+
+    if hasattr(dyn, 'betaeta_right'):  # Beta arc curvature
+        header += ",betaeta_right,betaetaerr_right"
+        write_string += ",{0},{1}".format(dyn.betaeta_right,
+                                          dyn.betaetaerr_right)
+
+    if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
+        header += ",delmax"
+        write_string += ",{0}".format(dyn.norm_delmax)
+
     header += "\n"
     write_string += "\n"
 
-    with open(filename, "a") as outfile:
+    with open(filename, "a+") as outfile:
         if os.stat(filename).st_size == 0:  # file is empty, write header
             outfile.write(header)
         outfile.write(write_string)
@@ -133,11 +176,69 @@ def read_results(filename):
     return param_dict
 
 
+def search_and_replace(filename, search, replace):
+
+    with open(filename, 'r') as file:
+        data = file.read()
+
+    data = data.replace(search, replace)
+
+    with open(filename, 'w') as file:
+        file.write(data)
+
+    return
+
+
+def cov_to_corr(cov):
+    """
+    Calculate correlation matrix from covariance
+    """
+    std = np.sqrt(np.diag(cov))
+    outer_std = np.outer(std, std)
+    corr = cov / outer_std
+    corr[cov == 0] = 0
+    return corr
+
+
 def float_array_from_dict(dictionary, key):
     """
     Convert an array stored in dictionary to a numpy array
     """
-    return np.array(list(map(float, dictionary[key])))
+    ind = np.argwhere(np.array(dictionary[key]) == 'None').ravel()
+
+    if ind.size != 0:
+        arr = dictionary[key]
+        for i in ind:
+            arr[i] = 'nan'
+        dictionary[key] = arr
+
+    return np.array(list(map(float, dictionary[key]))).squeeze()
+
+
+def save_fits(filename, dyn):
+
+    from astropy.io import fits
+
+    hdu = fits.PrimaryHDU(np.flip(np.transpose(np.flip(dyn.dyn, axis=1)),
+                                  axis=0))
+    hdul = fits.HDUList([hdu])
+    hdul.writeto(filename)
+
+
+def difference(x):
+    """
+    unlike np.diff, computes differences between centres of elements in x,
+        returns numpy array same size as x
+    """
+    dx = []
+    for i in range(0, len(x)):
+        if i == 0:
+            dx.append((x[i+1] - x[i])/2)
+        elif i == len(x)-1:
+            dx.append((x[i] - x[i-1])/2)
+        else:
+            dx.append((x[i+1] - x[i-1])/2)
+    return np.array(dx).squeeze()
 
 
 def get_ssb_delay(mjds, raj, decj):
@@ -258,6 +359,15 @@ def read_par(parfile):
     return par
 
 
+def mjd_to_year(mjd):
+    """
+    converts mjd to year
+    """
+    t = Time(mjd, format='mjd')
+    yrs = t.byear  # observation year
+    return yrs
+
+
 def pars_to_params(pars, params=None):
     """
     Converts a dictionary of par file parameters from read_par() to an
@@ -329,9 +439,6 @@ def slow_FT(dynspec, freqs):
     t*(f / fref), account for phase scaling of f_D.
     Given a uniform t axis, this reduces to a regular FT
 
-    Uses Olaf's c-implemation if possible, otherwise reverts
-    to a slow, pure Python / numpy method
-
     Reference freq is currently hardcoded to the middle of the band
 
     Parameters
@@ -343,38 +450,11 @@ def slow_FT(dynspec, freqs):
         Frequencies of the channels in dynspec
     """
 
-    from numpy.ctypeslib import ndpointer
-    import ctypes
-
-    dir = os.path.dirname(__file__)
-    filename = os.path.join(dir, 'fit_1d-response.so')
-    lib = ctypes.CDLL(filename)
-    # lib.omp_set_num_threads (4)   # if you do not want to use all cores
-
-    lib.comp_dft_for_secspec.argtypes = [
-        ctypes.c_int,   # ntime
-        ctypes.c_int,   # nfreq
-        ctypes.c_int,   # nr    Doppler axis
-        ctypes.c_double,  # r0
-        ctypes.c_double,  # delta r
-        ndpointer(dtype=np.float64,
-                  flags='CONTIGUOUS', ndim=1),  # freqs [nfreq]
-        ndpointer(dtype=np.float64,
-                  flags='CONTIGUOUS', ndim=1),  # src [ntime]
-        ndpointer(dtype=np.float64,
-                  flags='CONTIGUOUS', ndim=2),  # input pow [ntime,nfreq]
-        ndpointer(dtype=np.complex128,
-                  flags='CONTIGUOUS', ndim=2),  # result [nr,nfreq]
-    ]
-
     # cast dynspec as float 64
     dynspec = dynspec.astype(np.float64)
 
     ntime = dynspec.shape[0]
     nfreq = dynspec.shape[1]
-    r0 = np.fft.fftfreq(ntime)
-    delta_r = r0[1] - r0[0]
-    src = np.linspace(0, 1, ntime).astype('float64')
     src = np.arange(ntime).astype('float64')
 
     # declare the empty result array:
@@ -386,25 +466,14 @@ def slow_FT(dynspec, freqs):
     fscale = freqs / fref
     fscale = fscale.astype('float64')
 
-    # call the DFT:
-    if os.path.isfile(filename):
-        print("Computing slow FT using C-implementation, fit_1d-response")
-        lib.comp_dft_for_secspec(ntime, nfreq, ntime, min(r0), delta_r, fscale,
-                                 src, dynspec, SS)
+    ft = np.fft.fftfreq(ntime, 1)
 
-        # flip along time
-        SS = SS[::-1]
-    else:
-        print("C-implentation fit_1d-response not installed, "
-              "computing slowFT with numpy")
-        ft = np.fft.fftfreq(ntime, 1)
-
-        # Scaled array of t * f/fref
-        tscale = src[:, np.newaxis]*fscale[np.newaxis, :]
-        FTphase = -2j*np.pi*tscale[:, np.newaxis, :] * \
-            ft[np.newaxis, :, np.newaxis]
-        SS = np.sum(dynspec[:, np.newaxis, :]*np.exp(FTphase), axis=0)
-        SS = np.fft.fftshift(SS, axis=0)
+    # Scaled array of t * f/fref
+    tscale = src[:, np.newaxis]*fscale[np.newaxis, :]
+    FTphase = -2j*np.pi*tscale[:, np.newaxis, :] * \
+        ft[np.newaxis, :, np.newaxis]
+    SS = np.sum(dynspec[:, np.newaxis, :]*np.exp(FTphase), axis=0)
+    SS = np.fft.fftshift(SS, axis=0)
 
     # Still need to FFT y axis, should change to pyfftw for memory and
     #   speed improvement
@@ -441,6 +510,35 @@ def svd_model(arr, nmodes=1):
     return arr, model
 
 
+def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
+    """
+    Calculate scintillation velocity from ACF frequency and time scales
+    """
+
+    freq = freq / 1e3   # convert to GHz
+    if params is not None:
+        d = params['d']
+        d_err = params['derr']
+        s = params['s']
+        s_err = params['serr']
+
+        coeff = a * np.sqrt(2 * d * (1 - s) / s)  # thin screen coefficient
+        coeff_err = (dnu / s) * ((1 - s) * d_err**2 / (2 * d) +
+                                 (d * s_err**2 / (2 * s**2 * (1 - s))))
+    else:
+        coeff, coeff_err = a, 0  # thin screen coefficient for fitting
+
+    viss = coeff * np.sqrt(dnu) / (freq * tau)
+
+    if (dnuerr is not None) and (tauerr is not None):
+        viss_err = (1 / (freq * tau)) * \
+            np.sqrt(coeff**2 * ((dnuerr**2 / (4 * dnu)) +
+                                (dnu * tauerr**2 / tau**2)) + coeff_err)
+        return viss, viss_err
+    else:
+        return viss
+
+
 def interp_nan_2d(array):
     """
     Fill in NaN values of a 2D array using linear interpolation
@@ -459,6 +557,32 @@ def interp_nan_2d(array):
     return array
 
 
+def make_pickle(obj, filepath):
+    """
+    pickle.write, which works for very large files
+    """
+    max_bytes = 2**31 - 1
+    bytes_out = pickle.dumps(obj)
+    n_bytes = sys.getsizeof(bytes_out)
+    with open(filepath, 'wb') as f_out:
+        for idx in range(0, n_bytes, max_bytes):
+            f_out.write(bytes_out[idx:idx+max_bytes])
+
+
+def load_pickle(filepath):
+    """
+    pickle.load, which works for very large files
+    """
+    max_bytes = 2**31 - 1
+    input_size = os.path.getsize(filepath)
+    bytes_in = bytearray(0)
+    with open(filepath, 'rb') as f_in:
+        for _ in range(0, input_size, max_bytes):
+            bytes_in += f_in.read(max_bytes)
+        obj = pickle.loads(bytes_in)
+    return obj
+
+
 # Potential future functions
 
 def make_dynspec(archive, template=None, phasebin=1):
@@ -474,10 +598,3 @@ def remove_duplicates(dyn_files):
     Filters out dynamic spectra from simultaneous observations
     """
     return dyn_files
-
-
-def make_pickle(dyn, process=True, sspec=True, acf=True, lamsteps=True):
-    """
-    Pickles a dynamic spectrum object
-    """
-    return
