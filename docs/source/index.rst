@@ -13,6 +13,12 @@ Welcome to scintools's documentation!
    dynspec
    
    simulation
+   
+   acf
+   
+   scint_models
+   
+   scint_utils
 
 
 

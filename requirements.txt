@@ -3,4 +3,5 @@ numpy
 scipy
 matplotlib
 lmfit
+emcee
 corner

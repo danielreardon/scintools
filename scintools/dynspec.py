@@ -16,14 +16,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
 from copy import deepcopy as cp
-from scint_models import scint_acf_model, scint_acf_model_2d_approx,\
+from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          scint_acf_model_2d, tau_acf_model, dnu_acf_model,\
-                         fit_parabola, fit_log_parabola
-from scint_utils import is_valid, svd_model, interp_nan_2d
-from scipy.interpolate import griddata, interp1d, RectBivariateSpline, interp2d
-from scipy.integrate import quad
+                         fit_parabola, fit_log_parabola, fitter, \
+                         powerspectrum_model
+from scintools.scint_utils import is_valid, svd_model, interp_nan_2d
+from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
+from lmfit import Parameters
+import corner
 
 
 class Dynspec:
@@ -173,7 +175,7 @@ class Dynspec:
         self.bw = dyn.bw  # obs bw
         self.df = dyn.df  # channel bw
         self.freq = dyn.freq
-        self.tobs = dyn.tobs  # initial estimate of tobs
+        self.tobs = dyn.tobs
         self.dt = dyn.dt
         self.mjd = dyn.mjd
         self.dyn = dyn.dyn
@@ -191,19 +193,19 @@ class Dynspec:
         """
 
         self.trim_edges()  # remove zeros on band edges
-        self.refill()  # refill with linear interpolation
-        self.correct_dyn()
+        self.refill()  # refill and zeroed regions with linear interpolation
+        # self.correct_dyn()  # correct by svd
         self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
         self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
-                 input_x=None, input_y=None, trap=False, display=True):
+                 input_x=None, input_y=None, trap=False, display=True,
+                 figsize=(9, 9), dpi=200):
         """
         Plot the dynamic spectrum
         """
-        plt.figure(1, figsize=(12, 6))
         if input_dyn is None:
             if lamsteps:
                 if not hasattr(self, 'lamdyn'):
@@ -224,40 +226,46 @@ class Dynspec:
         # standard deviation
         std = np.std(dyn[is_valid(dyn)*np.array(np.abs(
                                                 is_valid(dyn)) > 0)])
-        vmin = minval
-        vmax = medval+5*std
+        vmin = minval + std
+        vmax = medval + 4*std
+        if display or (filename is not None):
+            plt.figure(figsize=figsize)
         if input_dyn is None:
             if lamsteps:
                 plt.pcolormesh(self.times/60, self.lam, dyn,
-                               vmin=vmin, vmax=vmax)
+                               vmin=vmin, vmax=vmax, linewidth=0,
+                               rasterized=True)
                 plt.ylabel('Wavelength (m)')
             else:
                 plt.pcolormesh(self.times/60, self.freqs, dyn,
-                               vmin=vmin, vmax=vmax)
+                               vmin=vmin, vmax=vmax, linewidth=0,
+                               rasterized=True)
                 plt.ylabel('Frequency (MHz)')
             plt.xlabel('Time (mins)')
             # plt.colorbar()  # arbitrary units
         else:
-            plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax)
+            plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax,
+                           linewidth=0, rasterized=True)
 
         if filename is not None:
-            plt.savefig(filename, dpi=200, papertype='a4', bbox_inches='tight',
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
                         pad_inches=0.1)
             plt.close()
         elif input_dyn is None and display:
             plt.show()
 
-    def plot_acf(self, method='acf1d', alpha=5.3, contour=False, filename=None,
+    def plot_acf(self, method='acf1d', alpha=5/3, contour=False, filename=None,
                  input_acf=None, input_t=None, input_f=None, fit=True,
-                 mcmc=False, display=True):
+                 mcmc=False, display=True, crop=None, tlim=None, flim=None,
+                 figsize=(9, 9), verbose=False, dpi=200):
         """
         Plot the ACF
         """
-
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau') and input_acf is None and fit:
-            self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc)
+            self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc,
+                                  verbose=verbose)
         if input_acf is None:
             arr = self.acf
             tspan = self.tobs
@@ -270,39 +278,70 @@ class Dynspec:
         wn = arr[0][0] - arr[0][1]  # subtract the white noise spike
         arr[0][0] = arr[0][0] - wn  # Set the noise spike to zero for plotting
         arr = np.fft.fftshift(arr)
+
+        if crop == 'auto' or crop == 'manual':
+            if crop == 'auto':
+                if not fit:
+                    print("Can't auto crop without fitting!")
+                tlim = 4 * self.tau / 60
+                flim = 4 * self.dnu
+                if tlim > self.tobs / 60:
+                    tlim = self.tobs / 60
+                    flim = self.bw
+
+            tfactor = tlim * 60 / tspan
+            tspan = tlim * 60
+            tmin = int((0.5 - tfactor/2) * len(arr[0]))
+            tmax = int((0.5 + tfactor/2) * len(arr[0]))
+
+            ffactor = flim / fspan
+            fspan = flim
+            fmin = int((0.5 - ffactor/2) * len(arr))
+            fmax = int((0.5 + ffactor/2) * len(arr))
+
+            arr = arr[fmin:fmax, tmin:tmax]
+
+        elif crop is not None:
+            print('\n', "Unrecognized cropping mode. Please specify 'auto',",
+                  "'manual' or None.", "'auto' requires selecting a fitting " +
+                  "method. \n")
+
         t_delays = np.linspace(-tspan/60, tspan/60, np.shape(arr)[1])
         f_shifts = np.linspace(-fspan, fspan, np.shape(arr)[0])
 
         if input_acf is None:  # Also plot scintillation scales axes
-            fig, ax1 = plt.subplots()
+            fig, ax1 = plt.subplots(figsize=figsize)
             if contour:
                 im = ax1.contourf(t_delays, f_shifts, arr)
             else:
-                im = ax1.pcolormesh(t_delays, f_shifts, arr)
+                im = ax1.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
+                                    rasterized=True)
             ax1.set_ylabel('Frequency lag (MHz)')
             ax1.set_xlabel('Time lag (mins)')
             miny, maxy = ax1.get_ylim()
             if fit:
                 ax2 = ax1.twinx()
                 ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-                ax2.set_ylabel('Frequency lag / (dnu_d = {0})'.
+                ax2.set_ylabel(r'Frequency lag / (dnu$_d = {0}$)'.
                                format(round(self.dnu, 2)))
                 ax3 = ax1.twiny()
                 minx, maxx = ax1.get_xlim()
                 ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-                ax3.set_xlabel('Time lag/(tau_d={0})'.format(round(
+                ax3.set_xlabel(r'Time lag/(tau$_d={0}$)'.format(round(
                                                              self.tau/60, 2)))
             fig.colorbar(im, pad=0.15)
         else:  # just plot acf without scales
             if contour:
                 plt.contourf(t_delays, f_shifts, arr)
             else:
-                plt.pcolormesh(t_delays, f_shifts, arr)
+                plt.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
+                               rasterized=True)
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
 
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
+                        pad_inches=0.1)
             plt.close()
         elif input_acf is None and display:
             plt.show()
@@ -311,11 +350,11 @@ class Dynspec:
                    input_x=None, input_y=None, trap=False, prewhite=True,
                    plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
                    cutmid=0, startbin=0, display=True, colorbar=True,
-                   title=None):
+                   title=None, figsize=(9, 9), subtract_artefacts=False,
+                   overplot_curvature=None, dpi=200):
         """
         Plot the secondary spectrum
         """
-
         if input_sspec is None:
             if lamsteps:
                 if not hasattr(self, 'lamsspec'):
@@ -333,6 +372,15 @@ class Dynspec:
         else:
             sspec = input_sspec
             xplot = input_x
+
+        if subtract_artefacts:
+            # Subtract off delay response constant in Doppler
+            # Estimate using outer 10% of spectrum
+            delay_response = np.nanmean(sspec[:, np.argwhere(
+                    np.abs(self.fdop) > 0.9*np.max(self.fdop))], axis=1)
+            delay_response -= np.median(delay_response)
+            sspec = np.subtract(sspec, delay_response)
+
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         # std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
@@ -351,15 +399,21 @@ class Dynspec:
         delmax = np.max(self.tdel) if delmax is None else delmax
         delmax = delmax*(ref_freq/self.freq)**2
         ind = np.argmin(abs(self.tdel-delmax))
+        if display or (filename is not None):
+            plt.figure(figsize=figsize)
         if input_sspec is None:
             if lamsteps:
                 plt.pcolormesh(xplot, self.beta[:ind], sspec[:ind, :],
-                               vmin=vmin, vmax=vmax)
+                               vmin=vmin, vmax=vmax, linewidth=0,
+                               rasterized=True)
                 plt.ylabel(r'$f_\lambda$ (m$^{-1}$)')
             else:
                 plt.pcolormesh(xplot, self.tdel[:ind], sspec[:ind, :],
-                               vmin=vmin, vmax=vmax)
+                               vmin=vmin, vmax=vmax, linewidth=0,
+                               rasterized=True)
                 plt.ylabel(r'$f_\nu$ ($\mu$s)')
+            if overplot_curvature is not None:
+                plt.plot(xplot, overplot_curvature*xplot**2, 'r--')
             plt.xlabel(r'$f_t$ (mHz)')
             bottom, top = plt.ylim()
             if plotarc:
@@ -372,14 +426,16 @@ class Dynspec:
             plt.ylim(bottom, top)
 
         else:
-            plt.pcolormesh(xplot, input_y, sspec, vmin=vmin, vmax=vmax)
+            plt.pcolormesh(xplot, input_y, sspec, vmin=vmin, vmax=vmax,
+                           linewidth=0, rasterized=True)
         if colorbar:
             plt.colorbar()
         if title:
             plt.title(title)
 
         if filename is not None:
-            plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
+                        pad_inches=0.1)
             plt.close()
         elif input_sspec is None and display:
             plt.show()
@@ -388,25 +444,17 @@ class Dynspec:
                      title=None, input_scat_im=None, input_fdop=None,
                      lamsteps=False, trap=False, clean=True, use_angle=False,
                      use_spatial=False, s=None, veff=None, d=None,
-                     filename=None):
+                     filename=None, dpi=200):
         """
         Plot the scattered image
         """
         c = 299792458.0  # m/s
         if input_scat_im is None:
             if not hasattr(self, 'scat_im'):
-                if lamsteps:
-                    input_sspec = self.lamsspec
-                elif trap:
-                    input_sspec = self.trapsspec
-                else:
-                    input_sspec = self.sspec
-                self.calc_scat_im(input_sspec=input_sspec,
-                                  lamsteps=lamsteps, trap=trap,
+                self.calc_scat_im(lamsteps=lamsteps, trap=trap,
                                   clean=clean)
-            else:
-                scat_im = self.scat_im
-                xyaxes = self.scat_im_ax
+            scat_im = self.scat_im
+            xyaxes = self.scat_im_ax
 
         else:
             scat_im = input_scat_im
@@ -436,7 +484,8 @@ class Dynspec:
         vmin = medval - 3
         vmax = maxval - 3
 
-        plt.pcolormesh(xyaxes, xyaxes, scat_im, vmin=vmin, vmax=vmax)
+        plt.pcolormesh(xyaxes, xyaxes, scat_im, vmin=vmin, vmax=vmax,
+                       linewidth=0, rasterized=True)
         plt.title('Scattered image')
         if use_angle:
             plt.xlabel('Angle parallel to velocity (as)')
@@ -452,7 +501,8 @@ class Dynspec:
         if colorbar:
             plt.colorbar()
         if filename is not None:
-            plt.savefig(filename)
+            plt.savefig(filename, dpi=dpi, papertype='a4', bbox_inches='tight',
+                        pad_inches=0.1)
         if display:
             plt.show()
         else:
@@ -493,12 +543,13 @@ class Dynspec:
         elif display:
             plt.show()
 
-    def fit_arc(self, method='norm_sspec', asymm=False, plot=False,
-                delmax=None, numsteps=1e4, startbin=3, cutmid=3, lamsteps=True,
-                etamax=None, etamin=None, low_power_diff=-3,
-                high_power_diff=-1.5, ref_freq=1400, constraint=[0, np.inf],
-                nsmooth=5, filename=None, noise_error=True, display=True,
-                log_parabola=False):
+    def fit_arc(self, asymm=False, plot=False, delmax=None, numsteps=1e4,
+                startbin=3, cutmid=3, lamsteps=False, etamax=None, etamin=None,
+                low_power_diff=-1, figsize=(9, 9), high_power_diff=-0.5,
+                ref_freq=1400, constraint=[0, np.inf], nsmooth=5,
+                filename=None, noise_error=True, display=True, figN=None,
+                log_parabola=False, logsteps=False, plot_spec=False,
+                fit_spectrum=False, subtract_artefacts=False, dpi=200):
         """
         Find the arc curvature with maximum power along it
 
@@ -563,7 +614,7 @@ class Dynspec:
         max_sqrt_eta = np.sqrt(np.max(etamax_array))
         min_sqrt_eta = np.sqrt(np.min(etamin_array))
         # Create an array with equal steps in sqrt(curvature)
-        sqrt_eta_all = np.linspace(min_sqrt_eta, max_sqrt_eta, numsteps)
+        sqrt_eta_all = np.linspace(min_sqrt_eta, max_sqrt_eta, int(numsteps))
 
         for iarc in range(0, len(etamin_array)):
             if len(etamin_array) == 1:
@@ -590,25 +641,44 @@ class Dynspec:
             # initiate
             etaArray = []
 
-            if method == 'norm_sspec':
-                # Get the normalised secondary spectrum, set for minimum eta as
-                #   normalisation. Then calculate peak as
-                self.norm_sspec(eta=etamin, delmax=delmax, plot=False,
-                                startbin=startbin, maxnormfac=1, cutmid=cutmid,
-                                lamsteps=lamsteps, scrunched=True,
-                                plot_fit=False, numsteps=numsteps_new)
-                norm_sspec = self.normsspecavg.squeeze()
-                etafrac_array = np.linspace(-1, 1, len(norm_sspec))
-                ind1 = np.argwhere(etafrac_array > 1/(2*len(norm_sspec)))
-                ind2 = np.argwhere(etafrac_array < -1/(2*len(norm_sspec)))
+            # Get the normalised secondary spectrum, set for minimum eta as
+            #   normalisation. Then calculate peak as
+            self.norm_sspec(eta=etamin, delmax=delmax, plot=plot_spec,
+                            startbin=startbin, maxnormfac=1, cutmid=cutmid,
+                            lamsteps=lamsteps, scrunched=True,
+                            logsteps=logsteps, plot_fit=False,
+                            numsteps=numsteps_new, fit_spectrum=fit_spectrum,
+                            subtract_artefacts=subtract_artefacts)
+            norm_sspec = self.normsspecavg.squeeze()
+            etafrac_array = self.normsspec_fdop
+            ind1 = np.argwhere(etafrac_array >= 0)
+            ind2 = np.argwhere(etafrac_array < 0)
 
+            if asymm:
+                norm_sspec_avg1 = np.array(norm_sspec[ind1])
+                norm_sspec_avg2 = np.flip(norm_sspec[ind2], axis=0)
+                nspec = 2
+            else:
+                # take the mean
                 norm_sspec_avg = np.add(norm_sspec[ind1],
                                         np.flip(norm_sspec[ind2], axis=0))/2
-                norm_sspec_avg = norm_sspec_avg.squeeze()
-                etafrac_array_avg = 1/etafrac_array[ind1].squeeze()
+                nspec = 1
+            etafrac_array_avg_orig = 1/etafrac_array[ind1].squeeze()
+
+            for dummy in range(0, nspec):
+                etafrac_array_avg = etafrac_array_avg_orig
+                if asymm and dummy == 0:
+                    spec = np.array(norm_sspec_avg1)
+                elif asymm and dummy == 1:
+                    spec = np.array(norm_sspec_avg2)
+                else:
+                    spec = np.array(norm_sspec_avg)
+
+                spec = spec.squeeze()
+
                 # Make sure is valid
-                filt_ind = is_valid(norm_sspec_avg)
-                norm_sspec_avg = np.flip(norm_sspec_avg[filt_ind], axis=0)
+                filt_ind = is_valid(spec)
+                spec = np.flip(spec[filt_ind], axis=0)
                 etafrac_array_avg = np.flip(etafrac_array_avg[filt_ind],
                                             axis=0)
 
@@ -616,11 +686,11 @@ class Dynspec:
                 etaArray = etamin*etafrac_array_avg**2
                 ind = np.argwhere(etaArray < etamax)
                 etaArray = etaArray[ind].squeeze()
-                norm_sspec_avg = norm_sspec_avg[ind].squeeze()
+                spec = spec[ind].squeeze()
 
                 # Smooth data
                 norm_sspec_avg_filt = \
-                    savgol_filter(norm_sspec_avg, nsmooth, 1)
+                    savgol_filter(spec, nsmooth, 1)
 
                 # search for peaks within constraint range
                 indrange = np.argwhere((etaArray > constraint[0]) *
@@ -647,7 +717,7 @@ class Dynspec:
                     power = norm_sspec_avg_filt[ind + ind2]
                 # Now select this region of data for fitting
                 xdata = etaArray[int(ind-ind1):int(ind+ind2)]
-                ydata = norm_sspec_avg[int(ind-ind1):int(ind+ind2)]
+                ydata = spec[int(ind-ind1):int(ind+ind2)]
 
                 # Do the fit
                 # yfit, eta, etaerr = fit_parabola(xdata, ydata)
@@ -678,127 +748,84 @@ class Dynspec:
                     etaerr = np.abs(etaArray[int(ind-ind1)] -
                                     etaArray[int(ind+ind2)])/2
 
-                if plot and iarc == 0:
-                    plt.plot(etaArray, norm_sspec_avg)
-                    plt.plot(etaArray, norm_sspec_avg_filt)
-                    plt.plot(xdata, yfit)
-                    plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
-                                facecolor='C2', alpha=0.5)
-                    plt.xscale('log')
-                    if lamsteps:
-                        plt.xlabel(r'Arc curvature, '
-                                   r'$\eta$ (${\rm m}^{-1}\,{\rm mHz}^{-2}$)')
+                self.eta_array = etaArray
+                if asymm:
+                    if dummy == 0:
+                        self.norm_sspec_avg1 = spec
                     else:
-                        plt.xlabel('eta (tdel)')
-                    plt.ylabel('Mean power (dB)')
-                elif plot:
-                    plt.plot(xdata, yfit,
-                             color='C{0}'.format(str(int(3+iarc))))
-                    plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
-                                facecolor='C{0}'.format(str(int(3+iarc))),
-                                alpha=0.3)
-                if plot and iarc == len(etamin_array)-1:
-                    if filename is not None:
-                        plt.savefig(filename, figsize=(6, 6), dpi=150,
-                                    bbox_inches='tight', pad_inches=0.1)
-                        plt.close()
-                    elif display:
-                        plt.show()
-
-            else:
-                raise ValueError('Unknown arc fitting method. Please choose \
-                                 from gidmax or norm_sspec')
-
-            if iarc == 0:  # save primary
-                if lamsteps:
-                    self.betaeta = eta
-                    self.betaetaerr = etaerr / np.sqrt(2)
-                    self.betaetaerr2 = etaerr2 / np.sqrt(2)
+                        self.norm_sspec_avg2 = spec
                 else:
-                    self.eta = eta
-                    self.etaerr = etaerr / np.sqrt(2)
-                    self.etaerr2 = etaerr2 / np.sqrt(2)
+                    self.norm_sspec_avg = spec
 
-    def fit_arclets(self, lamsteps=False):
+                if iarc == 0:  # save primary
+                    if asymm and dummy == 0:
+                        if lamsteps:
+                            self.betaeta_left = eta
+                            self.betaetaerr_left = etaerr / np.sqrt(2)
+                            self.betaetaerr2_left = etaerr2 / np.sqrt(2)
+                        else:
+                            self.eta_left = eta
+                            self.etaerr_left = etaerr / np.sqrt(2)
+                            self.etaerr2_left = etaerr2 / np.sqrt(2)
+                    elif dummy == 1:
+                        if lamsteps:
+                            self.betaeta_right = eta
+                            self.betaetaerr_right = etaerr / np.sqrt(2)
+                            self.betaetaerr2_right = etaerr2 / np.sqrt(2)
+                        else:
+                            self.eta_right = eta
+                            self.etaerr_right = etaerr / np.sqrt(2)
+                            self.etaerr2_right = etaerr2 / np.sqrt(2)
+                    else:
+                        if lamsteps:
+                            self.betaeta = eta
+                            self.betaetaerr = etaerr / np.sqrt(2)
+                            self.betaetaerr2 = etaerr2 / np.sqrt(2)
+                        else:
+                            self.eta = eta
+                            self.etaerr = etaerr / np.sqrt(2)
+                            self.etaerr2 = etaerr2 / np.sqrt(2)
 
-        if not hasattr(self, 'betaeta') and not hasattr(self, 'eta'):
-            self.fit_arc(plot=False, log_parabola=True, low_power_diff=-0.5,
-                         high_power_diff=-0.5, delmax=0.8)
+            self.norm_delmax = delmax
 
-        medval = np.median(self.sspec[is_valid(self.sspec) *
-                                      np.array(np.abs(self.sspec) > 0)])
-        maxval = np.max(self.sspec[is_valid(self.sspec) *
-                                   np.array(np.abs(self.sspec) > 0)])
-        vmin = medval - 3
-        vmax = maxval - 3
-        plt.pcolormesh(self.fdop, self.tdel, self.sspec, vmin=vmin,
-                       vmax=vmax)
-        plt.ylim((0, max(self.tdel)))
-
-        if lamsteps:
-            yaxis = self.beta
-            sspec = 10**(self.lamsspec / 10)
-            eta = self.betaeta
-        else:
-            yaxis = self.tdel
-            sspec = 10**(self.sspec / 10)
-            eta = self.eta
-        g = RectBivariateSpline(yaxis, self.fdop, sspec)
-
-        avg_power_f = []
-        avg_power_err_f = []
-        arc_len = []
-        fdop = []
-        for f in self.fdop:
-            if abs(2 * f) < max(self.fdop) and (eta * f**2 < max(yaxis)) \
-               and f != 0:
-
-                def integrand(fd):
-                    return g(fd, eta * (f ** 2 - (fd - f) ** 2))
-
-                fmin = 0
-                fmax = 2 * f
-                x = np.linspace(fmin, fmax, 20)
-                plt.plot(x, eta * (f ** 2 - (x - f) ** 2))
-                power, power_err = quad(integrand, fmin, fmax, limit=1000)
-
-                arc_factor = 2 / ((fmax - fmin) / f)
-                arc_length = (arc_factor**2 * np.arcsinh((2 / arc_factor) *
-                                                         eta * f) + 2 *
-                              eta * f * np.sqrt(arc_factor**2 + 4 *
-                                                (eta * f)**2)) / \
-                             (2 * arc_factor**2 * eta)
-
-                avg_power = power / arc_length
-                avg_power_err = power_err / arc_length
-
-                avg_power_f.append(avg_power)
-                avg_power_err_f.append(avg_power_err)
-                arc_len.append(arc_length)
-                fdop.append(f)
-
-        plt.show()
-
-        power_f = np.array(avg_power_f)
-        power_err_f = np.array(avg_power_err_f)
-        fdop = np.array(fdop)
-
-        plt.plot(fdop, power_f)
-        plt.fill_between(fdop, power_f + power_err_f, power_f - power_err_f,
-                         color='r', alpha=0.5)
-        plt.xlabel(r'$f_t$ (mHz)')
-        plt.ylabel(r'Power')
-        plt.ylim((0, 5e2))
-        plt.show()
-
-        # plt.plot(fdop, arc_len)
-        # plt.show()
+            if plot and iarc == 0:
+                if figN is None:
+                    plt.figure(figsize=figsize)
+                else:
+                    plt.figure(figN, figsize=figsize)
+                plt.plot(self.eta_array[10:], self.norm_sspec_avg[10:])
+                plt.plot(etaArray[10:], norm_sspec_avg_filt[10:])
+                plt.plot(xdata, yfit, 'k')
+                plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
+                            facecolor='C2', alpha=0.5)
+                plt.xscale('log')
+                if lamsteps:
+                    plt.xlabel(r'Arc curvature, '
+                               r'$\eta$ (${\rm m}^{-1}\,{\rm mHz}^{-2}$)')
+                else:
+                    plt.xlabel('eta (tdel)')
+                plt.ylabel('Mean power (dB)')
+            elif plot:
+                plt.plot(xdata, yfit,
+                         color='k')
+                plt.axvspan(xmin=eta-etaerr, xmax=eta+etaerr,
+                            facecolor='C{0}'.format(str(int(3+iarc))),
+                            alpha=0.3)
+            if plot and iarc == len(etamin_array)-1:
+                if filename is not None:
+                    plt.savefig(filename, dpi=dpi,
+                                bbox_inches='tight', pad_inches=0.1)
+                    plt.close()
+                elif display:
+                    plt.show()
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
-                   maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=False,
-                   scrunched=True, plot_fit=True, ref_freq=1400, numsteps=None,
-                   filename=None, display=True, unscrunched=True,
-                   powerspec=False, interp_nan=False):
+                   maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=True,
+                   scrunched=True, plot_fit=True, ref_freq=1400,
+                   numsteps=None,  filename=None, display=True,
+                   unscrunched=True, logsteps=False, powerspec=True,
+                   interp_nan=False, fit_spectrum=False, powerspec_cut=False,
+                   figsize=(9, 9), subtract_artefacts=False, dpi=200):
         """
         Normalise fdop axis using arc curvature
         """
@@ -848,6 +875,16 @@ class Dynspec:
         sspec[:, int(nc/2 - np.floor(cutmid/2)):int(nc/2 +
               np.floor(cutmid/2))] = np.nan
         tdel = yaxis[startbin:ind]
+
+        if subtract_artefacts:
+            # Subtract off delay response constant in Doppler
+            # Estimate using outer 10% of spectrum
+            delay_response = np.nanmean(sspec[:, np.argwhere(
+                    np.abs(self.fdop) > 0.9*np.max(self.fdop))], axis=1)
+            delay_response -= np.median(delay_response)
+            sspec = np.subtract(sspec, delay_response)
+
+        nr, nc = np.shape(sspec)
         # tdel = yaxis[:ind]
         fdop = self.fdop
         maxfdop = maxnormfac*np.sqrt(tdel[-1]/eta)  # Maximum fdop for plot
@@ -856,35 +893,123 @@ class Dynspec:
         # Number of fdop bins to use. Oversample by factor of 2
         nfdop = 2*len(fdop[abs(fdop) <=
                            maxfdop]) if numsteps is None else numsteps
-        fdopnew = np.linspace(-maxnormfac, maxnormfac,
-                              nfdop)  # norm fdop
+        if nfdop % 2 != 0:
+            nfdop += 1
+
+        if logsteps:
+            # Set fdopnew in equal steps in log space
+            fdoplin = np.abs(np.linspace(-maxnormfac, maxnormfac, nfdop))
+            fdop_pos = 10**np.linspace(np.log10(np.min(fdoplin)),
+                                       np.log10(np.max(fdoplin)), int(nfdop/2))
+            fdop_neg = -np.flip(fdop_pos, axis=0)
+            fdopnew = np.concatenate((fdop_neg, fdop_pos))
+        else:
+            fdopnew = np.linspace(-maxnormfac, maxnormfac,
+                                  nfdop)  # norm fdop
         if minnormfac > 0:
             unscrunched = False  # Cannot plot 2D function
             inds = np.argwhere(np.abs(fdopnew) > minnormfac)
             fdopnew = fdopnew[inds]
+        if logsteps:
+            normSspeclin = []
+            masklin = []
         normSspec = []
+        mask = []
         isspectot = np.zeros(np.shape(fdopnew))
         for ii in range(0, len(tdel)):
             itdel = tdel[ii]
             imaxfdop = maxnormfac*np.sqrt(itdel/eta)
             ifdop = fdop[abs(fdop) <= imaxfdop]/np.sqrt(itdel/eta)
             isspec = sspec[ii, abs(fdop) <= imaxfdop]  # take the iith row
-            ind = np.argmin(abs(fdopnew))
+            if logsteps:
+                normlinelin = np.interp(fdoplin, ifdop, isspec)
+                masklin.append((np.abs(fdoplin) > np.max(np.abs(ifdop))))
+                normSspeclin.append(normlinelin)
             normline = np.interp(fdopnew, ifdop, isspec)
+            mask.append((np.abs(fdopnew) > np.max(np.abs(ifdop))))
             normSspec.append(normline)
             isspectot = np.add(isspectot, normline)
         normSspec = np.array(normSspec).squeeze()
         if interp_nan:
             # interpolate NaN values
             normSspec = interp_nan_2d(normSspec)
-        isspecavg = np.mean(normSspec, axis=0)  # make average
-        powerspectrum = np.nanmean(np.power(10, normSspec/10), axis=1)
-        ind1 = np.argmin(abs(fdopnew-1)-2)
-        if isspecavg[ind1] < 0:
-            isspecavg = isspecavg + 2  # make 1 instead of -1
+            if logsteps:
+                normSspeclin = np.array(normSspeclin).squeeze()
+                normSspeclin = interp_nan_2d(normSspeclin)
+
+        if logsteps:
+            masklin += np.isnan(normSspeclin)
+            normSspeclin = np.ma.array(normSspeclin, mask=mask)
+            mask += np.isnan(normSspec)
+            normSspec = np.ma.array(normSspec, mask=mask)
+            self.mask = mask
+            self.powerspectrum = np.ma.mean(np.power(10, normSspeclin/10),
+                                            axis=1)
+        else:
+            mask += np.isnan(normSspec)
+            normSspec = np.ma.array(normSspec, mask=mask)
+            self.mask = mask
+            self.powerspectrum = np.ma.mean(np.power(10, normSspec/10), axis=1)
+
+        xdata = np.sqrt(tdel)
+        ydata = np.sqrt(tdel)*self.powerspectrum
+        xdata = xdata[~np.isnan(xdata)]
+        ydata = ydata[~np.isnan(ydata)]
+
+        # Initial guesses:
+        alpha = -11/3
+        index = np.argmin(np.abs(xdata - 10))
+        amp = ydata[index] * xdata[index]**-alpha
+        # Median of last 10%
+        wn = np.min(ydata)
+        if fit_spectrum:
+
+            params = Parameters()
+            params.add('wn', value=wn, vary=True, min=np.min(ydata),
+                       max=np.inf)
+            params.add('alpha', value=alpha, vary=True, min=-np.inf, max=0)
+            params.add('amp', value=amp, vary=True, min=0.0, max=np.inf)
+
+            results = fitter(powerspectrum_model, params, (xdata, ydata))
+
+            params = results.params
+
+            wn = params['wn'].value
+            amp = params['amp'].value
+            alpha = params['alpha'].value
+
+            self.ps_wn = wn
+            self.ps_amp = amp
+            self.ps_alpha = alpha
+
+            self.ps_wn_err = params['wn'].stderr
+            self.ps_amp_err = params['amp'].stderr
+            self.ps_alpha_err = params['alpha'].stderr
+
+        # Now define weights for the normalised spectrum sum
+        arc_spectrum = amp*xdata**alpha
+        self.weights = 10*np.log10(arc_spectrum)
+
+        # make average
+        if powerspec_cut:
+            indices = np.argwhere(arc_spectrum > wn)
+            isspecavg = np.ma.average(normSspec[indices, :], axis=0,
+                                      weights=self.weights[indices].squeeze()
+                                      ).squeeze()
+        else:
+            isspecavg = np.ma.average(normSspec, axis=0,
+                                      weights=self.weights.squeeze()).squeeze()
+
+        self.normsspecavg = isspecavg
+        self.normsspec = normSspec
+        self.normsspec_tdel = tdel
+        self.normsspec_fdop = fdopnew
+
         if plot:
             # Plot delay-scrunched "power profile"
             if scrunched:
+                if display or (filename is not None):
+                    plt.figure(figsize=figsize)
                 plt.plot(fdopnew, isspecavg)
                 bottom, top = plt.ylim()
                 plt.xlabel("Normalised $f_t$")
@@ -892,19 +1017,26 @@ class Dynspec:
                 if plot_fit:
                     plt.plot([1, 1], [bottom*0.9, top*1.1], 'r--', alpha=0.5)
                     plt.plot([-1, -1], [bottom*0.9, top*1.1], 'r--', alpha=0.5)
-                plt.ylim(bottom*0.9, top*1.1)  # always plot from zero!
+                plt.ylim(bottom*0.9, top*1.1)
                 plt.xlim(-maxnormfac, maxnormfac)
                 if filename is not None:
                     filename_name = filename.split('.')[0]
-                    filename_extension = filename.split('.')[1]
+                    if '+' in filename_name:
+                        filename_name = filename_name.split('+')[0]
+                    filename_extension = filename.split('.')[-1]
                     plt.savefig(filename_name + '_1d.' + filename_extension,
-                                bbox_inches='tight', pad_inches=0.1)
+                                bbox_inches='tight', pad_inches=0.1, dpi=dpi)
                     plt.close()
                 elif display:
                     plt.show()
             # Plot 2D normalised secondary spectrum
             if unscrunched:
-                plt.pcolormesh(fdopnew, tdel, normSspec, vmin=vmin, vmax=vmax)
+                if display or (filename is not None):
+                    plt.figure(figsize=figsize)
+                np.ma.set_fill_value(normSspec, np.nan)
+                plt.pcolormesh(fdopnew, tdel, np.ma.filled(normSspec),
+                               vmin=vmin, vmax=vmax, linewidth=0,
+                               rasterized=True)
                 if lamsteps:
                     plt.ylabel(r'$f_\lambda$ (m$^{-1}$)')
                 else:
@@ -917,38 +1049,54 @@ class Dynspec:
                 plt.ylim(bottom, top)
                 plt.colorbar()
                 if filename is not None:
-                    plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+                    plt.savefig(filename, bbox_inches='tight', pad_inches=0.1,
+                                dpi=dpi)
                     plt.close()
                 elif display:
                     plt.show()
             # plot power spectrum
             if powerspec:
-                plt.loglog(np.sqrt(tdel), powerspectrum)
-                # Overlay theory
-                kf = np.argwhere(np.sqrt(tdel) <= 10)
-                amp = np.mean(powerspectrum[kf]*(np.sqrt(tdel[kf]))**3.67)
-                plt.loglog(np.sqrt(tdel), amp*(np.sqrt(tdel))**(-3.67))
+                if display or (filename is not None):
+                    plt.figure(figsize=figsize)
+                if fit_spectrum:
+                    plt.loglog(xdata, ydata, 'mediumblue')
+                    # Overlay theory
+                    kf = np.argwhere(np.sqrt(tdel) <= 10)
+                    amp = np.mean((1/tdel[kf]) * self.powerspectrum[kf] *
+                                  (np.sqrt(tdel[kf]))**(11/3 + 1))
+                    plt.loglog(xdata, wn*np.ones(np.shape(xdata)), 'darkcyan')
+                    plt.loglog(xdata, arc_spectrum, 'crimson')
+                    plt.loglog(xdata, wn + arc_spectrum, 'darkorange')
+                    plt.loglog(np.sqrt(tdel),
+                               tdel*amp*(np.sqrt(tdel))**-((11/3 + 1)))
+                    plt.legend(['Power spectrum', 'White noise',
+                                'Arc spectrum', 'Full spectrum model'],
+                               loc='upper right')
+                else:
+                    plt.loglog(xdata, ydata)
+                    plt.loglog(xdata, arc_spectrum)
                 if lamsteps:
                     plt.xlabel(r'$f_\lambda^{1/2}$ (m$^{-1/2}$)')
                 else:
                     plt.xlabel(r'$f_\nu^{1/2}$ ($\mu$s$^{1/2}$)')
-                plt.ylabel("Mean PSD")
+                plt.ylabel(r'$f_\lambda^{1/2} D(f_\lambda^{1/2})$ ')
                 plt.grid(which='both', axis='both')
+
                 if filename is not None:
                     filename_name = filename.split('.')[0]
-                    filename_extension = filename.split('.')[1]
+                    if '+' in filename_name:
+                        filename_name = filename_name.split('+')[0]
+                    filename_extension = filename.split('.')[-1]
                     plt.savefig(filename_name + '_power.' + filename_extension,
-                                bbox_inches='tight', pad_inches=0.1)
+                                bbox_inches='tight', pad_inches=0.1, dpi=dpi)
                     plt.close()
                 elif display:
                     plt.show()
 
-        self.normsspecavg = isspecavg
-        self.normsspec = normSspec
-        self.normsspec_tdel = tdel
         return
 
-    def get_acf_tilt(self, plot=False, tmax=None, fmax=None):
+    def get_acf_tilt(self, plot=False, tmax=None, fmax=None, display=True,
+                     filename=None, nscale=0.5, nscaleplot=2, nmin=5, dpi=200):
         """
         Estimates the tilt in the ACF, which is proportional to the phase
             gradient parallel to Veff
@@ -959,11 +1107,11 @@ class Dynspec:
             self.get_scint_params()
 
         if tmax is None:
-            tmax = self.tau/60/3
+            tmax = nscale*self.tau/60
         else:
             tmax = tmax
         if fmax is None:
-            fmax = self.dnu/5
+            fmax = nscale*self.dnu
         else:
             fmax = fmax
 
@@ -974,9 +1122,13 @@ class Dynspec:
 
         # just the peak
         xdata_inds = np.argwhere(abs(t_delays) <= tmax)
+        if len(xdata_inds) < nmin:
+            xdata_inds = np.argwhere(abs(t_delays) <= nmin*self.dt)
         xdata = np.array(t_delays[xdata_inds]).squeeze()
 
         inds = np.argwhere(abs(f_shifts) <= fmax)
+        if len(inds) < nmin:
+            inds = np.argwhere(abs(f_shifts) <= nmin*self.df)
         peak_array = []
         peakerr_array = []
         y_array = []
@@ -1001,33 +1153,59 @@ class Dynspec:
         for i in range(len(params)):  # for each parameter
             errors.append(np.absolute(pcov[i][i])**0.5)
 
-        self.acf_tilt = float(params[0].squeeze())
-        self.acf_tilt_err = float(errors[0].squeeze())
+        self.acf_tilt = -1/(float(params[0].squeeze()))  # take -ve
+        self.acf_tilt_err = float(errors[0].squeeze()) * \
+            1/float(params[0].squeeze())**2
 
         if plot:
             plt.errorbar(peak_array, y_array,
                          xerr=np.array(peakerr_array).squeeze(),
-                         marker='.', alpha=0.3)
-            plt.plot(peak_array, yfit, alpha=0.5)
+                         marker='.')
+            plt.plot(peak_array, yfit)
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
             plt.title('Peak measurements, and weighted fit')
-            plt.show()
+            if filename is not None:
+                filename_name = filename.split('.')[0]
+                filename_extension = filename.split('.')[-1]
+                plt.savefig(filename_name + '_tilt_fit.' + filename_extension,
+                            dpi=dpi, bbox_inches='tight',
+                            pad_inches=0.1)
+                plt.close()
+            elif display:
+                plt.show()
 
-            plt.pcolormesh(t_delays, f_shifts, acf)
-            plt.plot(peak_array, y_array, 'r', alpha=0.2)
-            plt.plot(peak_array, yfit, 'k', alpha=0.2)
+            plt.pcolormesh(t_delays, f_shifts, acf, linewidth=0,
+                           rasterized=True)
+            plt.plot(peak_array, y_array, 'r', alpha=0.5)
+            plt.plot(peak_array, yfit, 'k', alpha=0.5)
+            yl = plt.ylim()
+            if yl[1] > nscaleplot*self.dnu:
+                plt.ylim([-nscaleplot*self.dnu, nscaleplot*self.dnu])
+            xl = plt.xlim()
+            if xl[1] > nscaleplot*self.tau:
+                plt.xlim([-nscaleplot*self.tau, nscaleplot*self.tau])
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
-            plt.title(r'Tilt = {0} $\pm$ {1} (MHz/min)'.format(
-                    round(self.acf_tilt, 2), round(self.acf_tilt_err, 1)))
-            plt.show()
+            plt.title(r'Tilt = {0} $\pm$ {1} (min/MHz)'.format(
+                    round(self.acf_tilt, 2), round(self.acf_tilt_err, 2)))
+            if filename is not None:
+                filename_name = filename.split('.')[0]
+                filename_extension = filename.split('.')[-1]
+                plt.savefig(filename_name + '_tilt_acf.' + filename_extension,
+                            dpi=dpi, bbox_inches='tight',
+                            pad_inches=0.1)
+                plt.close()
+            elif display:
+                plt.show()
 
         return
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
-                         mcmc=False, full_frame=False, display=True,
-                         nscale=4, nitr=1):
+                         mcmc=False, full_frame=False, nscale=4,
+                         nwalkers=50, steps=50, burn=0.2, nitr=1,
+                         lnsigma=True, verbose=False, progress=True,
+                         display=True, filename=None, dpi=200):
         """
         Measure the scintillation timescale
             Method:
@@ -1037,12 +1215,9 @@ class Dynspec:
                     a phase gradient (a shear to the ACF)
         """
 
-        from lmfit import Minimizer, Parameters
-        import corner
-
         if not hasattr(self, 'acf'):
             self.calc_acf()
-        if not hasattr(self, 'sspec'):
+        if not hasattr(self, 'sspec') and 'sspec' in method:
             self.calc_sspec()
 
         ydata_f = self.acf[int(self.nchan):, int(self.nsub)]
@@ -1050,14 +1225,12 @@ class Dynspec:
         ydata_t = self.acf[int(self.nchan), int(self.nsub):]
         xdata_t = self.dt * np.linspace(0, len(ydata_t), len(ydata_t))
 
-        nt = len(xdata_t)  # number of t-lag samples
+        nt = len(xdata_t)  # number of t-lag samples (along half of acf frame)
         nf = len(xdata_f)
 
         # concatenate x and y arrays
         xdata = np.array(np.concatenate((xdata_t, xdata_f)))
         ydata = np.array(np.concatenate((ydata_t, ydata_f)))
-
-        weights = np.ones(np.shape(ydata))
 
         # Get initial parameter values from 1d fit
         # Estimate amp and white noise level
@@ -1070,124 +1243,241 @@ class Dynspec:
 
         # Define fit parameters
         params = Parameters()
-        params.add('tau', value=tau, vary=True, min=0.0, max=np.inf)
-        params.add('dnu', value=dnu, vary=True, min=0.0, max=np.inf)
-        params.add('amp', value=amp, vary=True, min=0.0, max=np.inf)
-        params.add('wn', value=wn, vary=True, min=0.0, max=np.inf)
+        params.add('tau', value=tau, vary=True, min=-np.inf, max=np.inf)
+        params.add('dnu', value=dnu, vary=True, min=-np.inf, max=np.inf)
+        params.add('amp', value=amp, vary=True, min=-np.inf, max=np.inf)
+        params.add('wn', value=wn, vary=True, min=-np.inf, max=np.inf)
+        if 'sim:mb2=' in self.name:
+            # No white noise in simulation. Don't fit or conf. int. will break
+            params['wn'].value = 0
+            params['wn'].vary = False
         params.add('nt', value=nt, vary=False)
         params.add('nf', value=nf, vary=False)
         if alpha is None:
             params.add('alpha', value=5/3, vary=True,
-                       min=1, max=3)
+                       min=-np.inf, max=np.inf)
         else:
             params.add('alpha', value=alpha, vary=False)
 
-        def fitter(scint_model, params, args, mcmc=mcmc, pos=None):
-            # Do fit
-            func = Minimizer(scint_model, params, fcn_args=args)
-            results = func.minimize()
-            if mcmc:
-                func = Minimizer(scint_model, results.params, fcn_args=args)
-                print('Doing mcmc posterior sample')
-                mcmc_results = func.emcee(nwalkers=nitr, steps=2000,
-                                          burn=500, pos=pos, is_weighted=False)
-                results = mcmc_results
-
-            return results
-
-        if method == 'acf1d':
-            results = fitter(scint_acf_model, params, (xdata, ydata, weights), mcmc=mcmc)
+        if method == 'acf1d' or method == 'acf2d_approx' or method == 'acf2d':
+            if method == 'acf2d_approx' or method == 'acf2d':
+                if verbose:
+                    print("\nDoing 1D fit to initialize fit values")
+            elif verbose:
+                print("\nPerforming least-squares fit to 1D ACF model")
+            chisqr = np.inf
+            for itr in range(nitr):
+                results = fitter(scint_acf_model, params,
+                                 (xdata, ydata, None), nan_policy='propagate')
+                if results.chisqr < chisqr:
+                    chisqr = results.chisqr
+                    params = results.params
 
         if method == 'acf2d_approx' or method == 'acf2d':
-            results = fitter(scint_acf_model, params, (xdata, ydata, weights), mcmc=False)
-            
-            params = results.params
 
-            dnu = params['dnu']
-            tau = params['tau']
+            dnu = params['dnu'].value
+            tau = params['tau'].value
+            if verbose:
+                print('1D tau estimate:', tau,
+                      '\n1D dnu estimate:', dnu)
 
-            ntau = nscale
-            ndnu = nscale
-            while ntau > (self.tobs / tau):
-                ntau -= 0.5
-                print('Warning: nscale too large for number of sub ints.' +
-                      'Decreasing.')
-            while ndnu > (self.bw / dnu):
-                ndnu -= 0.5
-                print('Warning: nscale too large for number of channels. ' +
-                      'Decreasing.')
+            ydata = np.copy(self.acf)
+            tticks = np.linspace(-self.tobs, self.tobs,
+                                 len(ydata[0, :]) + 1)[:-1]
+            fticks = np.linspace(-self.bw, self.bw,
+                                 len(ydata[:, 0]) + 1)[:-1]
 
-            fmin = int(self.nchan - ndnu * (dnu / self.df))
-            fmax = int(self.nchan + ndnu * (dnu / self.df))
-            tmin = int(self.nsub - ntau * (tau / self.dt))
-            tmax = int(self.nsub + ntau * (tau / self.dt))
+            wn_loc = np.unravel_index(np.argmax(ydata, axis=None),
+                                      ydata.shape)
 
-            ydata_2d = self.acf[fmin-1:fmax, tmin-1:tmax]
-            tticks = np.linspace(-self.tobs, self.tobs, len(self.acf[0, :]))
-            tdata = tticks[tmin-1:tmax]
-            fticks = np.linspace(-self.bw, self.bw, len(self.acf[:, 0]))
-            fdata = fticks[fmin-1:fmax]
+            fleft = wn_loc[0]
+            fright = np.shape(ydata)[0] - wn_loc[0] - 1
+            fmin = wn_loc[0] - min(fleft, fright)
+            fmax = wn_loc[0] + min(fleft, fright) + 1
 
-            weights_2d = np.ones(np.shape(ydata_2d))
+            tleft = wn_loc[1]
+            tright = np.shape(ydata)[1] - wn_loc[1] - 1
+            tmin = wn_loc[1] - min(tleft, tright)
+            tmax = wn_loc[1] + min(tleft, tright) + 1
 
-            if method == 'acf2d_approx':
+            ydata_centered = ydata[fmin:fmax, tmin:tmax]
+            tdata_centered = tticks[tmin:tmax]
+            fdata_centered = fticks[fmin:fmax]
 
-                params.add('tobs', value=self.tobs, vary=False)
-                params.add('freq', value=self.freq, vary=False)
-                params.add('phasegrad', value=1e-10, vary=True,
-                           min=-np.Inf, max=np.Inf)
+            if nscale is not None and not full_frame:
+                ntau = nscale
+                ndnu = nscale
 
+                if (self.tobs / tau) > 2:
+                    while ntau > (self.tobs / tau):
+                        ntau = ntau - 1
+                        if verbose:
+                            print('nscale too large for time axis, ' +
+                                  'decreasing to', ntau)
+
+                    tframe = int(round(ntau * (tau / self.dt)))
+                    tmin = int(np.floor(
+                        np.shape(ydata_centered)[1] / 2)) - tframe
+                    tmax = int(np.floor(
+                        np.shape(ydata_centered)[1] / 2)) + tframe + 1
+
+                else:
+                    tmin = 0
+                    tmax = len(tticks)
+
+                if (self.bw / dnu) > 2:
+                    while ndnu > (self.bw / dnu):
+                        ndnu = ndnu - 1
+                        if verbose:
+                            print('nscale too large for frequency axis, ' +
+                                  'decreasing to', ndnu)
+
+                    fframe = int(round(ndnu * (dnu / self.df)))
+                    fmin = int(np.floor(
+                        np.shape(ydata_centered)[0] / 2)) - fframe
+                    fmax = int(np.floor(
+                        np.shape(ydata_centered)[0] / 2)) + fframe + 1
+
+                else:
+                    fmin = 0
+                    fmax = len(fticks)
+
+                ydata_2d = ydata_centered[fmin:fmax, tmin:tmax]
+                tdata = tdata_centered[tmin:tmax]
+                fdata = fdata_centered[fmin:fmax]
+            else:
+                ydata_2d = ydata_centered
+                tdata = tdata_centered
+                fdata = fdata_centered
+
+            plt.pcolormesh(ydata_2d)
+            plt.show()
+
+            params.add('tobs', value=self.tobs, vary=False)
+            params.add('bw', value=self.bw, vary=False)
+            params.add('freq', value=self.freq, vary=False)
+            params.add('phasegrad', value=0.1, vary=True,
+                       min=-np.Inf, max=np.Inf)
+            if hasattr(self, 'acf_tilt'):  # if have a confident measurement
+                if self.acf_tilt_err is not None:
+                    params['phasegrad'].value = \
+                        self.acf_tilt / (self.tau/60) * self.dnu / 2 / \
+                        (self.dnu/self.freq)**(1/6)
+            if method == 'acf2d':
+                if verbose:
+                    print("\nDoing approximate 2D fit to initialize fit",
+                          "values")
+            elif verbose:
+                print("\nPerforming least-squares fit to approximate 2D " +
+                      "ACF model")
+            chisqr = np.inf
+
+            for itr in range(nitr):
+                nfit = 5
+                # max_nfev = 2000 * (nfit + 1)  # lmfit default
+                max_nfev = 10000 * (nfit + 1)
                 results = fitter(scint_acf_model_2d_approx, params,
-                                 (tdata, fdata, ydata_2d, weights_2d),
-                                 mcmc=mcmc)
+                                 (tdata, fdata, ydata_2d, None),
+                                 mcmc=mcmc, max_nfev=max_nfev,
+                                 nan_policy='propagate')
+                if results.chisqr < chisqr:
+                    chisqr = results.chisqr
+                    params = results.params
 
-            elif method == 'acf2d':
+            if method == 'acf2d':
 
-                params.add('tobs', value=np.max(tdata), vary=False)
-                params.add('bw', value=np.max(fdata), vary=False)
-                params.add('nscale', value=nscale, vary=False)
-                params.add('ar', value=1,
-                           vary=True, min=1, max=10)
-                params.add('phasegrad_x', value=0.01, vary=True,
-                           min=-5, max=5)
-                params.add('phasegrad_y', value=0.01, vary=True,
-                           min=-5, max=5)
-                params.add('v_x', value=np.random.normal(loc=0, scale=1),
-                           vary=True, min=-10, max=10)
-                params.add('v_y', value=np.random.normal(loc=0, scale=1),
-                           vary=True, min=-10, max=10)
-                #params.add('psi', value=np.random.uniform(low=0, high=180),
-                #           vary=True, min=0, max=180)
+                dnu = params['dnu'].value
+                tau = params['tau'].value
+                if verbose:
+                    print('2D tau estimate:', tau,
+                          '\n2D dnu estimate:', dnu)
 
-                plt.imshow(ydata_2d)
-                plt.show()
+                chisqr = np.inf
+                for itr in range(nitr):
+                    params.add('ar', value=1,
+                               vary=True, min=-np.inf, max=np.inf)
+                    params.add('phasegrad_x', value=params['phasegrad'].value,
+                               vary=True, min=-np.inf, max=np.inf)
+                    params.add('phasegrad_y', value=0.1,
+                               vary=True, min=-np.inf, max=np.inf)
+                    params.add('v_x', value=0.1,
+                               vary=True, min=-np.inf, max=np.inf)
+                    params.add('v_y', value=0.1,
+                               vary=True, min=-np.inf, max=np.inf)
 
-                if mcmc:
-                    pos_array = []
-                    for itr in range(0, nitr):
-                        pos_i = [np.random.normal(loc=params['tau'].value,
-                                                  scale=0.2*params['tau'].value),  # tau
-                                 np.random.normal(loc=params['dnu'].value,
-                                                  scale=0.2*params['dnu'].value),  # dnu
-                                 np.random.normal(loc=params['amp'].value,
-                                                  scale=0.1*params['amp'].value),  # amp
-                                 np.random.normal(loc=params['wn'].value,
-                                                  scale=0.1*params['wn'].value),  # wn
-                                 # ar
-                                 1 + np.abs(np.random.normal(loc=0, scale=2)),
-                                 np.random.normal(loc=0, scale=1),  # phs_x
-                                 np.random.normal(loc=0, scale=1),  # phs_y
-                                 np.random.normal(loc=0, scale=0.1),  # v_ra
-                                 np.random.normal(loc=0, scale=0.1),  # v_dec
-                                # np.random.uniform(low=0, high=180),  # psi
-                                 np.random.uniform(low=0, high=10),  # lnsigma
-                                 ]
-                        pos_array.append(pos_i)
+                    from lmfit import Parameter
 
-                    pos = np.array(pos_array)
+                    params['nf'] = Parameter(name='nf',
+                                             value=np.shape(ydata_centered)[0],
+                                             vary=False)
+                    params['nt'] = Parameter(name='nt',
+                                             value=np.shape(ydata_centered)[1],
+                                             vary=False)
 
-                results = fitter(scint_acf_model_2d, params,
-                                 (ydata_2d, weights_2d), mcmc=mcmc, pos=pos)
+                    if mcmc:
+                        pos_array = []
+                        for i in range(nwalkers):
+                            pos_i = []
+                            pos_i.append(np.random.normal(
+                                            loc=params['tau'].value,
+                                            scale=params['tau'].value))  # tau
+                            pos_i.append(np.random.normal(
+                                            loc=params['dnu'].value,
+                                            scale=params['dnu'].value))  # dnu
+                            pos_i.append(np.random.normal(
+                                            loc=params['amp'].value,
+                                            scale=params['amp'].value))  # amp
+                            pos_i.append(np.random.normal(
+                                            loc=params['wn'].value,
+                                            scale=params['wn'].value))  # wn
+                            if alpha is None:
+                                pos_i.append(np.random.normal(
+                                             loc=params['alpha'].value,
+                                             scale=params['alpha'].value))
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # phs
+                            pos_i.append(
+                                1 + np.abs(np.random.normal(loc=0,
+                                                            scale=2)))  # ar
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # phs_x
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # phs_y
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # v_x
+                            pos_i.append(np.random.normal(loc=0,
+                                                          scale=1))  # v_y
+                            if lnsigma:
+                                pos_i.append(np.random.uniform(low=0,
+                                                               high=10))
+
+                            pos_array.append(pos_i)
+
+                        pos = np.array(pos_array)
+                        print(np.shape(pos))
+                    else:
+                        pos = None
+
+                    if verbose:
+                        if mcmc:
+                            print("\nPerforming mcmc posterior sample for",
+                                  "analytical", "2D ACF model")
+                        else:
+                            print("\nPerforming least-squares fit to",
+                                  "analytical 2D ACF model")
+                    nfit = 9
+                    # max_nfev = 2000 * (nfit + 1)  # lmfit default
+                    max_nfev = 10000 * (nfit + 1)
+                    results = fitter(scint_acf_model_2d, params,
+                                     (ydata_2d, None), mcmc=mcmc,
+                                     pos=pos, nwalkers=nwalkers,
+                                     steps=steps, burn=burn,
+                                     progress=progress,
+                                     max_nfev=max_nfev, nan_policy='propagate',
+                                     is_weighted=(not lnsigma))
+                    if results.chisqr < chisqr:
+                        chisqr = results.chisqr
+                        params = results.params
 
         elif method == 'sspec':
             '''
@@ -1222,6 +1512,11 @@ class Dynspec:
         self.tauerr = results.params['tau'].stderr
         self.dnu = results.params['dnu'].value
         self.dnuerr = results.params['dnu'].stderr
+        if 'sim:mb2=' not in self.name:
+            self.wn = results.params['wn'].value
+            self.wnerr = results.params['wn'].stderr
+        else:
+            self.wn = 0
         if method == 'acf2d_approx':
             self.phasegrad = results.params['phasegrad'].value
             self.phasegraderr = results.params['phasegrad'].stderr
@@ -1245,91 +1540,128 @@ class Dynspec:
             self.talpha = alpha
             self.talphaerr = 0
 
-        print("\t ACF FIT PARAMETERS\n")
-        print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau,
-              err=self.tauerr))
-        print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu,
-              err=self.dnuerr))
-        print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
-              err=self.talphaerr))
-        if method == 'acf2d_approx':
-            print("phase grad:\t\t{val} +/- {err}".format(val=self.phasegrad,
-                  err=self.phasegraderr))
-        elif method == 'acf2d':
-            print("ar:\t\t{val} +/- {err}".format(val=self.ar,
-                  err=self.arerr))
-            print("phase grad x:\t\t{val} +/- {err}".format(
-                    val=self.phasegrad_x, err=self.phasegrad_xerr))
-            print("phase grad y:\t\t{val} +/- {err}".format(
-                    val=self.phasegrad_y, err=self.phasegrad_yerr))
-            print("v_ra:\t\t{val} +/- {err}".format(val=self.v_ra,
-                  err=self.v_raerr))
-            print("v_dec:\t\t{val} +/- {err}".format(val=self.v_dec,
-                  err=self.v_decerr))
-            print("psi:\t\t{val} +/- {err}".format(val=self.psi,
-                  err=self.psierr))
+        if verbose:
+            print("\n\t ACF FIT PARAMETERS\n")
+            print("tau:\t\t\t{val} +/- {err} s".format(val=self.tau,
+                  err=self.tauerr))
+            print("dnu:\t\t\t{val} +/- {err} MHz".format(val=self.dnu,
+                  err=self.dnuerr))
+            if alpha is None:
+                print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
+                      err=self.talphaerr))
+            if method == 'acf2d_approx':
+                print("phase grad:\t\t{val} +/- {err}".
+                      format(val=self.phasegrad, err=self.phasegraderr))
+            elif method == 'acf2d':
+                print("ar:\t\t{val} +/- {err}".format(val=self.ar,
+                      err=self.arerr))
+                print("phase grad x:\t\t{val} +/- {err}".format(
+                        val=self.phasegrad_x, err=self.phasegrad_xerr))
+                print("phase grad y:\t\t{val} +/- {err}".format(
+                        val=self.phasegrad_y, err=self.phasegrad_yerr))
+                print("v_x:\t\t{val} +/- {err}".format(val=self.v_x,
+                      err=self.v_xerr))
+                print("v_y:\t\t{val} +/- {err}".format(val=self.v_y,
+                      err=self.v_yerr))
 
         if plot:
             # get models:
             if method == 'acf1d':
                 # Get tau model
                 t_residuals = tau_acf_model(results.params, xdata_t, ydata_t,
-                                            weights[:nt])
-                tmodel = ydata_t - t_residuals/weights[:nt]
+                                            None)
+                tmodel = ydata_t - t_residuals
                 # Get dnu model
                 f_residuals = dnu_acf_model(results.params, xdata_f, ydata_f,
-                                            weights[nt:])
-                fmodel = ydata_f - f_residuals/weights[nt:]
+                                            None)
+                fmodel = ydata_f - f_residuals
 
+                if display or filename is not None:
+                    plt.figure(figsize=(9, 6))
                 plt.subplot(2, 1, 1)
-                plt.plot(xdata_t, ydata_t)
-                plt.plot(xdata_t, tmodel)
+                plt.plot(xdata_t, ydata_t/np.max(ydata_t))
+                plt.plot(xdata_t, tmodel/np.max(ydata_t))
+                # plot 95% white noise level assuming no correlation
+                xl = plt.xlim()
+                plt.plot([xl[0], xl[1]], [0, 0], 'k--')
+                plt.plot([xl[0], xl[1]],
+                         [1/np.sqrt(self.nsub), 1/np.sqrt(self.nsub)],
+                         ':', color='crimson')
+                plt.plot([xl[0], xl[1]],
+                         [-1/np.sqrt(self.nsub), -1/np.sqrt(self.nsub)],
+                         ':', color='crimson')
                 plt.xlabel('Time lag (s)')
                 plt.subplot(2, 1, 2)
-                plt.plot(xdata_f, ydata_f)
-                plt.plot(xdata_f, fmodel)
+                plt.plot(xdata_f, ydata_f/np.max(ydata_f))
+                plt.plot(xdata_f, fmodel/np.max(ydata_f))
+                # plot 95% white noise level assuming no correlation
+                xl = plt.xlim()
+                plt.plot([xl[0], xl[1]], [0, 0], 'k--')
+                plt.plot([xl[0], xl[1]],
+                         [1/np.sqrt(self.nchan), 1/np.sqrt(self.nchan)],
+                         ':', color='crimson')
+                plt.plot([xl[0], xl[1]],
+                         [-1/np.sqrt(self.nchan), -1/np.sqrt(self.nchan)],
+                         ':', color='crimson')
                 plt.xlabel('Frequency lag (MHz)')
-                if display:
+                plt.tight_layout()
+                if filename is not None:
+                    filename_name = filename.split('.')[0]
+                    filename_extension = filename.split('.')[-1]
+                    plt.savefig(filename_name + '_1Dfit.' + filename_extension,
+                                dpi=dpi, bbox_inches='tight',
+                                pad_inches=0.1)
+                    plt.close()
+                elif display:
                     plt.show()
 
             elif method == 'acf2d_approx' or method == 'acf2d':
-                # Get tau model
-                if full_frame:
-                    ydata = self.acf
-                    tdata = tticks
-                    fdata = fticks
-                    weights = np.ones(np.shape(ydata))
-                    if method == 'acf2d_approx':
-                        residuals = scint_acf_model_2d_approx(results.params,
-                                                              tdata, fdata,
-                                                              ydata, weights)
-                    else:
-                        residuals = scint_acf_model_2d(results.params, ydata,
-                                                       weights)
 
-                    model = (ydata - residuals) / weights
-
+                weights = np.ones(np.shape(ydata_centered))
+                if method == 'acf2d_approx':
+                    model = -scint_acf_model_2d_approx(results.params,
+                                                       tdata_centered,
+                                                       fdata_centered,
+                                                       np.zeros(np.shape(
+                                                           ydata_centered)),
+                                                       np.ones(np.shape(
+                                                           weights)))
                 else:
-                    ydata = ydata_2d
-                    if method == 'acf2d_approx':
-                        residuals = scint_acf_model_2d_approx(results.params,
-                                                              tdata, fdata,
-                                                              ydata,
-                                                              weights_2d)
-                    else:
-                        residuals = scint_acf_model_2d(results.params, ydata,
-                                                       weights_2d)
+                    model = -scint_acf_model_2d(results.params, np.zeros(
+                                                np.shape(ydata_centered)),
+                                                np.ones(np.shape(weights)))
+                residuals = (ydata_centered - model) * weights
+                if nscale is not None and not full_frame:
+                    model = model[fmin:fmax, tmin:tmax]
+                    residuals = residuals[fmin:fmax, tmin:tmax]
 
-                    model = (ydata - residuals) / weights_2d
-
-                data = [(ydata, 'data'), (model, 'model'),
+                data = [(ydata_2d, 'data'), (model, 'model'),
                         (residuals, 'residuals')]
                 for d in data:
-                    plt.pcolormesh(tdata/60, fdata, d[0])
+
+                    if d[1] != 'residuals':
+                        # subtract the white noise spike from data and model
+                        arr = np.fft.ifftshift(d[0])
+                        arr[0][0] -= self.wn
+                        arr = np.fft.fftshift(arr)
+                    else:
+                        arr = d[0]
+
+                    plt.pcolormesh(tdata/60, fdata, arr, linewidth=0,
+                                   rasterized=True)
+                    if d[1] == 'residuals':
+                        plt.clim(vmin=-1, vmax=1)  # fractional error
                     plt.title(d[1])
                     plt.xlabel('Time lag (mins)')
                     plt.ylabel('Frequency lag (MHz)')
-                    if display:
+                    if filename is not None:
+                        filename_name = filename.split('.')[0]
+                        filename_extension = filename.split('.')[-1]
+                        plt.savefig(filename_name + '_2Dfit_{0}.'.format(d[1])
+                                    + filename_extension, dpi=dpi,
+                                    bbox_inches='tight', pad_inches=0.1)
+                        plt.close()
+                    elif display:
                         plt.show()
 
             elif method == 'sspec':
@@ -1337,17 +1669,24 @@ class Dynspec:
                 sspec plotting routine
                 '''
 
-            if mcmc:
+            if mcmc and method == "acf2d" and plot:
                 corner.corner(results.flatchain,
                               labels=results.var_names,
                               truths=list(results.params.valuesdict().
                                           values()))
-                if display:
+                if filename is not None:
+                    filename_name = filename.split('.')[0]
+                    filename_extension = filename.split('.')[-1]
+                    plt.savefig(filename_name + '_corner.'
+                                + filename_extension, dpi=dpi,
+                                bbox_inches='tight', pad_inches=0.1)
+                    plt.close()
+                elif display:
                     plt.show()
 
         return results.params
 
-    def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None,
+    def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None, dpi=200,
                 lamsteps=False, maxfdop=np.inf, figsize=(8, 13), display=True):
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
@@ -1417,7 +1756,7 @@ class Dynspec:
                 filename_name = filename.split('.')[0]
                 filename_extension = filename.split('.')[1]
                 plt.savefig(filename_name + '_dynspec.' + filename_extension,
-                            figsize=(6, 10), dpi=150, bbox_inches='tight',
+                            figsize=(9, 15), dpi=dpi, bbox_inches='tight',
                             pad_inches=0.1)
                 plt.close()
             elif display:
@@ -1425,7 +1764,7 @@ class Dynspec:
             plt.figure(2)
             if filename is not None:
                 plt.savefig(filename_name + '_acf.' + filename_extension,
-                            figsize=(6, 10), dpi=150, bbox_inches='tight',
+                            figsize=(9, 15), dpi=dpi, bbox_inches='tight',
                             pad_inches=0.1)
                 plt.close()
             elif display:
@@ -1433,7 +1772,7 @@ class Dynspec:
             plt.figure(3)
             if filename is not None:
                 plt.savefig(filename_name + '_sspec.' + filename_extension,
-                            figsize=(6, 10), dpi=150, bbox_inches='tight',
+                            figsize=(9, 15), dpi=dpi, bbox_inches='tight',
                             pad_inches=0.1)
                 plt.close()
             elif display:
@@ -1541,7 +1880,14 @@ class Dynspec:
                      fit_arc=True, plotarc=False, plot_fit=False, plot=False,
                      plot_log=True, use_angle=False, use_spatial=False):
         """
-        Calculate the scattered image
+        Calculate the scattered image.
+
+        Assumes that the scattering is defined by the primary arc,
+        i.e. interference between highly scattered waves and unscattered waves
+        (B(tx,ty) vs B(0,0)).
+
+        The x axis of the image is aligned with the velocity.
+
         """
 
         if input_sspec is None:
@@ -1605,37 +1951,42 @@ class Dynspec:
             fdop = fdop[flim-int(0.02*nf):nf-flim+int(0.02*nf)]
 
         if clean:
-            # fill infs and extremely small pixel values
-            array = cp(sspec)
-            x = np.arange(0, array.shape[1])
-            y = np.arange(0, array.shape[0])
+            try:
+                # fill infs and extremely small pixel values
+                array = cp(sspec)
+                x = np.arange(0, array.shape[1])
+                y = np.arange(0, array.shape[0])
 
-            # mask invalid values
-            array = np.ma.masked_where((array < 1e-22), array)
-            xx, yy = np.meshgrid(x, y)
+                # mask invalid values
+                array = np.ma.masked_where((array < 1e-22), array)
+                xx, yy = np.meshgrid(x, y)
 
-            # get only the valid values
-            x1 = xx[~array.mask]
-            y1 = yy[~array.mask]
-            newarr = np.ravel(array[~array.mask])
+                # get only the valid values
+                x1 = xx[~array.mask]
+                y1 = yy[~array.mask]
+                newarr = np.ravel(array[~array.mask])
 
-            sspec = griddata((x1, y1), newarr, (xx, yy), method='linear')
+                sspec = griddata((x1, y1), newarr, (xx, yy),
+                                 method='linear')
 
-            # fill nans with the mean
-            meanval = np.mean(sspec[is_valid(sspec)])
-            sspec[np.isnan(sspec)] = meanval
+                # fill nans with the mean
+                meanval = np.mean(sspec[is_valid(sspec)])
+                sspec[np.isnan(sspec)] = meanval
+            except Exception as e:
+                print(e)
+                print('Cleaning failed. Continuing with uncleaned spectrum.')
 
         max_fd = max(fdop)
-        fd_step = max_fd / sampling
 
-        fdop_x = np.arange(-max_fd, max_fd, fd_step)
+        fdop_x = np.linspace(-max_fd, max_fd, 2*sampling)
         fdop_x = np.append(fdop_x, max_fd)
         nx = len(fdop_x)
 
-        fdop_y = np.arange(0, max_fd, fd_step)
+        fdop_y = np.linspace(0, max_fd, sampling)
         fdop_y = np.append(fdop_y, max_fd)
         ny = len(fdop_y)
 
+        # equally space square
         fdop_x_est, fdop_y_est = np.meshgrid(fdop_x, fdop_y)
         fdop_est = fdop_x_est
         tdel_est = (fdop_x_est**2 + fdop_y_est**2) * eta
@@ -1643,28 +1994,28 @@ class Dynspec:
 
         # 2D interpolation
         interp = RectBivariateSpline(td[:, 0], fd[0], sspec)
+        # interpolate sspec onto grid for theta
         image = interp.ev(tdel_est, fdop_est)
-
-        plt.pcolor(10*np.log10(image))
-        plt.show()
 
         image = image * fdop_y_est
         scat_im = np.zeros((nx, nx))
         scat_im[ny-1:nx, :] = image
-        scat_im[0:ny, :] = np.flipud(image[0:ny, :])
+        scat_im[0:ny-1, :] = image[ny-1:0:-1, :]
+
+        xyaxes = fdop_x
 
         if plot or plot_log:
-            self.plot_scat_im(input_scat_im=scat_im, input_fdop=fdop_x,
+            self.plot_scat_im(input_scat_im=scat_im, input_fdop=xyaxes,
                               s=s, veff=veff, d=d, use_angle=use_angle,
                               use_spatial=use_spatial, display=True,
                               plot_log=plot_log)
 
         self.scat_im = scat_im
-        self.scat_im_ax = fdop_x
+        self.scat_im_ax = xyaxes
 
     def calc_sspec(self, prewhite=True, halve=True, plot=False, lamsteps=False,
                    input_dyn=None, input_x=None, input_y=None, trap=False,
-                   window='blackman', window_frac=0.1):
+                   window='blackman', window_frac=0.1, return_sspec=False):
         """
         Calculate secondary spectrum
         """
@@ -1757,7 +2108,7 @@ class Dynspec:
         # Make db
         sec = 10*np.log10(sec)
 
-        if input_dyn is None:
+        if input_dyn is None and not return_sspec:
             if lamsteps:
                 self.lamsspec = sec
             elif trap:
@@ -1779,26 +2130,43 @@ class Dynspec:
                 yaxis = tdel
             return fdop, yaxis, sec
 
-    def calc_acf(self, scale=False, input_dyn=None, plot=True):
+    def calc_acf(self, method='direct', input_dyn=None, normalise=True,
+                 window_frac=0.1):
         """
         Calculate autocovariance function
         """
 
-        if input_dyn is None:
-            # mean subtracted dynspec
-            arr = cp(self.dyn) - np.mean(self.dyn[is_valid(self.dyn)])
-            nf = self.nchan
-            nt = self.nsub
+        if method == 'direct':  # simply FFT2 and IFFT2
+            if input_dyn is None:
+                # mean subtracted dynspec
+                arr = cp(self.dyn) - np.mean(self.dyn[is_valid(self.dyn)])
+                nf = self.nchan
+                nt = self.nsub
+            else:
+                arr = input_dyn
+                nf = np.shape(input_dyn)[0]
+                nt = np.shape(input_dyn)[1]
+            arr = np.fft.fft2(arr, s=[2*nf, 2*nt])  # zero-padded
+            arr = np.abs(arr)  # absolute value
+            arr **= 2  # Squared manitude
+            arr = np.fft.ifft2(arr)
+            arr = np.fft.fftshift(arr)
+            arr = np.real(arr)  # real component, just in case
+            if normalise:
+                arr /= np.max(arr)  # normalise
+        elif method == 'sspec':  # Calculate through secondary spectrum
+            fdop, yaxis, sspec = self.calc_sspec(prewhite=False, halve=False,
+                                                 return_sspec=True,
+                                                 window_frac=window_frac)
+            sspec = np.fft.fftshift(sspec)
+            arr = np.fft.fft2(10**(sspec/10))
+            arr = np.fft.fftshift(arr)
+            arr = np.real(arr)  # real component, just in case
+            if normalise:
+                arr /= np.max(arr)  # normalise
         else:
-            arr = input_dyn
-            nf = np.shape(input_dyn)[0]
-            nt = np.shape(input_dyn)[1]
-        arr = np.fft.fft2(arr, s=[2*nf, 2*nt])  # zero-padded
-        arr = np.abs(arr)  # absolute value
-        arr **= 2  # Squared manitude
-        arr = np.fft.ifft2(arr)
-        arr = np.fft.fftshift(arr)
-        arr = np.real(arr)  # real component, just in case
+            print('Method not understood. Choose "direct" or "sspec"')
+
         if input_dyn is None:
             self.acf = arr
         else:
@@ -1845,7 +2213,7 @@ class Dynspec:
             self.dyn = medfilt(self.dyn, kernel_size=m)
 
     def scale_dyn(self, scale='lambda', factor=1, window_frac=0.1,
-                  window='hanning'):
+                  window='hanning', spacing='auto'):
         """
         Scales the dynamic spectrum along the frequency axis,
             with an alpha relationship
@@ -1861,16 +2229,26 @@ class Dynspec:
             nf, nt = np.shape(arin)
             freqs = cp(self.freqs)
             lams = np.divide(sc.c, freqs*10**6)
-            dlam = np.max(np.abs(np.diff(lams)))
-            lam_eq = np.arange(np.min(lams), np.max(lams), dlam)
+            if spacing == 'max':
+                dlam = np.max(np.abs(np.diff(lams)))
+            elif spacing == 'median':
+                dlam = np.median(np.abs(np.diff(lams)))
+            elif spacing == 'mean':
+                dlam = np.mean(np.abs(np.diff(lams)))
+            elif spacing == 'min':
+                dlam = np.min(np.abs(np.diff(lams)))
+            elif spacing == 'auto':
+                dlam = (np.max(lams) - np.min(lams))/len(freqs)
+            lam_eq = np.arange(np.min(lams)+1e-10, np.max(lams)-1e-10, dlam)
             self.dlam = dlam
-            feq = np.divide(sc.c, lam_eq)/10**6
+            feq = np.round(np.divide(sc.c, lam_eq)/10**6, 6)
             arout = np.zeros([len(lam_eq), int(nt)])
             for it in range(0, nt):
                 f = interp1d(freqs, arin[:, it], kind='cubic')
                 arout[:, it] = f(feq)
             self.lamdyn = np.flipud(arout)
             self.lam = np.flipud(lam_eq)
+            self.nlam = len(self.lam)
         elif scale == 'trapezoid':
             dyn = cp(self.dyn)
             dyn -= np.mean(dyn)
@@ -2012,10 +2390,10 @@ class SimDyn():
     Imports Simulation() object from scint_sim to Dynspec class
     """
 
-    def __init__(self, sim, freq=1400, dt=0.5, mjd=50000):
+    def __init__(self, sim):
 
         self.name =\
-            'sim:mb2={0},ar={1},psi={2},dlam={3}'.format(sim.mb2, sim.ar,
+            'sim:mb2={0}_ar={1}_psi={2}_dlam={3}'.format(sim.mb2, sim.ar,
                                                          sim.psi, sim.dlam)
         if sim.lamsteps:
             self.name += ',lamsteps'
@@ -2024,8 +2402,9 @@ class SimDyn():
         self.dyn = sim.spi
         dlam = sim.dlam
 
-        self.dt = dt
-        self.freq = freq
+        self.dt = sim.dt
+        self.freq = sim.freq
+        self.mjd = sim.mjd
         self.nsub = int(np.shape(self.dyn)[0])
         self.nchan = int(np.shape(self.dyn)[1])
         lams = np.linspace(1, 1+dlam, self.nchan)
@@ -2035,9 +2414,43 @@ class SimDyn():
         self.bw = max(self.freqs) - min(self.freqs)
         self.times = self.dt*np.arange(0, self.nsub)
         self.df = self.bw/self.nchan
-        self.tobs = float(self.times[-1] - self.times[0])
-        self.mjd = mjd
+        self.tobs = self.nsub * self.dt
         self.dyn = np.transpose(self.dyn)
+        return
+
+
+class HoloDyn():
+    """
+    Imports model dynamic spectrum from holography code. Walker et al. (2008).
+    """
+
+    def __init__(self, holofile, imholofile=None, df=1, dt=1, fmin=0, mjd=0):
+
+        from astropy.io import fits
+        redata_hdu = fits.open(holofile)
+        redata = redata_hdu[0].data
+        if imholofile is not None:
+            imdata_hdu = fits.open(imholofile)
+            imdata = imdata_hdu[0].data
+        else:
+            imdata = np.zeros(np.shape(redata))
+        dynt = redata + 1j * imdata
+        dynt = np.abs(dynt)
+
+        # Set parameters from input
+        self.dyn = np.flip(np.transpose(np.flip(dynt, axis=0)), axis=1)
+        self.name = os.path.basename(holofile)
+        self.header = self.name
+        self.freqs = (np.linspace(0, len(self.dyn), len(self.dyn)) * df) + fmin
+        self.times = np.linspace(0, len(self.dyn[0]), len(self.dyn[0])) * dt
+        self.nchan = len(self.freqs)
+        self.nsub = len(self.times)
+        self.bw = abs(max(self.freqs)) - abs(min(self.freqs))
+        self.tobs = max(self.times)
+        self.df = df
+        self.dt = dt
+        self.freq = np.mean(np.unique(self.freqs))
+        self.mjd = mjd
         return
 
 
