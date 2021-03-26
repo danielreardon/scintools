@@ -183,7 +183,7 @@ def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
 def Eval_calc(SS, tau, fd, eta, edges):
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
-    v0=thth_red[thth_red.shape[0]//2,:]
+    v0=np.copy(thth_red[thth_red.shape[0]//2,:])
     v0/=np.sqrt((np.abs(v0)**2).sum())
     w,V=eigsh(thth_red,1,v0=v0,which='LA')
     return(np.abs(w[0]))
@@ -488,7 +488,7 @@ def VLBI_chunk_retrieval(params):
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
-
+    dspec_args=(n_dish*(n_dish+1))/2-np.cumsum(np.linspace(1,n_dish,n_dish))
     thth_red=list()
     for i in range(len(dspec2_list)):
         dspec_pad = np.pad(dspec2_list[i],
@@ -497,7 +497,10 @@ def VLBI_chunk_retrieval(params):
                     constant_values=dspec2_list[i].mean())
 
         SS = np.fft.fftshift(np.fft.fft2(dspec_pad))
-        thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges)
+        if np.isin(i,dspec_args)
+            thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges)
+        else:
+            thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges,hermetian=False)
         thth_red.append(thth_single)
     thth_size=thth_red[0].shape[0]
     thth_comp=np.zeros((thth_size*n_dish,thth_size*n_dish),dtype=complex)
