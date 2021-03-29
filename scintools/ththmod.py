@@ -497,7 +497,7 @@ def VLBI_chunk_retrieval(params):
                     constant_values=dspec2_list[i].mean())
 
         SS = np.fft.fftshift(np.fft.fft2(dspec_pad))
-        if np.isin(i,dspec_args)
+        if np.isin(i,dspec_args):
             thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges)
         else:
             thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges,hermetian=False)
