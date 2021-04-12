@@ -10,10 +10,17 @@ import numpy as np
 import astropy.units as u
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm,SymLogNorm
 from scipy.optimize import curve_fit
 
 def svd_model(arr, nmodes=1):
+    """
+    Model a matrix using the first nmodes modes of the singular value decomposition
+
+    Arguments:
+    arr -- 2d numpy array ti be modeled
+    nmodes -- Number os SVD modes to use in reconstruction
+    """
     u, s, w = np.linalg.svd(arr)
     s[nmodes:] = 0
     S = np.zeros(([len(u), len(w)]), np.complex128)
@@ -25,6 +32,12 @@ def svd_model(arr, nmodes=1):
 def chi_par(x, A, x0, C):
     """
     Parabola for fitting to chisq curve.
+
+    Arguments:
+    x -- numpy array of x coordinates of fit
+    A -- 
+    x0 -- x coordinate of parabola extremum
+    C -- y coordinate of extremum
     """
     return A*(x - x0)**2 + C
 
@@ -157,6 +170,19 @@ def rev_map(thth, tau, fd, eta, edges,isdspec=True):
     return(recov.T)
 
 def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
+    """"
+    Create theta-theta array as well as model theta-theta, Conjugate Spectrum and Dynamic Spectrum
+    from data conjugate spectrum and curvature
+
+    Arguments:
+    SS -- 2d complex numpy array of the Conjugate Spectrum
+    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
+    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
+    eta -- curvature of main arc in units of (tau/fd^2)
+    edges -- 1d array of coordinate of bin edges in theta-theta array
+    fd2 --  fd values for reverse theta-theta map (defaults to fd)
+    tau2 -- tau values for reverse theta-theta map (defaults to tau)
+    """"
     if fd2==None:
         fd2=fd
     if tau2==None:
@@ -176,12 +202,40 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
     return(thth_red,thth2_red,recov,model,edges_red,w,V)
 
 def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
+    """
+    Calculate chisq value for modeled dynamic spectrum for a given curvature
+
+    Arguments:
+    dspec -- 2d array of observed dynamic spectrum
+    SS -- 2d array of conjugate spectrum
+    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
+    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
+    eta -- curvature of main arc in units of (tau/fd^2)
+    edges -- 1d array of coordinate of bin edges in theta-theta array
+    mask -- 2d boolean array of points in dynamic spectrum for fitting
+    N -- Variance of dynamic spectrum noise
+    fd2 --  fd values for reverse theta-theta map (defaults to fd)
+    tau2 -- tau values for reverse theta-theta map (defaults to tau)
+
+    """
     model=modeler(SS, tau, fd, eta, edges,fd2,tau2)[3][:dspec.shape[0],:dspec.shape[1]]
     chisq=np.sum((model-dspec)[mask]**2)/N
     return(chisq)
 
 def Eval_calc(SS, tau, fd, eta, edges):
+    """
+    Calculates the dominant eigenvalue for the theta-theta matrix from a given conjugate spectrum
+    and curvature.
+
+
+    Arguments:
+    SS -- 2d complex numpy array of the Conjugate Spectrum
+    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
+    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
+    eta -- curvature of main arc in units of (tau/fd^2)
+    edges -- 1d array of coordinate of bin edges in theta-theta array
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
+    """
     ##Find first eigenvector and value
     v0=np.copy(thth_red[thth_red.shape[0]//2,:])
     v0/=np.sqrt((np.abs(v0)**2).sum())
@@ -365,9 +419,10 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     recov_E=np.abs(np.fft.fftshift(np.fft.fft2(model_E)))**2
     model_E=model_E[:dspec.shape[0],:dspec.shape[1]]
     N_E=recov_E[:recov_E.shape[0]//4,:].mean()
+    thth_derot=thth_red*np.conjugate(thth2_red)
 
-    grid=plt.GridSpec(5,2)
-    plt.figure(figsize=(8,20))
+    grid=plt.GridSpec(6,2)
+    plt.figure(figsize=(8,24))
     plt.subplot(grid[0,0])
     plt.imshow(dspec,
             aspect='auto',
@@ -430,8 +485,26 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2)
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
-    plt.title(r'Data $\theta-\theta$')
-    plt.subplot(grid[3,:])
+    plt.title(r'Model $\theta-\theta$')
+    plt.subplot(grid[3,0])
+    plt.imshow(thth_derot.real,
+            norm=SymLogNorm(np.median(np.abs(thth_red)**2)),
+            origin='lower',
+            aspect='auto',
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max())
+    plt.xlabel(r'$\theta_1$')
+    plt.ylabel(r'$\theta_2$')
+    plt.title(r'Derotated $\theta-\theta$ (real)')
+    plt.subplot(grid[3,1])
+    plt.imshow(thth_derot.imag,
+            norm=SymLogNorm(np.median(np.abs(thth_red)**2)),
+            origin='lower',
+            aspect='auto',
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max())
+    plt.xlabel(r'$\theta_1$')
+    plt.ylabel(r'$\theta_2$')
+    plt.title(r'Derotated $\theta-\theta$ (imag)')
+    plt.subplot(grid[4,:])
     plt.plot(etas,measure)
     if not np.isnan(eta_fit):
         exp_fit = int(('%.0e' % eta_fit.value)[2:])
@@ -451,7 +524,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
         plt.title('Chisquare Search')
         plt.ylabel(r'$\chi^2$')
     plt.xlabel(r'$\eta$ ($s^3$)')
-    plt.subplot(grid[4,0])
+    plt.subplot(grid[5,0])
     plt.imshow(np.angle(model_E),
             cmap='twilight',
             aspect='auto',
@@ -461,7 +534,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Recovered Phases')
-    plt.subplot(grid[4,1])
+    plt.subplot(grid[5,1])
     plt.imshow(recov_E,
             norm=LogNorm(),
             origin='lower',
