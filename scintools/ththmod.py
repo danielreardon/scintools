@@ -170,7 +170,7 @@ def rev_map(thth, tau, fd, eta, edges,isdspec=True):
     return(recov.T)
 
 def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
-    """"
+    """
     Create theta-theta array as well as model theta-theta, Conjugate Spectrum and Dynamic Spectrum
     from data conjugate spectrum and curvature
 
@@ -182,7 +182,7 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
     edges -- 1d array of coordinate of bin edges in theta-theta array
     fd2 --  fd values for reverse theta-theta map (defaults to fd)
     tau2 -- tau values for reverse theta-theta map (defaults to tau)
-    """"
+    """
     if fd2==None:
         fd2=fd
     if tau2==None:
