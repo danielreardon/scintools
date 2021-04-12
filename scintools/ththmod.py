@@ -236,6 +236,7 @@ def Eval_calc(SS, tau, fd, eta, edges):
     edges -- 1d array of coordinate of bin edges in theta-theta array
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     """
+    thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
     v0=np.copy(thth_red[thth_red.shape[0]//2,:])
     v0/=np.sqrt((np.abs(v0)**2).sum())
