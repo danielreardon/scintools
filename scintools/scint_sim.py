@@ -45,6 +45,7 @@ class Simulation():
 
         self.mb2 = mb2
         self.rf = rf
+        self.ds = ds
         self.dx = dx if dx is not None else ds
         self.dy = dy if dy is not None else ds
         self.alpha = alpha
@@ -119,9 +120,16 @@ class Simulation():
         self.dyn = np.transpose(dyn)
 
         # # Theoretical arc curvature
-        # V = 1
-        # k = 2*pi/lambda0
-        # L = rf^2*k
+        V = self.ds / self.dt
+        lambda0 = self.freq  # wavelength, c=1
+        k = 2*np.pi/lambda0  # wavenumber
+        L = self.rf**2 * k  
+        # Curvature to use for Dynspec object within scintools
+        self.eta = L/(2 * V**2) / 10**6  
+        c = 299792458.0  # m/s
+        beta_to_eta = c*1e6/((self.freq*10**6)**2)
+        # Curvature for wavelength-rescaled dynamic spectrum
+        self.betaeta = self.eta / beta_to_eta  
 
         return
 
