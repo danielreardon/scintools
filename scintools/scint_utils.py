@@ -20,7 +20,7 @@ import pickle
 from astropy.time import Time
 
 
-def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
+def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
                   subint_threshold=5, output_directory=None):
     """
     Cleans an archive using coast_guard
@@ -93,6 +93,10 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'dnu'):  # Scintillation bandwidth
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
+        
+    if hasattr(dyn, 'dnu_est'):  # Estimated scintillation bandwidth
+        header += ",dnu_est"
+        write_string += ",{0}".format(dyn.dnu_est)
 
     if hasattr(dyn, 'ar'):  # Axial ratio
         header += ",ar,arerr"
@@ -517,10 +521,19 @@ def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
 
     freq = freq / 1e3   # convert to GHz
     if params is not None:
-        d = params['d']
-        d_err = params['derr']
-        s = params['s']
-        s_err = params['serr']
+        try:
+            d = params['d']
+            d_err = params['derr']
+        except KeyError:
+            d = params['d'].value
+            d_err = params['d'].stderr
+        
+        try:
+            s = params['s']
+            s_err = params['serr']
+        except KeyError:
+            s = params['s'].value
+            s_err = params['s'].stderr
 
         coeff = a * np.sqrt(2 * d * (1 - s) / s)  # thin screen coefficient
         coeff_err = (dnu / s) * ((1 - s) * d_err**2 / (2 * d) +

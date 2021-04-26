@@ -25,7 +25,7 @@ class Simulation():
                  inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
                  seed=None, nx=None, ny=None, dx=None, dy=None, plot=False,
                  verbose=False, freq=1400, dt=30, mjd=50000, nsub=None,
-                 efield=False):
+                 efield=False, noise=None):
         """
         Electromagnetic simulator based on original code by Coles et al. (2010)
 
