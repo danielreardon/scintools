@@ -558,7 +558,7 @@ class Dynspec:
     def fit_arc(self, asymm=False, plot=False, delmax=None, numsteps=1e4,
                 startbin=3, cutmid=3, lamsteps=False, etamax=None, etamin=None,
                 low_power_diff=-1, figsize=(9, 9), high_power_diff=-0.5,
-                ref_freq=1400, constraint=[0, np.inf], nsmooth=5,
+                ref_freq=1400, constraint=[0, np.inf], nsmooth=5, efac=1,
                 filename=None, noise_error=True, display=True, figN=None,
                 log_parabola=False, logsteps=False, plot_spec=False,
                 fit_spectrum=False, subtract_artefacts=False, dpi=200):
@@ -607,6 +607,7 @@ class Dynspec:
 
         # noise of mean out to delmax.
         noise = np.sqrt(np.sum(np.power(noise, 2)))/np.sqrt(len(yaxis)*2)
+        self.noise = noise
 
         if etamax is None:
             etamax = ymax/((self.fdop[1]-self.fdop[0])*cutmid)**2
@@ -761,13 +762,27 @@ class Dynspec:
                                     etaArray[int(ind+ind2)])/2
 
                 self.eta_array = etaArray
+                sigma = self.noise * efac
                 if asymm:
                     if dummy == 0:
                         self.norm_sspec_avg1 = spec
+                        prob = 1/(sigma * np.sqrt(2*np.pi)) * \
+                            np.exp(-0.5 * ((spec - np.max(spec)) / sigma)**2)
+                        self.prob_eta_peak1 = prob
+                        
                     else:
                         self.norm_sspec_avg2 = spec
+                        prob = 1/(sigma * np.sqrt(2*np.pi)) * \
+                            np.exp(-0.5 * ((spec - np.max(spec)) / sigma)**2)
+                        self.prob_eta_peak2 = prob
                 else:
                     self.norm_sspec_avg = spec
+                    prob = 1/(sigma * np.sqrt(2*np.pi)) * \
+                        np.exp(-0.5 * ((spec - np.max(spec)) / sigma)**2)
+                    self.prob_eta_peak = prob
+                    
+                
+                
 
                 if iarc == 0:  # save primary
                     if asymm and dummy == 0:
