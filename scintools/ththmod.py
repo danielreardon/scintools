@@ -662,3 +662,66 @@ def mosaic(chunks):
             E_recov[cf*cwf//2:cf*cwf//2+cwf,ct*cwt//2:ct*cwt//2+cwt]+=chunk_new*mask*np.exp(1j*rot)
     return(E_recov)
 
+def two_curve_map(SS, tau, fd, eta1, edges1,eta2,edges2):
+    """Map from Secondary Spectrum to theta-theta space allowing for arclets with different curvature
+
+    Arguments:
+    SS -- Secondary Spectrum in [tau,fd] order with (0,0) in center
+    tau -- Time lags in ascending order
+    fd -- doppler frequency in ascending order
+    eta1-- curvature of the main arc with the units of tau and fd
+    edges1 -- 1d numpy array with the edges of the theta bins along the main arc
+    eta2-- curvature of the arclets with the units of tau and fd
+    edges2 -- 1d numpy array with the edges of the theta bins along the arclets
+    """
+
+    # Find bin centers
+    th_cents1 = (edges1[1:] + edges1[:-1]) / 2
+#     th_cents1 -= th_cents1[np.abs(th_cents1) == np.abs(th_cents1).min()]
+    th_cents2 = (edges2[1:] + edges2[:-1]) / 2
+#     th_cents2 -= th_cents2[np.abs(th_cents2) == np.abs(th_cents2).min()]
+    # Calculate theta1 and th2 arrays
+    th1 = np.ones((th_cents2.shape[0], th_cents1.shape[0])) * th_cents1
+    th2 = np.ones((th_cents2.shape[0], th_cents1.shape[0])) * th_cents2[:,np.newaxis]
+
+    # tau and fd step sizes
+    dtau = np.diff(tau).mean()
+    dfd = np.diff(fd).mean()
+
+    # Find bin in SS space that each point maps back to
+    tau_inv = (((eta1 * th1**2 - eta2*th2**2)*u.mHz**2
+                - tau[1] + dtau/2)//dtau).astype(int)
+    fd_inv = (((th1 - th2)*u.mHz - fd[1] + dfd/2)//dfd).astype(int)
+
+    # Define thth
+    thth = np.zeros(tau_inv.shape, dtype=complex)
+
+    # Only fill thth points that are within the SS
+    pnts = (tau_inv > 0) * (tau_inv < tau.shape[0]-1) * (fd_inv < fd.shape[0]-1)
+    thth[pnts] = SS[tau_inv[pnts], fd_inv[pnts]]
+
+    # Preserve flux (int
+    thth *= np.sqrt(np.abs(2*eta1*th1-2*eta2*th2)).value
+
+    th2_max=np.sqrt(tau.max()/eta2)
+    th1_max=np.sqrt(tau.max()/eta1)
+    th_cents1 = (edges1[1:] + edges1[:-1]) / 2
+#     th_cents1 -= th_cents1[np.abs(th_cents1) == np.abs(th_cents1).min()]
+    th_cents2 = (edges2[1:] + edges2[:-1]) / 2
+#     th_cents2 -= th_cents2[np.abs(th_cents2) == np.abs(th_cents2).min()]
+    pnts_1=np.abs(th_cents1)<th1_max.value
+    pnts_2=np.abs(th_cents2)<th2_max.value
+    edges_red1=np.zeros(pnts_1[pnts_1].shape[0]+1)
+    edges_red1[:-1]=edges1[:-1][pnts_1]
+    edges_red1[-1]=edges1[1:][pnts_1].max()
+    edges_red2=np.zeros(pnts_2[pnts_2].shape[0]+1)
+    edges_red2[:-1]=edges2[:-1][pnts_2]
+    edges_red2[-1]=edges2[1:][pnts_2].max()
+    thth_red=thth[pnts_2,:][:,pnts_1]
+    th_cents1 = (edges_red1[1:] + edges_red1[:-1]) / 2
+    th_cents2 = (edges_red2[1:] + edges_red2[:-1]) / 2
+#     thth_red[:,eta1*(th_cents1**2)<eta2*(th_cents2.max())**2]=0
+    return(thth_red,edges_red1,edges_red2)
+
+
+
