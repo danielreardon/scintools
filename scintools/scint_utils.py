@@ -580,6 +580,32 @@ def make_pickle(obj, filepath):
     with open(filepath, 'wb') as f_out:
         for idx in range(0, n_bytes, max_bytes):
             f_out.write(bytes_out[idx:idx+max_bytes])
+            
+
+def calculate_curvature_peak_probability(power_data, noise_level, 
+                                         curvatures=None):
+    """
+    Calculates the probability distribution 
+    """
+    prob = 1/(noise_level * np.sqrt(2*np.pi)) * \
+        np.exp(-0.5 * ((power_data - np.max(power_data)) / noise_level)**2)
+    # Note: currently doesn't normalise using "curvatures"
+    return prob
+
+
+def save_curvature_data(dyn, filename=None):
+    """
+    Saves the "power vs curvature" and noise level to file
+    """
+    if filename is None:
+        filename = dyn.name + 'curvature_data'
+        
+    if hasattr(dyn, 'norm_sspec_avg1'):
+        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg1, 
+                 dyn.norm_sspec_avg2, dyn.noise)
+    else:
+        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg, dyn.noise)
+    return
 
 
 def load_pickle(filepath):
