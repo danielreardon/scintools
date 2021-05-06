@@ -583,12 +583,16 @@ def make_pickle(obj, filepath):
             
 
 def calculate_curvature_peak_probability(power_data, noise_level, 
-                                         curvatures=None):
+                                         curvatures=None, log=False):
     """
     Calculates the probability distribution 
     """
-    prob = 1/(noise_level * np.sqrt(2*np.pi)) * \
-        np.exp(-0.5 * ((power_data - np.max(power_data)) / noise_level)**2)
+    if log:
+        prob = np.log(1/(noise_level * np.sqrt(2*np.pi))) + \
+            -0.5 * ((power_data - np.max(power_data)) / noise_level)**2
+    else:
+        prob = 1/(noise_level * np.sqrt(2*np.pi)) * \
+            np.exp(-0.5 * ((power_data - np.max(power_data)) / noise_level)**2)
     # Note: currently doesn't normalise using "curvatures"
     return prob
 
