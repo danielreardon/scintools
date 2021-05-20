@@ -318,19 +318,19 @@ def scint_sspec_model(params, xdata, ydata):
     """
 
     parvals = params.valuesdict()
-    
+
     nt = parvals['nt']
-    
+
     # Scintillation timescale model
     xdata_t = xdata[:nt]
     ydata_t = ydata[:nt]
     residuals_t = tau_sspec_model(params, xdata_t, ydata_t)
-    
+
     # Scintillation bandwidth model
     xdata_f = xdata[nt:]
     ydata_f = ydata[nt:]
     residuals_f = dnu_sspec_model(params, xdata_f, ydata_f)
-    
+
     return np.concatenate((residuals_t, residuals_f))
 
 
@@ -562,7 +562,7 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
             omega = OM
         # Note: fifth Keplerian param T0 used in true anomaly calculation
         if 'KIN' in params.keys():
-            INC = params['KIN']*np.pi/180  # inclination 
+            INC = params['KIN']*np.pi/180  # inclination
         elif 'COSI' in params.keys():
             INC = np.arccos(params['COSI'])
         elif 'SINI' in params.keys():
@@ -570,16 +570,16 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
         else:
             print('Warning: inclination parameter (KIN, COSI, or SINI) ' +
                   'not found')
-            
+
         if 'sense' in params.keys():
             sense = params['sense']
             if sense < 0.5:  # KIN < 90
                 if INC > np.pi/2:
                     INC = np.pi - INC
-            if sense >= 0.5: # KIN > 90
+            if sense >= 0.5:  # KIN > 90
                 if INC < np.pi/2:
                     INC = np.pi - INC
-                    
+
         KOM = params['KOM']*np.pi/180  # longitude ascending node
 
         # Calculate pulsar velocity aligned with the line of nodes (Vx) and
@@ -588,7 +588,7 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
                                          np.sqrt(1 - ECC**2))
         vp_x = -vp_0 * (ECC * np.sin(omega) + np.sin(true_anomaly + omega))
         vp_y = vp_0 * np.cos(INC) * (ECC * np.cos(omega) + np.cos(true_anomaly
-                                                               + omega))
+                                                                  + omega))
     else:
         vp_x = 0
         vp_y = 0

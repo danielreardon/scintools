@@ -19,7 +19,7 @@ from copy import deepcopy as cp
 from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          scint_acf_model_2d, tau_acf_model, dnu_acf_model,\
                          fit_parabola, fit_log_parabola, fitter, \
-                         powerspectrum_model, scint_sspec_model
+                         powerspectrum_model
 from scintools.scint_utils import is_valid, svd_model, interp_nan_2d
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
@@ -193,7 +193,7 @@ class Dynspec:
         """
 
         self.trim_edges()  # remove zeros on band edges
-        self.refill()  # refill and zeroed regions with linear interpolation
+        # self.refill()  # refill and zeroed regions with linear interpolation
         # self.correct_dyn()  # correct by svd
         self.calc_acf()  # calculate the ACF
         if lamsteps:
@@ -352,7 +352,7 @@ class Dynspec:
             plt.show()
 
     def plot_sspec(self, lamsteps=False, input_sspec=None, filename=None,
-                   input_x=None, input_y=None, trap=False, prewhite=True,
+                   input_x=None, input_y=None, trap=False, prewhite=False,
                    plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
                    cutmid=0, startbin=0, display=True, colorbar=True,
                    title=None, figsize=(9, 9), subtract_artefacts=False,
@@ -769,7 +769,6 @@ class Dynspec:
                         prob = 1/(sigma * np.sqrt(2*np.pi)) * \
                             np.exp(-0.5 * ((spec - np.max(spec)) / sigma)**2)
                         self.prob_eta_peak1 = prob
-                        
                     else:
                         self.norm_sspec_avg2 = spec
                         prob = 1/(sigma * np.sqrt(2*np.pi)) * \
@@ -780,9 +779,6 @@ class Dynspec:
                     prob = 1/(sigma * np.sqrt(2*np.pi)) * \
                         np.exp(-0.5 * ((spec - np.max(spec)) / sigma)**2)
                     self.prob_eta_peak = prob
-                    
-                
-                
 
                 if iarc == 0:  # save primary
                     if asymm and dummy == 0:
@@ -1251,8 +1247,8 @@ class Dynspec:
             Method:
                 acf1d - takes a 1D cut through the centre of the ACF for
                 sspec - measures timescale from the secondary spectrum
-                acf2d_approx - uses an analytic approximation to the ACF including
-                    a phase gradient (a shear to the ACF)
+                acf2d_approx - uses an analytic approximation to the ACF
+                    including a phase gradient (a shear to the ACF)
         """
 
         if not hasattr(self, 'acf'):
@@ -1315,8 +1311,8 @@ class Dynspec:
             for itr in range(nitr):
                 results = fitter(scint_acf_model, params,
                                  (xdata, ydata, None), nan_policy=nan_policy,
-                                  mcmc=mcmc, is_weighted=(not lnsigma),
-                                  burn=burn, nwalkers=nwalkers, steps=steps)
+                                 mcmc=mcmc, is_weighted=(not lnsigma),
+                                 burn=burn, nwalkers=nwalkers, steps=steps)
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
@@ -1536,43 +1532,42 @@ class Dynspec:
             sspec method
             '''
             print("This method doesn't work yet, do something else")
-            fdyn = np.fft.fft2(self.dyn, (2 * nf, 2 * nt))
-            fdynsq = fdyn * np.conjugate(fdyn)
-            
-            secspec = np.real(fdynsq)
-            secspec = np.fft.fftshift(fdynsq)
-            secspec = secspec[nf:2*nf, :]
-            secspec = np.real(secspec)
-            
-            rowsum = np.sum(secspec[:, :nt], axis=0)
-            ydata_t = rowsum / (2*nf)
-            colsum = np.sum(secspec[:nf, :], axis=1)
-            ydata_f = colsum / (2 * nt)
-            
-            # concatenate x and y arrays
-            xdata = np.array(np.concatenate((xdata_t, xdata_f)))
-            ydata = np.concatenate((ydata_t, ydata_f))
-            
-            if verbose:
-                print("\nPerforming least-squares fit to secondary spectrum")
-            chisqr = np.inf
-            for itr in range(nitr):
-                results = fitter(scint_sspec_model, params,
-                                 (xdata, ydata), nan_policy=nan_policy,
-                                  mcmc=mcmc, is_weighted=(not lnsigma),
-                                  burn=burn, nwalkers=nwalkers, steps=steps)
-                if results.chisqr < chisqr:
-                    chisqr = results.chisqr
-                    params = results.params
-                    res = results
-        
+            # fdyn = np.fft.fft2(self.dyn, (2 * nf, 2 * nt))
+            # fdynsq = fdyn * np.conjugate(fdyn)
+
+            # secspec = np.real(fdynsq)
+            # secspec = np.fft.fftshift(fdynsq)
+            # secspec = secspec[nf:2*nf, :]
+            # secspec = np.real(secspec)
+
+            # rowsum = np.sum(secspec[:, :nt], axis=0)
+            # ydata_t = rowsum / (2*nf)
+            # colsum = np.sum(secspec[:nf, :], axis=1)
+            # ydata_f = colsum / (2 * nt)
+
+            # # concatenate x and y arrays
+            # xdata = np.array(np.concatenate((xdata_t, xdata_f)))
+            # ydata = np.concatenate((ydata_t, ydata_f))
+
+            # if verbose:
+            #     print("\nPerforming least-squares fit to secondary spectrum")
+            # chisqr = np.inf
+            # for itr in range(nitr):
+            #     results = fitter(scint_sspec_model, params,
+            #                      (xdata, ydata), nan_policy=nan_policy,
+            #                       mcmc=mcmc, is_weighted=(not lnsigma),
+            #                       burn=burn, nwalkers=nwalkers, steps=steps)
+            #     if results.chisqr < chisqr:
+            #         chisqr = results.chisqr
+            #         params = results.params
+            #         res = results
+
         if flux_estimate:
             flux_var_est = \
                 np.mean(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])**2
             flux_var = np.var(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])
             # Estimate of scint bandwidth
             self.dnu_est = self.df * flux_var/flux_var_est
-            
 
         # Done fitting - now define results
         self.tau = res.params['tau'].value

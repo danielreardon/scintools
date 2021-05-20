@@ -123,13 +123,13 @@ class Simulation():
         V = self.ds / self.dt
         lambda0 = self.freq  # wavelength, c=1
         k = 2*np.pi/lambda0  # wavenumber
-        L = self.rf**2 * k  
+        L = self.rf**2 * k
         # Curvature to use for Dynspec object within scintools
         self.eta = L/(2 * V**2) / 10**6 / np.cos(psi * np.pi/180)**2
         c = 299792458.0  # m/s
         beta_to_eta = c*1e6/((self.freq*10**6)**2)
         # Curvature for wavelength-rescaled dynamic spectrum
-        self.betaeta = self.eta / beta_to_eta  
+        self.betaeta = self.eta / beta_to_eta
 
         return
 
@@ -525,7 +525,7 @@ class ACF():
         Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
 
         dsp = 2 * spmax / (ns)
-        ddnun = 2 * dnumax / nf
+        # ddnun = 2 * dnumax / nf
 
         sqrtar = np.sqrt(self.ar)
         # equally spaced dnu array dnu = dnun * nuhalf
@@ -666,10 +666,10 @@ class ACF():
 
 class Brightness():
 
-    def __init__(self, ar=1.0, exponent=1.67, thetagx=0.5, thetagy=0.0,
-                 thetarx=0.5, thetary=0.0, df=0.04, dt=0.08, dx=0.1,
+    def __init__(self, ar=1.0, exponent=1.67, thetagx=0, thetagy=0.0, psi=90,
+                 thetarx=0, thetary=0.0, df=0.04, dt=0.08, dx=0.1,
                  nf=10, nt=80, nx=30, ncuts=5, plot=True, contour=True,
-                 figsize=(10, 8), smooth_jacobian=True):
+                 figsize=(10, 8), smooth_jacobian=False):
         """
         Simulate Delay-Doppler Spectrum from Scattered angular spectrum from
         Yao et al. (2020), modified to get the phase gradient terms correctly
@@ -706,6 +706,7 @@ class Brightness():
         self.thetagy = thetagy
         self.thetarx = thetarx
         self.thetary = thetary
+        self.psi = psi
         self.df = df
         self.dt = dt
         self.dx = dx
@@ -716,30 +717,42 @@ class Brightness():
 
         # Calculate brighness distribution
         self.calc_brightness()
-        # Calculate secondary spectrum and ACF
-        self.calc_SS(smooth_jacobian=smooth_jacobian)
-        self.calc_acf()
-
         if plot:
             self.plot_acf_efield(figsize=figsize)
             self.plot_brightness(figsize=figsize)
+
+        # Calculate secondary spectrum
+        self.calc_SS(smooth_jacobian=smooth_jacobian)
+        if plot:
             self.plot_sspec(figsize=figsize)
-            self.plot_acf(figsize=figsize, contour=contour)
             self.plot_cuts(figsize=figsize)
+
+        # Calculate ACF
+        self.calc_acf()
+        if plot:
+            self.plot_acf(figsize=figsize, contour=contour)
 
     def calc_brightness(self):
         # first need to get the brightness distribution from the ACF of the
         # electric field. Reference distances to the spatial scale in the
         # X-direction
 
-        # if you want to set the orientation of the axial ratio to some angle
-        # other than 0 or 90 degrees, this is the place to do it
-
         x = np.arange(-self.nx, self.nx, self.dx)
         self.X, self.Y = np.meshgrid(x, x)
+
+        R = (self.ar**2 - 1) / (self.ar**2 + 1)
+        cosa = np.cos(2 * self.psi * np.pi/180)
+        sina = np.sin(2 * self.psi * np.pi/180)
+        # quadratic coefficients
+        a = (1 - R * cosa) / np.sqrt(1 - R**2)
+        b = (1 + R * cosa) / np.sqrt(1 - R**2)
+        c = -2 * R * sina / np.sqrt(1 - R**2)
+
         # ACF of electric field
-        Rho = np.exp(-(self.X**2 + (1/self.ar)**2 * self.Y**2)
+        Rho = np.exp(-(a * self.X**2 + b * self.Y**2 +
+                       c * self.X * self.Y)
                      ** (self.exponent/2))
+
         self.x = x
         self.acf_efield = Rho
 
