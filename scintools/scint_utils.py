@@ -20,7 +20,7 @@ import pickle
 from astropy.time import Time
 
 
-def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=7,
+def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
                   subint_threshold=5, output_directory=None):
     """
     Cleans an archive using coast_guard
@@ -93,6 +93,10 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'dnu'):  # Scintillation bandwidth
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
+        
+    if hasattr(dyn, 'dnu_est'):  # Estimated scintillation bandwidth
+        header += ",dnu_est"
+        write_string += ",{0}".format(dyn.dnu_est)
 
     if hasattr(dyn, 'ar'):  # Axial ratio
         header += ",ar,arerr"
@@ -372,7 +376,6 @@ def pars_to_params(pars, params=None):
     """
     Converts a dictionary of par file parameters from read_par() to an
     lmfit Parameters() class to use in models
-
     By default, parameters are not varied
     """
 
@@ -438,12 +441,9 @@ def slow_FT(dynspec, freqs):
     Slow FT of dynamic spectrum along points of
     t*(f / fref), account for phase scaling of f_D.
     Given a uniform t axis, this reduces to a regular FT
-
     Reference freq is currently hardcoded to the middle of the band
-
     Parameters
     ----------
-
     dynspec: [time, frequency] ndarray
         Dynamic spectrum to be Fourier Transformed
     f: array of floats
@@ -486,13 +486,11 @@ def slow_FT(dynspec, freqs):
 def svd_model(arr, nmodes=1):
     """
     Take SVD of a dynamic spectrum, divide by the largest N modes
-
     Parameters
     ----------
     arr : array_like
       Time/freq visiblity matrix
     nmodes :
-
     Returns
     -------
     Original data array multiplied by the largest SVD mode conjugate,
@@ -517,10 +515,19 @@ def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
 
     freq = freq / 1e3   # convert to GHz
     if params is not None:
-        d = params['d']
-        d_err = params['derr']
-        s = params['s']
-        s_err = params['serr']
+        try:
+            d = params['d']
+            d_err = params['derr']
+        except KeyError:
+            d = params['d'].value
+            d_err = params['d'].stderr
+        
+        try:
+            s = params['s']
+            s_err = params['serr']
+        except KeyError:
+            s = params['s'].value
+            s_err = params['s'].stderr
 
         coeff = a * np.sqrt(2 * d * (1 - s) / s)  # thin screen coefficient
         coeff_err = (dnu / s) * ((1 - s) * d_err**2 / (2 * d) +
@@ -567,6 +574,36 @@ def make_pickle(obj, filepath):
     with open(filepath, 'wb') as f_out:
         for idx in range(0, n_bytes, max_bytes):
             f_out.write(bytes_out[idx:idx+max_bytes])
+            
+
+def calculate_curvature_peak_probability(power_data, noise_level, 
+                                         curvatures=None, log=False):
+    """
+    Calculates the probability distribution 
+    """
+    if log:
+        prob = np.log(1/(noise_level * np.sqrt(2*np.pi))) + \
+            -0.5 * ((power_data - np.max(power_data)) / noise_level)**2
+    else:
+        prob = 1/(noise_level * np.sqrt(2*np.pi)) * \
+            np.exp(-0.5 * ((power_data - np.max(power_data)) / noise_level)**2)
+    # Note: currently doesn't normalise using "curvatures"
+    return prob
+
+
+def save_curvature_data(dyn, filename=None):
+    """
+    Saves the "power vs curvature" and noise level to file
+    """
+    if filename is None:
+        filename = dyn.name + 'curvature_data'
+        
+    if hasattr(dyn, 'norm_sspec_avg1'):
+        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg1, 
+                 dyn.norm_sspec_avg2, dyn.noise)
+    else:
+        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg, dyn.noise)
+    return
 
 
 def load_pickle(filepath):

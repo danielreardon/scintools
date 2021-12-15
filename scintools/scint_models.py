@@ -4,18 +4,14 @@
 models.py
 ----------------------------------
 Scintillation models
-
-A library of scintillation models to use with lmfit
-
+A library of scintillation models to use with lmfit, emcee, or bilby
     Each model has at least inputs:
         params
         xdata
         ydata
         weights
-
     And output:
         residuals = (ydata - model) * weights
-
     Some functions use additional inputs
 """
 
@@ -34,7 +30,7 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
     maxfev = [0 if max_nfev is None else max_nfev]
     maxfev = int(maxfev[0])
     func = Minimizer(model, params, fcn_args=args, nan_policy=nan_policy,
-                     maxfev=maxfev)
+                     max_nfev=maxfev)
     results = func.minimize()
     if mcmc:
         func = Minimizer(model, results.params, fcn_args=args)
@@ -250,7 +246,7 @@ def scint_acf_model_2d(params, ydata, weights):
     return (ydata - model) * weights
 
 
-def tau_sspec_model(params, xdata, ydata, weights):
+def tau_sspec_model(params, xdata, ydata):
     """
     Fit 1D function to cut through ACF for scintillation timescale.
     Exponent is 5/3 for Kolmogorov turbulence.
@@ -259,9 +255,6 @@ def tau_sspec_model(params, xdata, ydata, weights):
         alpha = index of exponential function. 2 is Gaussian, 5/3 is Kolmogorov
         wn = white noise spike in ACF cut
     """
-
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
 
     amp = params['amp']
     tau = params['tau']
@@ -281,10 +274,11 @@ def tau_sspec_model(params, xdata, ydata, weights):
     model = np.real(model)
     model = model[0:len(xdata)]
 
-    return (ydata - model) * weights
+    # Use the model for the weights
+    return (ydata - model) * model
 
 
-def dnu_sspec_model(params, xdata, ydata, weights):
+def dnu_sspec_model(params, xdata, ydata):
     """
     Fit 1D function to cut through ACF for decorrelation bandwidth.
     Default function has is exponential with dnu measured at half power
@@ -292,8 +286,6 @@ def dnu_sspec_model(params, xdata, ydata, weights):
         dnu = bandwidth at 1/2 power
         wn = white noise spike in ACF cut
     """
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
 
     amp = params['amp']
     dnu = params['dnu']
@@ -312,34 +304,30 @@ def dnu_sspec_model(params, xdata, ydata, weights):
     model = np.real(model)
     model = model[0:len(xdata)]
 
-    return (ydata - model) * weights
+    # Use the model for the weights
+    return (ydata - model) * model
 
 
-def scint_sspec_model(params, xdata, ydata, weights):
+def scint_sspec_model(params, xdata, ydata):
     """
     Fit both tau (tau_acf_model) and dnu (dnu_acf_model) simultaneously
     """
 
-    # if weights is None:
-    #     weights = np.ones(np.shape(ydata))
-    #
-    # parvals = params.valuesdict()
-    #
-    # nt = parvals['nt']
-    #
-    # # Scintillation timescale model
-    # xdata_t = xdata[:nt]
-    # ydata_t = ydata[:nt]
-    # weights_t = weights[:nt]
-    # residuals_t = tau_sspec_model(params, xdata_t, ydata_t, weights_t)
-    #
-    # # Scintillation bandwidth model
-    # xdata_f = xdata[nt:]
-    # ydata_f = ydata[nt:]
-    # weights_f = weights[nt:]
-    # residuals_f = dnu_sspec_model(params, xdata_f, ydata_f, weights_f)
-    #
-    # return np.concatenate((residuals_t, residuals_f))
+    parvals = params.valuesdict()
+
+    nt = parvals['nt']
+
+    # Scintillation timescale model
+    xdata_t = xdata[:nt]
+    ydata_t = ydata[:nt]
+    residuals_t = tau_sspec_model(params, xdata_t, ydata_t)
+
+    # Scintillation bandwidth model
+    xdata_f = xdata[nt:]
+    ydata_f = ydata[nt:]
+    residuals_f = dnu_sspec_model(params, xdata_f, ydata_f)
+
+    return np.concatenate((residuals_t, residuals_f))
 
 
 def arc_power_curve(params, xdata, ydata, weights):
@@ -409,7 +397,6 @@ def arc_curvature(params, ydata, weights, true_anomaly,
                   vearth_ra, vearth_dec):
     """
     arc curvature model
-
         ydata: arc curvature
     """
 
@@ -470,11 +457,10 @@ def arc_curvature(params, ydata, weights, true_anomaly,
 
 
 def veff_thin_screen(params, ydata, weights, true_anomaly,
-                     vearth_ra, vearth_dec):
+                     vearth_ra, vearth_dec, mjd=None):
     """
     Effective velocity thin screen model.
     Uses Eq. 4 from Rickett et al. (2014) for anisotropy coefficients.
-
         ydata: arc curvature
     """
 
@@ -495,7 +481,7 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
 
     veff_ra, veff_dec, vp_ra, vp_dec = \
         effective_velocity_annual(params, true_anomaly,
-                                  vearth_ra, vearth_dec)
+                                  vearth_ra, vearth_dec, mjd=mjd)
 
     if 'nmodel' in params.keys():
         nmodel = params['nmodel']
@@ -546,7 +532,8 @@ Below: Models that do not return residuals for a fitter
 """
 
 
-def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
+def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
+                              mjd=None):
     """
     Effective velocity with annual and pulsar terms
         Note: Does NOT include IISM velocity, but returns veff in IISM frame
@@ -562,7 +549,11 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
         A1 = params['A1']  # projected semi-major axis in lt-s
         PB = params['PB']  # orbital period in days
         ECC = params['ECC']  # orbital eccentricity
-        OM = params['OM']*np.pi/180  # longitude of periastron rad
+        OM = params['OM'] * np.pi/180  # longitude of periastron rad
+        if 'OMDOT' in params.keys():
+            omega = OM + params['OMDOT']*np.pi/180*(mjd-params['T0'])/365.2425
+        else:
+            omega = OM
         # Note: fifth Keplerian param T0 used in true anomaly calculation
         if 'KIN' in params.keys():
             INC = params['KIN']*np.pi/180  # inclination
@@ -573,15 +564,25 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec):
         else:
             print('Warning: inclination parameter (KIN, COSI, or SINI) ' +
                   'not found')
+
+        if 'sense' in params.keys():
+            sense = params['sense']
+            if sense < 0.5:  # KIN < 90
+                if INC > np.pi/2:
+                    INC = np.pi - INC
+            if sense >= 0.5:  # KIN > 90
+                if INC < np.pi/2:
+                    INC = np.pi - INC
+
         KOM = params['KOM']*np.pi/180  # longitude ascending node
 
         # Calculate pulsar velocity aligned with the line of nodes (Vx) and
         #   perpendicular in the plane (Vy)
         vp_0 = (2 * np.pi * A1 * v_c) / (np.sin(INC) * PB * 86400 *
                                          np.sqrt(1 - ECC**2))
-        vp_x = -vp_0 * (ECC * np.sin(OM) + np.sin(true_anomaly + OM))
-        vp_y = vp_0 * np.cos(INC) * (ECC * np.cos(OM) + np.cos(true_anomaly
-                                                               + OM))
+        vp_x = -vp_0 * (ECC * np.sin(omega) + np.sin(true_anomaly + omega))
+        vp_y = vp_0 * np.cos(INC) * (ECC * np.cos(omega) + np.cos(true_anomaly
+                                                                  + omega))
     else:
         vp_x = 0
         vp_y = 0

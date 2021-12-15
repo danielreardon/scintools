@@ -25,10 +25,9 @@ class Simulation():
                  inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
                  seed=None, nx=None, ny=None, dx=None, dy=None, plot=False,
                  verbose=False, freq=1400, dt=30, mjd=50000, nsub=None,
-                 efield=False):
+                 efield=False, noise=None):
         """
         Electromagnetic simulator based on original code by Coles et al. (2010)
-
         mb2: Max Born parameter for strength of scattering
         rf: Fresnel scale
         ds (or dx,dy): Spatial step sizes with respect to rf
@@ -45,6 +44,7 @@ class Simulation():
 
         self.mb2 = mb2
         self.rf = rf
+        self.ds = ds
         self.dx = dx if dx is not None else ds
         self.dy = dy if dy is not None else ds
         self.alpha = alpha
@@ -119,9 +119,16 @@ class Simulation():
         self.dyn = np.transpose(dyn)
 
         # # Theoretical arc curvature
-        # V = 1
-        # k = 2*pi/lambda0
-        # L = rf^2*k
+        V = self.ds / self.dt
+        lambda0 = self.freq  # wavelength, c=1
+        k = 2*np.pi/lambda0  # wavenumber
+        L = self.rf**2 * k
+        # Curvature to use for Dynspec object within scintools
+        self.eta = L/(2 * V**2) / 10**6 / np.cos(psi * np.pi/180)**2
+        c = 299792458.0  # m/s
+        beta_to_eta = c*1e6/((self.freq*10**6)**2)
+        # Curvature for wavelength-rescaled dynamic spectrum
+        self.betaeta = self.eta / beta_to_eta
 
         return
 
@@ -245,7 +252,6 @@ class Simulation():
     def get_pulse(self):
         """
         script to get the pulse shape vs distance x from spe
-
         you usually need a spectral window because the leading edge of the
         pulse response is very steep. it is also attractive to pad the spe file
         with zeros before FT of course this correlates adjacent samples in the
@@ -420,7 +426,6 @@ class ACF():
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
-
         s_max - number of coherence spatial scales to calculate over
         dnu_max - number of decorrelation bandwidths to calculate over
         ns - number of spatial steps
@@ -431,7 +436,6 @@ class ACF():
         phasegrad_y - phase gradient in y direction
         Vx - Effective velocity in x direction
         Vy - Effective velocity in y direction
-
         If ISS spectrum is a Kolmogorov power-law with no inner or outer scale,
         alpha=5/3
         """
@@ -455,48 +459,37 @@ class ACF():
         """
         computes 2-D ACF of intensity vs t and v where optimal sampling of t
         and v is provided with the output ACF
-
         assume ISS spectrum is a Kolmogorov power-law with no inner or outer
         scale
-
         requires velocity and angular displacement due to phase gradient
         (vectors) vectors are x, y where x = major axis of spatial structure,
         i.e. density variations are elongated by "ar" in the x direction. y is
         90deg CCW.
-
         implement the integrals in Appendix A of Rickett, Coles et al ApJ 2014
         on the analysis of the double pulsar scintillation equations A1 and A2.
         A2 has an error. It would be correct if nu were replaced by omega,
         i.e. had an extra 2*pi
-
         coordinates are with respect to ar major axis so we don't have to
         rotate the structure, we put V and sig vectors in the structure
         coordinates.
-
         The distance sn is normalized by So and the frequency dnun by \nu_{0.5}
         the spatial scale and the frequency scale respectively.
         the phase gradient is normalized by the 1/s0, i.e. sigxn = gradphix*s0
-
         if there is no phase gradient then the acf is symmetric and only one
         quadrant needs to be calculated. Otherwise two quadrants are necessary.
-
         new algorithm to compute same integral. Normalized integral is
         game(sn, dnun) = -j/(2pi)^2 (1/dnun) sum sum (dsn)^2
         game(snp,0)exp((j/4pi)(1/dnun) | sn - snp|^2
-
         the worst case sampling is when dnun is very small. Then the argument
         of the complex exponential becomes large and aliasing will occur. If
         dnun=0.01 and dsp=0.1 the alias will peak at snx = 5. Reducing the
         sampling dsp to 0.05 will push that alias out to snx = 8. However
         halving dsp will increase the time by a factor of 4.
-
         The frequency decorrelation is quite linear near the origin and looks
         quasi-exponential, the 0.5 width is dnun = 0.15. Sampling of 0.05 is
         more than adequate in frequency. Sampling of 0.1 in sn is adequate
-
         dnun = 0.0 is divergent with this integral but can be obtained
         trivially from the ACF of the electric field directly
-
         Use formula vec{S} = vec{V} t - 2 vec{vec{sigma_p}}}delta nu/nu
         equation A6 to get equal t sampling. dt = ds / |V| and tmax= Smax + 2
         |sigma_p| dnu/nu
@@ -517,7 +510,7 @@ class ACF():
         Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
 
         dsp = 2 * spmax / (ns)
-        ddnun = 2 * dnumax / nf
+        # ddnun = 2 * dnumax / nf
 
         sqrtar = np.sqrt(self.ar)
         # equally spaced dnu array dnu = dnun * nuhalf
@@ -658,28 +651,25 @@ class ACF():
 
 class Brightness():
 
-    def __init__(self, ar=1.0, exponent=1.67, thetagx=0.5, thetagy=0.0,
-                 thetarx=0.5, thetary=0.0, df=0.04, dt=0.08, dx=0.1,
+    def __init__(self, ar=1.0, exponent=1.67, thetagx=0, thetagy=0.0, psi=90,
+                 thetarx=0, thetary=0.0, df=0.04, dt=0.08, dx=0.1,
                  nf=10, nt=80, nx=30, ncuts=5, plot=True, contour=True,
-                 figsize=(10, 8), smooth_jacobian=True):
+                 figsize=(10, 8), smooth_jacobian=False):
         """
         Simulate Delay-Doppler Spectrum from Scattered angular spectrum from
         Yao et al. (2020), modified to get the phase gradient terms correctly
         and to clean up the bright points in the secondary spectrum which cause
         artifacts in the ACF
-
         Here we assume that the angular spectrum interferes with an unscattered
         wave. The angular spectrum is defined by the spectral exponent. First
         the ACF of the field is calculated, then it is 2D-FFT'ed to get the
         brightness distribution. The brightness distribution can be offset by a
         phase gradient which causes an angular shift as a fraction of the half-
         width of the brightness distribution.
-
         The unscattered wave can also be offset by the phase gradient (as it
         would be in weak scattering), or it can be at zero offset (or anywhere
         else). The default would be to set the phase gradient angle and the
         reference angle to be equal
-
         params:
             ar: axial ratio
             exponent: exponent of phase structure function
@@ -689,7 +679,6 @@ class Brightness():
             thetary:
             dx, nx: spatial resolution and size of e-field ACF, relative to
                 spatial scale
-
         """
 
         self.ar = ar
@@ -698,6 +687,7 @@ class Brightness():
         self.thetagy = thetagy
         self.thetarx = thetarx
         self.thetary = thetary
+        self.psi = psi
         self.df = df
         self.dt = dt
         self.dx = dx
@@ -708,30 +698,42 @@ class Brightness():
 
         # Calculate brighness distribution
         self.calc_brightness()
-        # Calculate secondary spectrum and ACF
-        self.calc_SS(smooth_jacobian=smooth_jacobian)
-        self.calc_acf()
-
         if plot:
             self.plot_acf_efield(figsize=figsize)
             self.plot_brightness(figsize=figsize)
+
+        # Calculate secondary spectrum
+        self.calc_SS(smooth_jacobian=smooth_jacobian)
+        if plot:
             self.plot_sspec(figsize=figsize)
-            self.plot_acf(figsize=figsize, contour=contour)
             self.plot_cuts(figsize=figsize)
+
+        # Calculate ACF
+        self.calc_acf()
+        if plot:
+            self.plot_acf(figsize=figsize, contour=contour)
 
     def calc_brightness(self):
         # first need to get the brightness distribution from the ACF of the
         # electric field. Reference distances to the spatial scale in the
         # X-direction
 
-        # if you want to set the orientation of the axial ratio to some angle
-        # other than 0 or 90 degrees, this is the place to do it
-
         x = np.arange(-self.nx, self.nx, self.dx)
         self.X, self.Y = np.meshgrid(x, x)
+
+        R = (self.ar**2 - 1) / (self.ar**2 + 1)
+        cosa = np.cos(2 * self.psi * np.pi/180)
+        sina = np.sin(2 * self.psi * np.pi/180)
+        # quadratic coefficients
+        a = (1 - R * cosa) / np.sqrt(1 - R**2)
+        b = (1 + R * cosa) / np.sqrt(1 - R**2)
+        c = -2 * R * sina / np.sqrt(1 - R**2)
+
         # ACF of electric field
-        Rho = np.exp(-(self.X**2 + (1/self.ar)**2 * self.Y**2)
+        Rho = np.exp(-(a * self.X**2 + b * self.Y**2 +
+                       c * self.X * self.Y)
                      ** (self.exponent/2))
+
         self.x = x
         self.acf_efield = Rho
 
@@ -743,28 +745,22 @@ class Brightness():
     def calc_SS(self, smooth_jacobian=True):
         """
         now set up the secondary spectrum defined by:
-
         delay = theta^2, i.e. 0.5 L/c = 1
         doppler = theta, i.e. V/lambda = 1
-
         therefore differential delay (td), and differential doppler (fd) are:
             td = (thetax+thetagx)^2 +(thetay+thetagy)^2 - thetagx^2-thetagy^2
             fd = (thetax + thetagx) - thetagx = thetax
             Jacobian = 1/(thetay+thetagy)
         thetay + thetagy =
             sqrt(td - (thetax + thetagx)^2 + thetagx^2 + thetagy^2)
-
         the arc is defined by (thetay+thetagy) == 0 where there is a half order
         singularity.
-
         The singularity creates a problem in the code because the sampling in
         fd,td is not synchronized with the arc position, so there can be some
         very bright points if the sample happens to lie very close to the
         singularity.
-
         this is not a problem in interpreting the secondary spectrum, but it
         causes large artifacts when Fourier transforming it to get the ACF.
-
         So I [Bill Coles, in original Matlab code] have limited the Jacobian by
         not allowing (thetay+thetagy) to be less than half the step size in
         thetax and thetay.
@@ -900,7 +896,6 @@ class Brightness():
         particular the ACF cut in doppler at zero delay is invarient with phase
         gradient and is also exp(-(time/t0)^exponent), so you can confirm that
         the exponent is correct by examining that cut.
-
         the cut in frequency (the bandwidth) is very sensitive to ar and its
         orientation and to phase gradients.
         """
