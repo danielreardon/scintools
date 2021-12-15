@@ -12,8 +12,10 @@ A library of scintillation models to use with lmfit, emcee, or bilby
         xdata
         ydata
         weights
+
     And output:
         residuals = (ydata - model) * weights
+
     Some functions use additional inputs
 """
 
@@ -399,6 +401,7 @@ def arc_curvature(params, ydata, weights, true_anomaly,
                   vearth_ra, vearth_dec):
     """
     arc curvature model
+
         ydata: arc curvature
     """
 

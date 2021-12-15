@@ -376,6 +376,7 @@ def pars_to_params(pars, params=None):
     """
     Converts a dictionary of par file parameters from read_par() to an
     lmfit Parameters() class to use in models
+
     By default, parameters are not varied
     """
 
@@ -443,8 +444,10 @@ def slow_FT(dynspec, freqs):
     Given a uniform t axis, this reduces to a regular FT
 
     Reference freq is currently hardcoded to the middle of the band
+
     Parameters
     ----------
+
     dynspec: [time, frequency] ndarray
         Dynamic spectrum to be Fourier Transformed
     f: array of floats
@@ -487,11 +490,13 @@ def slow_FT(dynspec, freqs):
 def svd_model(arr, nmodes=1):
     """
     Take SVD of a dynamic spectrum, divide by the largest N modes
+
     Parameters
     ----------
     arr : array_like
       Time/freq visiblity matrix
     nmodes :
+
     Returns
     -------
     Original data array multiplied by the largest SVD mode conjugate,
