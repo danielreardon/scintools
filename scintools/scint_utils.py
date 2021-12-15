@@ -441,6 +441,7 @@ def slow_FT(dynspec, freqs):
     Slow FT of dynamic spectrum along points of
     t*(f / fref), account for phase scaling of f_D.
     Given a uniform t axis, this reduces to a regular FT
+
     Reference freq is currently hardcoded to the middle of the band
     Parameters
     ----------

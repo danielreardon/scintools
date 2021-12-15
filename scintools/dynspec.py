@@ -1968,10 +1968,13 @@ class Dynspec:
                      plot_log=True, use_angle=False, use_spatial=False):
         """
         Calculate the scattered image.
+
         Assumes that the scattering is defined by the primary arc,
         i.e. interference between highly scattered waves and unscattered waves
         (B(tx,ty) vs B(0,0)).
+
         The x axis of the image is aligned with the velocity.
+
         """
 
         if input_sspec is None:

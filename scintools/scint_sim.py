@@ -436,6 +436,7 @@ class ACF():
         phasegrad_y - phase gradient in y direction
         Vx - Effective velocity in x direction
         Vy - Effective velocity in y direction
+
         If ISS spectrum is a Kolmogorov power-law with no inner or outer scale,
         alpha=5/3
         """
@@ -646,8 +647,6 @@ class ACF():
         if display:
             plt.show()
 
-        return
-
 
 class Brightness():
 
@@ -821,6 +820,189 @@ class Brightness():
         self.LSS = 10*np.log10(SS)
         return
 
+
+class Brightness():
+
+    def __init__(self, ar=1.0, exponent=1.67, thetagx=0, thetagy=0.0, psi=90,
+                 thetarx=0, thetary=0.0, df=0.04, dt=0.08, dx=0.1,
+                 nf=10, nt=80, nx=30, ncuts=5, plot=True, contour=True,
+                 figsize=(10, 8), smooth_jacobian=False):
+        """
+        Simulate Delay-Doppler Spectrum from Scattered angular spectrum from
+        Yao et al. (2020), modified to get the phase gradient terms correctly
+        and to clean up the bright points in the secondary spectrum which cause
+        artifacts in the ACF
+
+        Here we assume that the angular spectrum interferes with an unscattered
+        wave. The angular spectrum is defined by the spectral exponent. First
+        the ACF of the field is calculated, then it is 2D-FFT'ed to get the
+        brightness distribution. The brightness distribution can be offset by a
+        phase gradient which causes an angular shift as a fraction of the half-
+        width of the brightness distribution.
+
+        The unscattered wave can also be offset by the phase gradient (as it
+        would be in weak scattering), or it can be at zero offset (or anywhere
+        else). The default would be to set the phase gradient angle and the
+        reference angle to be equal
+
+        params:
+            ar: axial ratio
+            exponent: exponent of phase structure function
+            thetagx: scattered wave offset by phase gradient
+            thetagy:
+            thetarx: reference angle for unscattered wave (normally thetax)
+            thetary:
+            dx, nx: spatial resolution and size of e-field ACF, relative to
+                spatial scale
+
+        """
+
+        self.ar = ar
+        self.exponent = exponent
+        self.thetagx = thetagx
+        self.thetagy = thetagy
+        self.thetarx = thetarx
+        self.thetary = thetary
+        self.psi = psi
+        self.df = df
+        self.dt = dt
+        self.dx = dx
+        self.nf = nf
+        self.nt = nt
+        self.nx = nx
+        self.ncuts = ncuts
+
+        # Calculate brighness distribution
+        self.calc_brightness()
+        if plot:
+            self.plot_acf_efield(figsize=figsize)
+            self.plot_brightness(figsize=figsize)
+
+        # Calculate secondary spectrum
+        self.calc_SS(smooth_jacobian=smooth_jacobian)
+        if plot:
+            self.plot_sspec(figsize=figsize)
+            self.plot_cuts(figsize=figsize)
+
+        # Calculate ACF
+        self.calc_acf()
+        if plot:
+            self.plot_acf(figsize=figsize, contour=contour)
+
+    def calc_brightness(self):
+        # first need to get the brightness distribution from the ACF of the
+        # electric field. Reference distances to the spatial scale in the
+        # X-direction
+
+        x = np.arange(-self.nx, self.nx, self.dx)
+        self.X, self.Y = np.meshgrid(x, x)
+
+        R = (self.ar**2 - 1) / (self.ar**2 + 1)
+        cosa = np.cos(2 * self.psi * np.pi/180)
+        sina = np.sin(2 * self.psi * np.pi/180)
+        # quadratic coefficients
+        a = (1 - R * cosa) / np.sqrt(1 - R**2)
+        b = (1 + R * cosa) / np.sqrt(1 - R**2)
+        c = -2 * R * sina / np.sqrt(1 - R**2)
+
+        # ACF of electric field
+        Rho = np.exp(-(a * self.X**2 + b * self.Y**2 +
+                       c * self.X * self.Y)
+                     ** (self.exponent/2))
+
+        self.x = x
+        self.acf_efield = Rho
+
+        # get brightness distribution
+        B = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(Rho)))
+        self.B = np.abs(B)
+        return
+
+    def calc_SS(self, smooth_jacobian=True):
+        """
+        now set up the secondary spectrum defined by:
+
+        delay = theta^2, i.e. 0.5 L/c = 1
+        doppler = theta, i.e. V/lambda = 1
+
+        therefore differential delay (td), and differential doppler (fd) are:
+            td = (thetax+thetagx)^2 +(thetay+thetagy)^2 - thetagx^2-thetagy^2
+            fd = (thetax + thetagx) - thetagx = thetax
+            Jacobian = 1/(thetay+thetagy)
+        thetay + thetagy =
+            sqrt(td - (thetax + thetagx)^2 + thetagx^2 + thetagy^2)
+
+        the arc is defined by (thetay+thetagy) == 0 where there is a half order
+        singularity.
+
+        The singularity creates a problem in the code because the sampling in
+        fd,td is not synchronized with the arc position, so there can be some
+        very bright points if the sample happens to lie very close to the
+        singularity.
+
+        this is not a problem in interpreting the secondary spectrum, but it
+        causes large artifacts when Fourier transforming it to get the ACF.
+
+        So I [Bill Coles, in original Matlab code] have limited the Jacobian by
+        not allowing (thetay+thetagy) to be less than half the step size in
+        thetax and thetay.
+        """
+
+        fd = np.arange(-self.nf, self.nf, self.df)
+        td = np.arange(-self.nt, self.nt, self.dt)
+        self.fd = fd
+        self.td = td
+        # now get the thetax and thetay corresponding to fd and td
+        # first initialize arrays all of same size
+        amp = np.zeros((len(td), len(fd)))
+        thetax = np.zeros((len(td), len(fd)))
+        thetay = np.zeros((len(td), len(fd)))
+        SS = np.zeros((len(td), len(fd)))
+        for ifd in range(0, len(fd)):
+            for itd in range(0, len(td)):
+                thetax[itd, ifd] = fd[ifd] - self.thetagx + self.thetarx
+                thetayplusthetagysq = td[itd] - \
+                    (thetax[itd, ifd] + self.thetagx)**2 + self.thetarx**2 + \
+                    self.thetary**2
+                if thetayplusthetagysq > 0:
+                    thymthgy = np.sqrt(thetayplusthetagysq)  # thetay-thetagy
+                    thetay[itd, ifd] = thymthgy - self.thetagy
+                    if thymthgy < 0.5*self.df:
+                        if smooth_jacobian:
+                            amp[itd, ifd] = (np.arcsin(1) -
+                                             np.arcsin((thetax[itd, ifd] -
+                                                        0.5*self.df) /
+                                             thymthgy))/self.df
+                        else:
+                            amp[itd, ifd] = 2/self.df  # bound Jacobian
+                    else:
+                        amp[itd, ifd] = 1/thymthgy  # Jacobian
+                else:
+                    amp[itd, ifd] = 10**(-6)  # on or outside primary arc
+
+        self.thetax = thetax
+        self.thetay = thetay
+
+        # now get secondary spectrum by interpolating in the brightness array
+        # and multiplying by the Jacobian of the tranformation from (td,fd) to
+        # (thx,thy)
+
+        SS = griddata((np.ravel(self.X), np.ravel(self.Y)), np.ravel(self.B),
+                      (np.ravel(thetax), np.ravel(thetay)), method='linear') \
+            * np.ravel(amp)
+        SS = np.reshape(SS, (len(td), len(fd)))
+
+        # now add the SS with the sign of td and fd changed
+        # unfortunately that is not simply reversing the matrix
+        # however if you take just SS(1:, 1:) then it can be reversed and
+        # added to the original
+
+        SSrev = np.flip(np.flip(SS[1:, 1:], axis=0), axis=1)
+        SS[1:, 1:] += SSrev
+        self.SS = SS
+        self.LSS = 10*np.log10(SS)
+        return
+
     def calc_acf(self):
         acf = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(self.SS)))
         acf = np.real(acf)
@@ -896,6 +1078,7 @@ class Brightness():
         particular the ACF cut in doppler at zero delay is invarient with phase
         gradient and is also exp(-(time/t0)^exponent), so you can confirm that
         the exponent is correct by examining that cut.
+
         the cut in frequency (the bandwidth) is very sensitive to ar and its
         orientation and to phase gradients.
         """

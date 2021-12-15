@@ -29,7 +29,7 @@ setup(
     author_email='dreardon@swin.edu.au',
     license='MIT',
     packages=['scintools'],
-    install_requires=['numpy', 'scipy', 'matplotlib', 'corner', 'lmfit', 'astropy', 'emcee'],
+    install_requires=['numpy', 'scipy', 'matplotlib', 'corner', 'lmfit', 'astropy', 'emcee', 'bilby'],
     include_package_data=True,
     zip_safe=False,
 )

@@ -4,7 +4,9 @@
 models.py
 ----------------------------------
 Scintillation models
+
 A library of scintillation models to use with lmfit, emcee, or bilby
+
     Each model has at least inputs:
         params
         xdata
@@ -461,6 +463,7 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
     """
     Effective velocity thin screen model.
     Uses Eq. 4 from Rickett et al. (2014) for anisotropy coefficients.
+
         ydata: arc curvature
     """
 
