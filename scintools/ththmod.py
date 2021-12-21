@@ -10,10 +10,17 @@ import numpy as np
 import astropy.units as u
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
+from matplotlib.colors import LogNorm,SymLogNorm
 from scipy.optimize import curve_fit
 
 def svd_model(arr, nmodes=1):
+    """
+    Model a matrix using the first nmodes modes of the singular value decomposition
+
+    Arguments:
+    arr -- 2d numpy array ti be modeled
+    nmodes -- Number os SVD modes to use in reconstruction
+    """
     u, s, w = np.linalg.svd(arr)
     s[nmodes:] = 0
     S = np.zeros(([len(u), len(w)]), np.complex128)
@@ -25,6 +32,12 @@ def svd_model(arr, nmodes=1):
 def chi_par(x, A, x0, C):
     """
     Parabola for fitting to chisq curve.
+
+    Arguments:
+    x -- numpy array of x coordinates of fit
+    A -- 
+    x0 -- x coordinate of parabola extremum
+    C -- y coordinate of extremum
     """
     return A*(x - x0)**2 + C
 
@@ -157,6 +170,19 @@ def rev_map(thth, tau, fd, eta, edges,isdspec=True):
     return(recov.T)
 
 def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
+    """
+    Create theta-theta array as well as model theta-theta, Conjugate Spectrum and Dynamic Spectrum
+    from data conjugate spectrum and curvature
+
+    Arguments:
+    SS -- 2d complex numpy array of the Conjugate Spectrum
+    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
+    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
+    eta -- curvature of main arc in units of (tau/fd^2)
+    edges -- 1d array of coordinate of bin edges in theta-theta array
+    fd2 --  fd values for reverse theta-theta map (defaults to fd)
+    tau2 -- tau values for reverse theta-theta map (defaults to tau)
+    """
     if fd2==None:
         fd2=fd
     if tau2==None:
@@ -176,14 +202,43 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
     return(thth_red,thth2_red,recov,model,edges_red,w,V)
 
 def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
+    """
+    Calculate chisq value for modeled dynamic spectrum for a given curvature
+
+    Arguments:
+    dspec -- 2d array of observed dynamic spectrum
+    SS -- 2d array of conjugate spectrum
+    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
+    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
+    eta -- curvature of main arc in units of (tau/fd^2)
+    edges -- 1d array of coordinate of bin edges in theta-theta array
+    mask -- 2d boolean array of points in dynamic spectrum for fitting
+    N -- Variance of dynamic spectrum noise
+    fd2 --  fd values for reverse theta-theta map (defaults to fd)
+    tau2 -- tau values for reverse theta-theta map (defaults to tau)
+
+    """
     model=modeler(SS, tau, fd, eta, edges,fd2,tau2)[3][:dspec.shape[0],:dspec.shape[1]]
     chisq=np.sum((model-dspec)[mask]**2)/N
     return(chisq)
 
 def Eval_calc(SS, tau, fd, eta, edges):
+    """
+    Calculates the dominant eigenvalue for the theta-theta matrix from a given conjugate spectrum
+    and curvature.
+
+
+    Arguments:
+    SS -- 2d complex numpy array of the Conjugate Spectrum
+    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
+    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
+    eta -- curvature of main arc in units of (tau/fd^2)
+    edges -- 1d array of coordinate of bin edges in theta-theta array
+    thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
+    """
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
-    v0=thth_red[thth_red.shape[0]//2,:]
+    v0=np.copy(thth_red[thth_red.shape[0]//2,:])
     v0/=np.sqrt((np.abs(v0)**2).sum())
     w,V=eigsh(thth_red,1,v0=v0,which='LA')
     return(np.abs(w[0]))
@@ -365,9 +420,10 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     recov_E=np.abs(np.fft.fftshift(np.fft.fft2(model_E)))**2
     model_E=model_E[:dspec.shape[0],:dspec.shape[1]]
     N_E=recov_E[:recov_E.shape[0]//4,:].mean()
+    thth_derot=thth_red*np.conjugate(thth2_red)
 
-    grid=plt.GridSpec(5,2)
-    plt.figure(figsize=(8,20))
+    grid=plt.GridSpec(6,2)
+    plt.figure(figsize=(8,24))
     plt.subplot(grid[0,0])
     plt.imshow(dspec,
             aspect='auto',
@@ -430,8 +486,26 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
             vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2)
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
-    plt.title(r'Data $\theta-\theta$')
-    plt.subplot(grid[3,:])
+    plt.title(r'Model $\theta-\theta$')
+    plt.subplot(grid[3,0])
+    plt.imshow(thth_derot.real,
+            norm=SymLogNorm(np.median(np.abs(thth_red)**2)),
+            origin='lower',
+            aspect='auto',
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max())
+    plt.xlabel(r'$\theta_1$')
+    plt.ylabel(r'$\theta_2$')
+    plt.title(r'Derotated $\theta-\theta$ (real)')
+    plt.subplot(grid[3,1])
+    plt.imshow(thth_derot.imag,
+            norm=SymLogNorm(np.median(np.abs(thth_red)**2)),
+            origin='lower',
+            aspect='auto',
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max())
+    plt.xlabel(r'$\theta_1$')
+    plt.ylabel(r'$\theta_2$')
+    plt.title(r'Derotated $\theta-\theta$ (imag)')
+    plt.subplot(grid[4,:])
     plt.plot(etas,measure)
     if not np.isnan(eta_fit):
         exp_fit = int(('%.0e' % eta_fit.value)[2:])
@@ -451,7 +525,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
         plt.title('Chisquare Search')
         plt.ylabel(r'$\chi^2$')
     plt.xlabel(r'$\eta$ ($s^3$)')
-    plt.subplot(grid[4,0])
+    plt.subplot(grid[5,0])
     plt.imshow(np.angle(model_E),
             cmap='twilight',
             aspect='auto',
@@ -461,7 +535,7 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Recovered Phases')
-    plt.subplot(grid[4,1])
+    plt.subplot(grid[5,1])
     plt.imshow(recov_E,
             norm=LogNorm(),
             origin='lower',
@@ -488,7 +562,7 @@ def VLBI_chunk_retrieval(params):
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
-
+    dspec_args=(n_dish*(n_dish+1))/2-np.cumsum(np.linspace(1,n_dish,n_dish))
     thth_red=list()
     for i in range(len(dspec2_list)):
         dspec_pad = np.pad(dspec2_list[i],
@@ -497,15 +571,18 @@ def VLBI_chunk_retrieval(params):
                     constant_values=dspec2_list[i].mean())
 
         SS = np.fft.fftshift(np.fft.fft2(dspec_pad))
-        thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges)
+        if np.isin(i,dspec_args):
+            thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges)
+        else:
+            thth_single,edges_red=thth_redmap(SS,tau,fd,eta,edges,hermetian=False)
         thth_red.append(thth_single)
     thth_size=thth_red[0].shape[0]
     thth_comp=np.zeros((thth_size*n_dish,thth_size*n_dish),dtype=complex)
     for d1 in range(n_dish):
         for d2 in range(n_dish-d1):
             idx=int(((n_dish*(n_dish+1))//2)-(((n_dish-d1)*(n_dish-d1+1))//2)+d2)
-            thth_comp[d1*thth_size:(d1+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=thth_red[idx]
-            thth_comp[(d1+d2)*thth_size:(d1+d2+1)*thth_size,d1*thth_size:(d1+1)*thth_size]=np.conjugate(thth_red[idx].T)
+            thth_comp[d1*thth_size:(d1+1)*thth_size,(d1+d2)*thth_size:(d1+d2+1)*thth_size]=np.conjugate(thth_red[idx].T)
+            thth_comp[(d1+d2)*thth_size:(d1+d2+1)*thth_size,d1*thth_size:(d1+1)*thth_size]=thth_red[idx]
     w,V=eigsh(thth_comp,1,which='LA')
     w=w[0]
     V=V[:,0]
@@ -584,4 +661,67 @@ def mosaic(chunks):
             rot=np.angle((chunk_old*np.conjugate(chunk_new)*mask).mean())
             E_recov[cf*cwf//2:cf*cwf//2+cwf,ct*cwt//2:ct*cwt//2+cwt]+=chunk_new*mask*np.exp(1j*rot)
     return(E_recov)
+
+def two_curve_map(SS, tau, fd, eta1, edges1,eta2,edges2):
+    """Map from Secondary Spectrum to theta-theta space allowing for arclets with different curvature
+
+    Arguments:
+    SS -- Secondary Spectrum in [tau,fd] order with (0,0) in center
+    tau -- Time lags in ascending order
+    fd -- doppler frequency in ascending order
+    eta1-- curvature of the main arc with the units of tau and fd
+    edges1 -- 1d numpy array with the edges of the theta bins along the main arc
+    eta2-- curvature of the arclets with the units of tau and fd
+    edges2 -- 1d numpy array with the edges of the theta bins along the arclets
+    """
+
+    # Find bin centers
+    th_cents1 = (edges1[1:] + edges1[:-1]) / 2
+#     th_cents1 -= th_cents1[np.abs(th_cents1) == np.abs(th_cents1).min()]
+    th_cents2 = (edges2[1:] + edges2[:-1]) / 2
+#     th_cents2 -= th_cents2[np.abs(th_cents2) == np.abs(th_cents2).min()]
+    # Calculate theta1 and th2 arrays
+    th1 = np.ones((th_cents2.shape[0], th_cents1.shape[0])) * th_cents1
+    th2 = np.ones((th_cents2.shape[0], th_cents1.shape[0])) * th_cents2[:,np.newaxis]
+
+    # tau and fd step sizes
+    dtau = np.diff(tau).mean()
+    dfd = np.diff(fd).mean()
+
+    # Find bin in SS space that each point maps back to
+    tau_inv = (((eta1 * th1**2 - eta2*th2**2)*u.mHz**2
+                - tau[1] + dtau/2)//dtau).astype(int)
+    fd_inv = (((th1 - th2)*u.mHz - fd[1] + dfd/2)//dfd).astype(int)
+
+    # Define thth
+    thth = np.zeros(tau_inv.shape, dtype=complex)
+
+    # Only fill thth points that are within the SS
+    pnts = (tau_inv > 0) * (tau_inv < tau.shape[0]-1) * (fd_inv < fd.shape[0]-1)
+    thth[pnts] = SS[tau_inv[pnts], fd_inv[pnts]]
+
+    # Preserve flux (int
+    thth *= np.sqrt(np.abs(2*eta1*th1-2*eta2*th2)).value
+
+    th2_max=np.sqrt(tau.max()/eta2)
+    th1_max=np.sqrt(tau.max()/eta1)
+    th_cents1 = (edges1[1:] + edges1[:-1]) / 2
+#     th_cents1 -= th_cents1[np.abs(th_cents1) == np.abs(th_cents1).min()]
+    th_cents2 = (edges2[1:] + edges2[:-1]) / 2
+#     th_cents2 -= th_cents2[np.abs(th_cents2) == np.abs(th_cents2).min()]
+    pnts_1=np.abs(th_cents1)<th1_max.value
+    pnts_2=np.abs(th_cents2)<th2_max.value
+    edges_red1=np.zeros(pnts_1[pnts_1].shape[0]+1)
+    edges_red1[:-1]=edges1[:-1][pnts_1]
+    edges_red1[-1]=edges1[1:][pnts_1].max()
+    edges_red2=np.zeros(pnts_2[pnts_2].shape[0]+1)
+    edges_red2[:-1]=edges2[:-1][pnts_2]
+    edges_red2[-1]=edges2[1:][pnts_2].max()
+    thth_red=thth[pnts_2,:][:,pnts_1]
+    th_cents1 = (edges_red1[1:] + edges_red1[:-1]) / 2
+    th_cents2 = (edges_red2[1:] + edges_red2[:-1]) / 2
+#     thth_red[:,eta1*(th_cents1**2)<eta2*(th_cents2.max())**2]=0
+    return(thth_red,edges_red1,edges_red2)
+
+
 
