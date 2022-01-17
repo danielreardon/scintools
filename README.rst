@@ -26,4 +26,5 @@ Below is a list of works that use Scintools\:
 * `"A supernova remnant association for the fast-moving pulsar PSR J0908-4913", Johnston et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.507L..41J>`_
 * `"A Study of Birefringent Scintillation Towards the Millisecond Pulsar J0437-4715", Abdul Hamid (2021) <http://hdl.handle.net/10292/14786>`_
 * `"Probing the local interstellar medium with scintillometry of the bright pulsar B1133+16", McKee et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021arXiv211211980M>`_
+* `"Modelling annual scintillation arc variations in PSR J1643-1224 using the Large European Array for Pulsars", Mall et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220104245M>`_
 
