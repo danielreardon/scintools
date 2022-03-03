@@ -444,11 +444,10 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.title('Model Dynamic Spectrum')
     plt.subplot(grid[1,0])
     plt.imshow(np.abs(SS)**2,
-            norm=LogNorm(),
+            norm=LogNorm(vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2),
             origin='lower',
             aspect='auto',
-            extent=ext_find(fd,tau),
-            vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2)
+            extent=ext_find(fd,tau))
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
     plt.xlabel(r'$f_D$ (mHz)')
@@ -459,49 +458,46 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.ylabel(r'$\tau$ (us)')
     plt.subplot(grid[1,1])
     plt.imshow(np.abs(recov)**2,
-            norm=LogNorm(),
+            norm=LogNorm(vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2),
             origin='lower',
             aspect='auto',
-            extent=ext_find(fd,tau),
-            vmin=np.median(np.abs(SS)**2),vmax=np.abs(SS).max()**2)
+            extent=ext_find(fd,tau))
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
     plt.title('Model Secondary Spectrum')
     plt.subplot(grid[2,0])
     plt.imshow(np.abs(thth_red)**2,
-            norm=LogNorm(),
+            norm=LogNorm(vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2),
             origin='lower',
             aspect='auto',
-            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],
-            vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2)
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]])
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Data $\theta-\theta$')
     plt.subplot(grid[2,1])
     plt.imshow(np.abs(thth2_red)**2,
-            norm=LogNorm(),
+            norm=LogNorm(vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2),
             origin='lower',
             aspect='auto',
-            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],
-            vmin=np.median(np.abs(thth_red)**2),vmax=np.abs(thth_red).max()**2)
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]])
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Model $\theta-\theta$')
     plt.subplot(grid[3,0])
     plt.imshow(thth_derot.real,
-            norm=SymLogNorm(np.median(np.abs(thth_red)**2)),
+            norm=SymLogNorm(np.median(np.abs(thth_red)**2),vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max()),
             origin='lower',
             aspect='auto',
-            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max())
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]])
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Derotated $\theta-\theta$ (real)')
     plt.subplot(grid[3,1])
     plt.imshow(thth_derot.imag,
-            norm=SymLogNorm(np.median(np.abs(thth_red)**2)),
+            norm=SymLogNorm(np.median(np.abs(thth_red)**2),vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max()),
             origin='lower',
             aspect='auto',
-            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]],vmin=-np.abs(thth_derot).max(),vmax=np.abs(thth_derot).max())
+            extent=[edges_red[0],edges_red[-1],edges_red[0],edges_red[-1]])
     plt.xlabel(r'$\theta_1$')
     plt.ylabel(r'$\theta_2$')
     plt.title(r'Derotated $\theta-\theta$ (imag)')
@@ -537,11 +533,10 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     plt.title('Recovered Phases')
     plt.subplot(grid[5,1])
     plt.imshow(recov_E,
-            norm=LogNorm(),
+            norm=LogNorm(vmin=N_E),
             origin='lower',
             aspect='auto',
-            extent=ext_find(fd,tau),
-            vmin=N_E)
+            extent=ext_find(fd,tau))
     plt.xlim((-fd_lim,fd_lim))
     plt.ylim((0,tau_lim))
     plt.xlabel(r'$f_D$ (mHz)')
