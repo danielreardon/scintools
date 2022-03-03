@@ -52,7 +52,10 @@ def thth_map(SS, tau, fd, eta, edges,hermetian=True):
     eta -- curvature with the units of tau and fd
     edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
     """
-
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
     # Find bin centers
     th_cents = (edges[1:] + edges[:-1]) / 2
     th_cents -= th_cents[np.abs(th_cents) == np.abs(th_cents).min()]
@@ -65,7 +68,7 @@ def thth_map(SS, tau, fd, eta, edges,hermetian=True):
     dfd = np.diff(fd).mean()
 
     # Find bin in SS space that each point maps back to
-    tau_inv = (((eta * (th1**2 - th2**2))*u.mHz**2
+    tau_inv = (((eta * (th1**2 - th2**2))
                 - tau[0] + dtau/2)//dtau).astype(int)
     fd_inv = (((th1 - th2)*u.mHz - fd[0] + dfd/2)//dfd).astype(int)
 
@@ -102,6 +105,11 @@ def thth_redmap(SS, tau, fd, eta, edges,hermetian=True):
     edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
     """
 
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     # Find full thth
     thth = thth_map(SS, tau, fd, eta, edges,hermetian)
 
@@ -132,6 +140,11 @@ def rev_map(thth, tau, fd, eta, edges,isdspec=True):
     eta -- curvature with the units of tau and fd
     edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
     """
+
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
 
     # Find bin centers
     th_cents = (edges[1:] + edges[:-1]) / 2
@@ -183,10 +196,19 @@ def modeler(SS, tau, fd, eta, edges,fd2=None,tau2=None):
     fd2 --  fd values for reverse theta-theta map (defaults to fd)
     tau2 -- tau values for reverse theta-theta map (defaults to tau)
     """
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     if fd2==None:
         fd2=fd
+    else:
+        fd2 = unit_checks(fd2,'fd2',u.mHz)
     if tau2==None:
         tau2=tau
+    else:
+        tau2 = unit_checks(tau2,'tau2',u.us)
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
     w,V=eigsh(thth_red,1,which='LA')
@@ -218,6 +240,12 @@ def chisq_calc(dspec,SS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
     tau2 -- tau values for reverse theta-theta map (defaults to tau)
 
     """
+
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     model=modeler(SS, tau, fd, eta, edges,fd2,tau2)[3][:dspec.shape[0],:dspec.shape[1]]
     chisq=np.sum((model-dspec)[mask]**2)/N
     return(chisq)
@@ -236,6 +264,12 @@ def Eval_calc(SS, tau, fd, eta, edges):
     edges -- 1d array of coordinate of bin edges in theta-theta array
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     """
+
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     thth_red,edges_red=thth_redmap(SS, tau, fd, eta, edges)
     ##Find first eigenvector and value
     v0=np.copy(thth_red[thth_red.shape[0]//2,:])
@@ -244,6 +278,12 @@ def Eval_calc(SS, tau, fd, eta, edges):
     return(np.abs(w[0]))
 
 def G_revmap(w,V,eta,edges,tau,fd):
+
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     th_cents=(edges[1:]+edges[:-1])/2
     th_cents-=th_cents[np.abs(th_cents)==np.abs(th_cents).min()]
     screen=np.conjugate(V[:,np.abs(w)==np.abs(w).max()][:,0]*np.sqrt(w[np.abs(w)==np.abs(w).max()]))
@@ -323,7 +363,13 @@ def single_search(params):
     """
     dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad=params
 
-    etas = np.linspace(eta_low, eta_high, 100) * u.us / u.mHz**2
+    time2 = unit_checks(time2,'time2',u.s)
+    freq2 = unit_checks(freq2,'freq2',u.MHz)
+    eta_low = unit_checks(eta_low,'eta_low',u.s**3)
+    eta_high = unit_checks(eta_low,'eta_low',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
+    etas = np.linspace(eta_low, eta_high, 100)
 
 
     fd = fft_axis(time2, u.mHz, npad)
@@ -398,6 +444,18 @@ def PlotFunc(dspec,time,freq,SS,fd,tau,
     tau_lim -- Largest tau value for SS plots
     method -- Either 'eigenvalue' or 'chisq' depending on how curvature was found
     '''
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+    eta_fit = unit_checks(eta_fit,'eta_fit',u.s**3)
+    eta_sig = unit_checks(eta_sig,'eta_sig',u.s**3)
+    etas = unit_checks(etas,'etas',u.s**3)
+    etas_fit = unit_checks(etas_fit,'etas_fit',u.s**3)
+    if not tau_lim==None:
+        tau_lim = unit_checks(tau_lim,'tau_lim',u.us)
+
+
     fd_lim=min(2*edges.max(),fd.max().value)
     if np.isnan(eta_fit):
         eta=etas.mean()
@@ -554,6 +612,11 @@ def VLBI_chunk_retrieval(params):
     params -- tuple of relevant parameters
     '''
     dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,npad,n_dish = params
+    time2 = unit_checks(time2,'time2',u.s)
+    freq2 = unit_checks(freq2,'freq2',u.MHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
@@ -602,6 +665,12 @@ def single_chunk_retrieval(params):
     params -- tuple of relevant parameters
     '''
     dspec2,edges,time2,freq2,eta,idx_t,idx_f,npad = params
+
+    time2 = unit_checks(time2,'time2',u.s)
+    freq2 = unit_checks(freq2,'freq2',u.MHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
     print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
     fd = fft_axis(time2, u.mHz, npad)
     tau = fft_axis(freq2, u.us, npad)
@@ -669,6 +738,12 @@ def two_curve_map(SS, tau, fd, eta1, edges1,eta2,edges2):
     eta2-- curvature of the arclets with the units of tau and fd
     edges2 -- 1d numpy array with the edges of the theta bins along the arclets
     """
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta1 = unit_checks(eta1,'eta1',u.s**3)
+    edges1 = unit_checks(edges1,'edges1',u.mHz)
+    eta2 = unit_checks(eta2,'eta2',u.s**3)
+    edges2 = unit_checks(edges2,'edges2',u.mHz)   
 
     # Find bin centers
     th_cents1 = (edges1[1:] + edges1[:-1]) / 2
@@ -719,4 +794,12 @@ def two_curve_map(SS, tau, fd, eta1, edges1,eta2,edges2):
     return(thth_red,edges_red1,edges_red2)
 
 
-
+def unit_checks(var,name,desired):
+    if u.dimensionless_unscaled.is_equivalent(tau):
+        tau*=desired
+        print(f'{name} missing units. Assuming {desired}.')
+    elif u.us.is_equivalent(var)
+        var=var.to(desired)
+    else:
+        raise u.UnitConversionError(f'{name} units ({var.unit}) not equivalent to {desired}')
+    return(var)
