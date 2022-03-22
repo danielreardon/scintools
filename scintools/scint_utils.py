@@ -93,7 +93,7 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'dnu'):  # Scintillation bandwidth
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
-        
+
     if hasattr(dyn, 'dnu_est'):  # Estimated scintillation bandwidth
         header += ",dnu_est"
         write_string += ",{0}".format(dyn.dnu_est)
@@ -527,7 +527,6 @@ def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
         except KeyError:
             d = params['d'].value
             d_err = params['d'].stderr
-        
         try:
             s = params['s']
             s_err = params['serr']
@@ -580,19 +579,24 @@ def make_pickle(obj, filepath):
     with open(filepath, 'wb') as f_out:
         for idx in range(0, n_bytes, max_bytes):
             f_out.write(bytes_out[idx:idx+max_bytes])
-            
 
-def calculate_curvature_peak_probability(power_data, noise_level, 
+
+def calculate_curvature_peak_probability(power_data, noise_level,
                                          curvatures=None, log=False):
     """
-    Calculates the probability distribution 
+    Calculates the probability distribution
     """
+    if np.shape(noise_level) == ():
+        max_power = np.max(power_data)
+    else:
+        max_power = np.max(power_data, axis=1).reshape((len(power_data), 1))
+        noise_level = noise_level.reshape((len(noise_level), 1))
     if log:
         prob = np.log(1/(noise_level * np.sqrt(2*np.pi))) + \
-            -0.5 * ((power_data - np.max(power_data)) / noise_level)**2
+            -0.5 * ((power_data - max_power) / noise_level)**2
     else:
         prob = 1/(noise_level * np.sqrt(2*np.pi)) * \
-            np.exp(-0.5 * ((power_data - np.max(power_data)) / noise_level)**2)
+            np.exp(-0.5 * ((power_data - max_power) / noise_level)**2)
     # Note: currently doesn't normalise using "curvatures"
     return prob
 
@@ -603,12 +607,18 @@ def save_curvature_data(dyn, filename=None):
     """
     if filename is None:
         filename = dyn.name + 'curvature_data'
-        
-    if hasattr(dyn, 'norm_sspec_avg1'):
-        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg1, 
+
+    sup_data = np.array([dyn.name, dyn.mjd])
+
+    if hasattr(dyn, 'normsspecavg'):
+        np.savez(filename, sup_data, dyn.normsspec_fdop, dyn.normsspecavg,
+                 dyn.noise)
+    elif hasattr(dyn, 'norm_sspec_avg1'):
+        np.savez(filename, sup_data, dyn.eta_array, dyn.norm_sspec_avg1,
                  dyn.norm_sspec_avg2, dyn.noise)
     else:
-        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg, dyn.noise)
+        np.savez(filename, sup_data, dyn.eta_array, dyn.norm_sspec_avg,
+                 dyn.noise)
     return
 
 
@@ -641,3 +651,61 @@ def remove_duplicates(dyn_files):
     Filters out dynamic spectra from simultaneous observations
     """
     return dyn_files
+
+
+def curvature_log_likelihood(power, nfdop, noise, model_nfdop):
+    """
+    Calculates the log likelihood of a model prediction for nfdop by taking
+    the likelihood function for each observation to be a probability density
+    calculated from the doppler profile.
+
+    Parameters
+    ----------
+    power : array_like
+        doppler profile(s)
+    nfdop : array_like
+        nfdop values for doppler profile(s)
+    noise : float or array_like
+        noise value for each profile
+    model_nfdop : float or array_like
+        model preiction for nfdop for each profile
+
+    Returns
+    -------
+    float
+        log likelihood of the input data
+
+    """
+    # calculate probability from doppler profile and normalize
+    dim = len(np.shape(nfdop))
+    eta_prob = calculate_curvature_peak_probability(power, noise, log=True)
+    integral = np.sum(np.exp(eta_prob[..., :-1]) * np.diff(nfdop, axis=dim-1),
+                      axis=dim-1)
+    if dim == 2:
+        integral = integral.reshape((len(integral), 1))
+    eta_prob_norm = eta_prob - np.log(integral)
+
+    if dim == 2:
+        like = np.zeros(len(nfdop))  # initialize likelihood list
+        outside = np.argwhere((model_nfdop > np.max(nfdop, axis=1)) |
+                              (model_nfdop < np.min(nfdop, axis=1))).flatten()
+        inside = np.argwhere((model_nfdop < np.max(nfdop, axis=1)) &
+                             (model_nfdop > np.min(nfdop, axis=1))).flatten()
+        like[outside] = -200  # for model nfdop outside profile nfdop ranges
+
+        # determine likelihoods at model nfdop
+        model_nfdop = model_nfdop[inside].reshape((len(model_nfdop[inside]),
+                                                   1))
+        inds = np.argmin(np.abs(nfdop[inside] - model_nfdop), axis=1)
+        like[inside] = eta_prob_norm[inside, inds]
+
+        return np.sum(like)
+
+    elif dim == 1:
+        if np.min(nfdop) < model_nfdop < np.max(nfdop):
+            return eta_prob_norm[np.argmin(np.abs(nfdop - model_nfdop))]
+        else:
+            return -200
+    else:
+        raise ValueError("Invalid input array dimension. Must be either 1D "
+                         "(single observation) or 2D (multiple observations)")
