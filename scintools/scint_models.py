@@ -24,6 +24,7 @@ from __future__ import (absolute_import, division,
 import numpy as np
 from scintools.scint_sim import ACF
 from lmfit import Minimizer, conf_interval
+from scipy.ndimage import gaussian_filter
 
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
@@ -617,3 +618,64 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
     veff_dec = s * vearth_dec + (1 - s) * (vp_dec + pmdec_v)
 
     return veff_ra, veff_dec, vp_ra, vp_dec
+
+
+def arc_weak(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3, amp=1, smooth=0):
+    """
+    Parameters
+    ----------
+    fdop : Array 1D
+        The Doppler frequency (x-axis) coordinates of the model secondary
+        spectrum.
+    tdel : Array 1D
+        The wavenumber (y-axis) coordinates of the model secondary spectrum.
+    eta : floar, optional
+        Arc curvature. The default is 1.
+    ar : float, optional
+        Anisotropy axial ratio. The default is 1.
+    psi : float, optional
+        DESCRIPTION. The default is 0.
+    alpha : float, optional
+        DESCRIPTION. The default is 11/3.
+    amp : float, optional
+        DESCRIPTION. The default is 1.
+    smooth : float, optional
+        DESCRIPTION. The default is 0.
+
+    Returns
+    -------
+    sspec : Array 2D
+        The model secondary spectrum.
+
+    """
+
+    # Begin model
+    a = np.cos(psi * np.pi/180)**2 / ar + ar * np.sin(psi*np.pi/180)**2
+    b = ar * np.cos(psi * np.pi/180)**2 + (np.sin(psi * np.pi/180)**2)/ar
+    c = 2*np.sin(psi * np.pi/180)*np.cos(psi * np.pi/180)*(1/ar - ar)
+
+    fdx, TDEL = np.meshgrid(fdop, tdel)
+
+    f_arc = np.sqrt(TDEL/eta)
+
+    fdy = np.sqrt(TDEL/eta - fdx**2)
+
+    p = (a*fdx**2 + b*fdy**2 + c*fdx*fdy)**(-11/6) + \
+        (a*fdx**2 + b*fdy**2 - c*fdx*fdy)**(-11/6)
+
+    arc_frac = np.real(fdx)/np.real(f_arc)
+    arc_frac[np.abs(arc_frac) > 0.995] = 0.995  # restrict the asymptote
+    sspec = p / np.sqrt(1 - arc_frac**2)
+
+    # Make minimum 0
+    sspec -= np.nanmin(sspec)
+    sspec[np.isnan(sspec)] = 0
+    # Set amplitude to amp
+    sspec *= (TDEL/np.mean(tdel))**alpha
+    sspec *= amp / np.nanmax(sspec)
+
+    # smooth the spectrum
+    if smooth > 0:
+        sspec = gaussian_filter(sspec, smooth)
+
+    return sspec

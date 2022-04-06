@@ -93,10 +93,14 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'dnu'):  # Scintillation bandwidth
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
-        
+
     if hasattr(dyn, 'dnu_est'):  # Estimated scintillation bandwidth
         header += ",dnu_est"
         write_string += ",{0}".format(dyn.dnu_est)
+
+    if hasattr(dyn, 'nscint'):  # Estimated number of scintles
+        header += ",nscint"
+        write_string += ",{0}".format(dyn.nscint)
 
     if hasattr(dyn, 'ar'):  # Axial ratio
         header += ",ar,arerr"
@@ -527,7 +531,7 @@ def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
         except KeyError:
             d = params['d'].value
             d_err = params['d'].stderr
-        
+
         try:
             s = params['s']
             s_err = params['serr']
@@ -552,7 +556,7 @@ def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
         return viss
 
 
-def interp_nan_2d(array):
+def interp_nan_2d(array, method='linear'):
     """
     Fill in NaN values of a 2D array using linear interpolation
     """
@@ -566,7 +570,7 @@ def interp_nan_2d(array):
     x1 = xx[~array.mask]
     y1 = yy[~array.mask]
     newarr = np.ravel(array[~array.mask])
-    array = griddata((x1, y1), newarr, (xx, yy), method='linear')
+    array = griddata((x1, y1), newarr, (xx, yy), method=method)
     return array
 
 
@@ -580,12 +584,12 @@ def make_pickle(obj, filepath):
     with open(filepath, 'wb') as f_out:
         for idx in range(0, n_bytes, max_bytes):
             f_out.write(bytes_out[idx:idx+max_bytes])
-            
 
-def calculate_curvature_peak_probability(power_data, noise_level, 
+
+def calculate_curvature_peak_probability(power_data, noise_level,
                                          curvatures=None, log=False):
     """
-    Calculates the probability distribution 
+    Calculates the probability distribution
     """
     if log:
         prob = np.log(1/(noise_level * np.sqrt(2*np.pi))) + \
@@ -603,9 +607,9 @@ def save_curvature_data(dyn, filename=None):
     """
     if filename is None:
         filename = dyn.name + 'curvature_data'
-        
+
     if hasattr(dyn, 'norm_sspec_avg1'):
-        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg1, 
+        np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg1,
                  dyn.norm_sspec_avg2, dyn.noise)
     else:
         np.savez(filename, dyn.eta_array, dyn.norm_sspec_avg, dyn.noise)

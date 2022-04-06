@@ -22,9 +22,10 @@ from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          powerspectrum_model
 from scintools.scint_utils import is_valid, svd_model, interp_nan_2d
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
-from scipy.signal import convolve2d, medfilt, savgol_filter
+from scipy.signal import convolve2d, medfilt, savgol_filter, wiener
 from scipy.io import loadmat
 from lmfit import Parameters
+from skimage.restoration import inpaint
 import corner
 
 
@@ -149,6 +150,7 @@ class Dynspec:
             fluxerrs = np.flip(fluxerrs, 0)
         # Finished reading, now setup dynamic spectrum
         self.dyn = fluxes  # initialise dynamic spectrum
+        self.dyn_err = np.nanmedian(fluxerrs)
         self.lamsteps = lamsteps
         if process:
             self.default_processing(lamsteps=lamsteps)  # do default processing
@@ -195,10 +197,10 @@ class Dynspec:
         self.trim_edges()  # remove zeros on band edges
         # self.refill()  # refill and zeroed regions with linear interpolation
         # self.correct_dyn()  # correct by svd
-        self.calc_acf()  # calculate the ACF
+        # self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
-        self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
+        # self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
@@ -1185,8 +1187,18 @@ class Dynspec:
             errors.append(np.absolute(pcov[i][i])**0.5)
 
         self.acf_tilt = -1/(float(params[0].squeeze()))  # take -ve
-        self.acf_tilt_err = float(errors[0].squeeze()) * \
+        acf_tilt_err = float(errors[0].squeeze()) * \
             1/float(params[0].squeeze())**2
+
+        # Compute finite scintle error
+        N = (1 + 0.2*self.bw/self.dnu) * (1 + 0.2*self.tobs/self.tau)
+        fse_tau = self.tau/(2*np.sqrt(N))
+        fse_dnu = self.dnu/(2*np.log(2)*np.sqrt(N))
+
+        fse_tilt = self.acf_tilt * np.sqrt((fse_dnu/self.dnu)**2 +
+                                           (fse_tau/self.tau)**2)
+
+        self.acf_tilt_err = np.sqrt(acf_tilt_err**2 + fse_tilt**2)
 
         if plot:
             plt.errorbar(peak_array, y_array,
@@ -1221,7 +1233,7 @@ class Dynspec:
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
             plt.title(r'Tilt = {0} $\pm$ {1} (min/MHz)'.format(
-                    round(self.acf_tilt, 2), round(self.acf_tilt_err, 2)))
+                    round(self.acf_tilt, 3), round(self.acf_tilt_err, 3)))
             if filename is not None:
                 filename_name = filename.split('.')[0]
                 filename_extension = filename.split('.')[-1]
@@ -1240,8 +1252,8 @@ class Dynspec:
                          mcmc=False, full_frame=False, nscale=4,
                          nwalkers=100, steps=1000, burn=0.2, nitr=1,
                          lnsigma=True, verbose=False, progress=True,
-                         display=True, filename=None, dpi=200,
-                         nan_policy='propagate', flux_estimate=False):
+                         display=True, filename=None, dpi=200, frac_err=0.2,
+                         nan_policy='raise', flux_estimate=False):
         """
         Measure the scintillation timescale
             Method:
@@ -1301,18 +1313,30 @@ class Dynspec:
         else:
             params.add('alpha', value=alpha, vary=False)
 
-        if method == 'acf1d' or method == 'acf2d_approx' or method == 'acf2d':
+        # Create weights array
+        t_errors = 2/np.pi * np.arctan(xdata_t / tau) / \
+            np.sqrt(self.nsub)
+        t_errors[t_errors == 0] = 1e-3
+        f_errors = 2/np.pi * np.arctan(xdata_f / dnu) / \
+            np.sqrt(self.nchan)
+        f_errors[f_errors == 0] = 1e-3
+        weights = 1/np.array(np.concatenate((t_errors, f_errors)))
+
+        if (method == 'acf1d' or method == 'acf2d_approx' or
+           method == 'acf2d') and not hasattr(self, 'dnu'):
             if method == 'acf2d_approx' or method == 'acf2d':
                 if verbose:
                     print("\nDoing 1D fit to initialize fit values")
             elif verbose:
                 print("\nPerforming least-squares fit to 1D ACF model")
             chisqr = np.inf
+            if mcmc:
+                nitr = 1
             for itr in range(nitr):
                 results = fitter(scint_acf_model, params,
-                                 (xdata, ydata, None), nan_policy=nan_policy,
-                                 mcmc=mcmc, is_weighted=(not lnsigma),
-                                 burn=burn, nwalkers=nwalkers, steps=steps)
+                                 (xdata, ydata, weights),
+                                 nan_policy=nan_policy, mcmc=mcmc, burn=burn,
+                                 nwalkers=nwalkers, steps=steps)
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
                     params = results.params
@@ -1320,17 +1344,71 @@ class Dynspec:
 
         if method == 'acf2d_approx' or method == 'acf2d':
 
-            dnu = params['dnu'].value
-            tau = params['tau'].value
+            if hasattr(self, 'dnu'):
+                dnu = self.dnu
+                tau = self.tau
+                amp = self.amp
+                wn = self.wn
+                params['tau'].value = tau
+                params['dnu'].value = dnu
+                params['amp'].value = amp
+                params['wn'].value = wn
+            else:
+                dnu = params['dnu'].value
+                tau = params['tau'].value
+                amp = params['amp'].value
+                wn = params['wn'].value
+
+            pos_array = []
+            if mcmc:
+                for i in range(nwalkers):
+                    pos_i = []
+                    pos_i.append(np.random.normal(
+                                    loc=self.tau,
+                                    scale=2*self.tauerr))  # tau
+                    pos_i.append(np.random.normal(
+                                    loc=self.dnu,
+                                    scale=2*self.dnuerr))  # dnu
+                    pos_i.append(np.random.normal(
+                                    loc=self.amp,
+                                    scale=2*self.amperr))  # amp
+                    pos_i.append(np.random.normal(
+                                    loc=self.wn,
+                                    scale=self.wnerr))  # wn
+                    pos_i.append(np.random.normal(loc=0,
+                                                  scale=10))  # phs
+                    if lnsigma:
+                        pos_i.append(np.random.uniform(low=0,
+                                                       high=10))
+
+                    pos_array.append(pos_i)
+                pos = np.array(pos_array).squeeze()
+            else:
+                pos = None
+
             if verbose:
                 print('1D tau estimate:', tau,
                       '\n1D dnu estimate:', dnu)
 
             ydata = np.copy(self.acf)
+
             tticks = np.linspace(-self.tobs, self.tobs,
                                  len(ydata[0, :]) + 1)[:-1]
             fticks = np.linspace(-self.bw, self.bw,
                                  len(ydata[:, 0]) + 1)[:-1]
+
+            # Create weights array
+            t_errors_2d = 2/np.pi * np.arctan(np.abs(tticks) / tau) / \
+                np.sqrt(self.nsub)
+            t_errors_2d[t_errors_2d == 0] = 1e-3
+            f_errors_2d = 2/np.pi * np.arctan(np.abs(fticks) / dnu) / \
+                np.sqrt(self.nchan)
+            f_errors_2d[f_errors_2d == 0] = 1e-3
+
+            nc, nr = np.shape(ydata)
+            weights_2d = np.ones(np.shape(ydata))
+            weights_2d = weights_2d / np.transpose([f_errors_2d])
+            weights_2d = weights_2d / [t_errors_2d]
 
             wn_loc = np.unravel_index(np.argmax(ydata, axis=None),
                                       ydata.shape)
@@ -1346,6 +1424,7 @@ class Dynspec:
             tmax = wn_loc[1] + min(tleft, tright) + 1
 
             ydata_centered = ydata[fmin:fmax, tmin:tmax]
+            weights_centered = weights_2d[fmin:fmax, tmin:tmax]
             tdata_centered = tticks[tmin:tmax]
             fdata_centered = fticks[fmin:fmax]
 
@@ -1388,6 +1467,7 @@ class Dynspec:
                     fmax = len(fticks)
 
                 ydata_2d = ydata_centered[fmin:fmax, tmin:tmax]
+                weights_2d = weights_centered[fmin:fmax, tmin:tmax]
                 tdata = tdata_centered[tmin:tmax]
                 fdata = fdata_centered[fmin:fmax]
             else:
@@ -1395,13 +1475,10 @@ class Dynspec:
                 tdata = tdata_centered
                 fdata = fdata_centered
 
-            plt.pcolormesh(ydata_2d)
-            plt.show()
-
             params.add('tobs', value=self.tobs, vary=False)
             params.add('bw', value=self.bw, vary=False)
             params.add('freq', value=self.freq, vary=False)
-            params.add('phasegrad', value=0.1, vary=True,
+            params.add('phasegrad', value=0, vary=True,
                        min=-np.Inf, max=np.Inf)
             if hasattr(self, 'acf_tilt'):  # if have a confident measurement
                 if self.acf_tilt_err is not None:
@@ -1416,6 +1493,7 @@ class Dynspec:
                 print("\nPerforming least-squares fit to approximate 2D " +
                       "ACF model")
             chisqr = np.inf
+            print(params)
 
             for itr in range(nitr):
                 nfit = 5
@@ -1424,7 +1502,7 @@ class Dynspec:
                 results = fitter(scint_acf_model_2d_approx, params,
                                  (tdata, fdata, ydata_2d, None),
                                  mcmc=mcmc, max_nfev=max_nfev,
-                                 nan_policy='propagate',
+                                 nan_policy=nan_policy, pos=pos,
                                  is_weighted=(not lnsigma))
                 if results.chisqr < chisqr:
                     chisqr = results.chisqr
@@ -1578,27 +1656,36 @@ class Dynspec:
             print("\t get_scint_params(flux_estimate=True).")
         # Compute finite scintle error
         N = (1 + 0.2*self.bw/self.dnu) * (1 + 0.2*self.tobs/self.tau)
+        self.nscint = N
         fse_tau = self.tau/(2*np.sqrt(N))
         fit_tau = res.params['tau'].stderr
-        if fit_tau is None:
-            fit_tau = np.inf
+        print(res.params)
         fse_dnu = self.dnu/(2*np.log(2)*np.sqrt(N))
         fit_dnu = res.params['dnu'].stderr
-        if fit_dnu is None:
-            fit_dnu = np.inf
+
         if verbose:
             print("\nFinite scintle errors (tau, dnu):\n", fse_tau, fse_dnu)
             print("\nFit errors (tau, dnu):\n", fit_tau, fit_dnu)
+
+        if fit_dnu is None:
+            fit_dnu = np.inf
+        if fit_tau is None:
+            fit_tau = np.inf
+
         self.tauerr = np.sqrt(fit_tau**2 + fse_tau**2)
         self.dnuerr = np.sqrt(fit_dnu**2 + fse_dnu**2)
         if 'sim:mb2=' not in self.name:
             self.wn = res.params['wn'].value
             self.wnerr = res.params['wn'].stderr
+            self.amp = res.params['amp'].value
+            self.amperr = res.params['amp'].stderr
         else:
             self.wn = 0
         if method == 'acf2d_approx':
             self.phasegrad = res.params['phasegrad'].value
             fit_ph = res.params['phasegrad'].stderr
+            if fit_ph is None:
+                fit_ph = np.inf
             fse_ph = self.phasegrad * np.sqrt((fse_dnu/self.dnu)**2 +
                                               (fse_tau/self.tau)**2)
             self.phasegraderr = np.sqrt(fit_ph**2 + fse_ph**2)
@@ -1661,8 +1748,8 @@ class Dynspec:
                 if display or filename is not None:
                     plt.figure(figsize=(9, 6))
                 plt.subplot(2, 1, 1)
-                plt.plot(xdata_t, ydata_t/np.max(ydata_t))
-                plt.plot(xdata_t, tmodel/np.max(ydata_t))
+                plt.plot(xdata_t, ydata_t)
+                plt.plot(xdata_t, tmodel)
                 # plot 95% white noise level assuming no correlation
                 xl = plt.xlim()
                 plt.plot([0, xl[1]], [0, 0], 'k--')
@@ -1672,21 +1759,26 @@ class Dynspec:
                 plt.plot([0, xl[1]],
                          [-1/np.sqrt(self.nsub), -1/np.sqrt(self.nsub)],
                          ':', color='crimson')
+                plt.plot(xdata_t, t_errors, color='crimson')
                 plt.xlabel('Time lag (s)')
+                plt.tight_layout()
+
                 plt.subplot(2, 1, 2)
-                plt.plot(xdata_f, ydata_f/np.max(ydata_f))
-                plt.plot(xdata_f, fmodel/np.max(ydata_f))
+                plt.plot(xdata_f, ydata_f)
+                plt.plot(xdata_f, fmodel)
                 # plot 95% white noise level assuming no correlation
                 xl = plt.xlim()
-                plt.plot([xl[0], xl[1]], [0, 0], 'k--')
-                plt.plot([xl[0], xl[1]],
+                plt.plot([0, xl[1]], [0, 0], 'k--')
+                plt.plot([0, xl[1]],
                          [1/np.sqrt(self.nchan), 1/np.sqrt(self.nchan)],
                          ':', color='crimson')
-                plt.plot([xl[0], xl[1]],
+                plt.plot([0, xl[1]],
                          [-1/np.sqrt(self.nchan), -1/np.sqrt(self.nchan)],
                          ':', color='crimson')
+                plt.plot(xdata_f, f_errors, color='crimson')
                 plt.xlabel('Frequency lag (MHz)')
                 plt.tight_layout()
+
                 if filename is not None:
                     filename_name = filename.split('.')[0]
                     filename_extension = filename.split('.')[-1]
@@ -1904,21 +1996,48 @@ class Dynspec:
         self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
         self.mjd = self.mjd + self.times[0]/86400
 
-    def refill(self, linear=True, zeros=True):
+    def refill(self, method='linear', zeros=True, filter_size=3,
+               noise=None):
         """
         Replaces the nan values in array. Also replaces zeros by default
         """
-
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
 
-        if linear:  # do linear interpolation
+        if method == 'wiener':
+            print('Warning: currently in testing')
+            if noise is None:
+                noise = self.dyn_err
             array = cp(self.dyn)
-            self.dyn = interp_nan_2d(array)
+            # array[np.isnan(self.dyn)] = np.mean(self.dyn[is_valid(self.dyn)])
+            array = wiener(interp_nan_2d(array, method='nearest'),
+                           mysize=filter_size, noise=noise)
+            self.dyn[np.isnan(self.dyn)] = array[np.isnan(self.dyn)]
+        elif method == 'biharmonic':
+            array = cp(self.dyn)
+            # Create mask
+            mask = np.zeros(np.shape(array))
+            mask[np.isnan(array)] = 1
+            inpainted = inpaint.inpaint_biharmonic(array, mask)
+            self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
+        elif method == 'linear' or method == 'cubic' or method == 'nearest':
+            # do interpolation
+            array = cp(self.dyn)
+            self.dyn = interp_nan_2d(array, method=method)
+        else:
+            # Fill with the mean
+            meanval = np.mean(self.dyn[is_valid(self.dyn)])
+            self.dyn[np.isnan(self.dyn)] = meanval
 
-        # Fill remainder with the mean
-        meanval = np.mean(self.dyn[is_valid(self.dyn)])
-        self.dyn[np.isnan(self.dyn)] = meanval
+    def filter_dyn(self, method='wiener', filter_size=3, noise=None,
+                   return_array=False):
+        """
+        Apply a filter to the dynamic spectrum, or return the filtered result
+        """
+        if not return_array:
+            self.dyn = wiener(self.dyn, mysize=filter_size, noise=noise)
+        else:
+            return wiener(self.dyn, mysize=filter_size, noise=noise)
 
     def correct_dyn(self, svd=True, nmodes=1, frequency=False, time=True,
                     lamsteps=False, nsmooth=5):
@@ -2101,9 +2220,10 @@ class Dynspec:
         self.scat_im = scat_im
         self.scat_im_ax = xyaxes
 
-    def calc_sspec(self, prewhite=True, halve=True, plot=False, lamsteps=False,
-                   input_dyn=None, input_x=None, input_y=None, trap=False,
-                   window='blackman', window_frac=0.1, return_sspec=False):
+    def calc_sspec(self, prewhite=False, halve=True, plot=False,
+                   lamsteps=False, input_dyn=None, input_x=None, input_y=None,
+                   trap=False, window='blackman', window_frac=0.1,
+                   return_sspec=False):
         """
         Calculate secondary spectrum
         """
@@ -2304,14 +2424,10 @@ class Dynspec:
     def scale_dyn(self, scale='lambda', factor=1, window_frac=0.1,
                   window='hanning', spacing='auto'):
         """
-        Scales the dynamic spectrum along the frequency axis,
-            with an alpha relationship
+        Rescales the dynamic spectrum to specified shape
         """
 
-        if scale == 'factor':
-            # scale by some factor
-            print("This doesn't do anything yet")
-        elif scale == 'lambda':
+        if scale == 'lambda':
             # function to convert dyn(feq,t) to dyn(lameq,t)
             # fbw = fractional BW = BW / center frequency
             arin = cp(self.dyn)  # input array

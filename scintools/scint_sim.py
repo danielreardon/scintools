@@ -666,10 +666,10 @@ class ACF():
 
 class Brightness():
 
-    def __init__(self, ar=1.0, exponent=1.67, thetagx=0, thetagy=0.0, psi=90,
-                 thetarx=0, thetary=0.0, df=0.04, dt=0.08, dx=0.1,
-                 nf=10, nt=80, nx=30, ncuts=5, plot=True, contour=True,
-                 figsize=(10, 8), smooth_jacobian=False):
+    def __init__(self, ar=1.0, psi=0, alpha=1.67, thetagx=0, thetagy=0,
+                 thetarx=0, thetary=0, df=0.02, dt=0.08, dx=0.1,
+                 nf=10, nt=80, nx=30, ncuts=5, plot=False, contour=True,
+                 figsize=(10, 8), calc_sspec=True, calc_acf=True):
         """
         Simulate Delay-Doppler Spectrum from Scattered angular spectrum from
         Yao et al. (2020), modified to get the phase gradient terms correctly
@@ -690,7 +690,7 @@ class Brightness():
 
         params:
             ar: axial ratio
-            exponent: exponent of phase structure function
+            alpha: exponent of phase structure function
             thetagx: scattered wave offset by phase gradient
             thetagy:
             thetarx: reference angle for unscattered wave (normally thetax)
@@ -701,7 +701,7 @@ class Brightness():
         """
 
         self.ar = ar
-        self.exponent = exponent
+        self.alpha = alpha
         self.thetagx = thetagx
         self.thetagy = thetagy
         self.thetarx = thetarx
@@ -722,15 +722,17 @@ class Brightness():
             self.plot_brightness(figsize=figsize)
 
         # Calculate secondary spectrum
-        self.calc_SS(smooth_jacobian=smooth_jacobian)
-        if plot:
-            self.plot_sspec(figsize=figsize)
-            self.plot_cuts(figsize=figsize)
+        if calc_sspec:
+            self.calc_SS()
+            if plot:
+                self.plot_sspec(figsize=figsize)
+                self.plot_cuts(figsize=figsize)
 
         # Calculate ACF
-        self.calc_acf()
-        if plot:
-            self.plot_acf(figsize=figsize, contour=contour)
+        if calc_acf:
+            self.calc_acf()
+            if plot:
+                self.plot_acf(figsize=figsize, contour=contour)
 
     def calc_brightness(self):
         # first need to get the brightness distribution from the ACF of the
@@ -741,8 +743,8 @@ class Brightness():
         self.X, self.Y = np.meshgrid(x, x)
 
         R = (self.ar**2 - 1) / (self.ar**2 + 1)
-        cosa = np.cos(2 * self.psi * np.pi/180)
-        sina = np.sin(2 * self.psi * np.pi/180)
+        cosa = np.cos(2 * (90 - self.psi) * np.pi/180)
+        sina = np.sin(2 * (90 - self.psi) * np.pi/180)
         # quadratic coefficients
         a = (1 - R * cosa) / np.sqrt(1 - R**2)
         b = (1 + R * cosa) / np.sqrt(1 - R**2)
@@ -751,7 +753,7 @@ class Brightness():
         # ACF of electric field
         Rho = np.exp(-(a * self.X**2 + b * self.Y**2 +
                        c * self.X * self.Y)
-                     ** (self.exponent/2))
+                     ** (self.alpha/2))/2
 
         self.x = x
         self.acf_efield = Rho
@@ -761,7 +763,7 @@ class Brightness():
         self.B = np.abs(B)
         return
 
-    def calc_SS(self, smooth_jacobian=True):
+    def calc_SS(self):
         """
         now set up the secondary spectrum defined by:
 
@@ -809,15 +811,9 @@ class Brightness():
                     self.thetary**2
                 if thetayplusthetagysq > 0:
                     thymthgy = np.sqrt(thetayplusthetagysq)  # thetay-thetagy
-                    thetay[itd, ifd] = thymthgy - self.thetagy
+                    thetay[itd, ifd] += thymthgy - self.thetagy
                     if thymthgy < 0.5*self.df:
-                        if smooth_jacobian:
-                            amp[itd, ifd] = (np.arcsin(1) -
-                                             np.arcsin((thetax[itd, ifd] -
-                                                        0.5*self.df) /
-                                             thymthgy))/self.df
-                        else:
-                            amp[itd, ifd] = 2/self.df  # bound Jacobian
+                        amp[itd, ifd] = 2/self.df  # bound Jacobian
                     else:
                         amp[itd, ifd] = 1/thymthgy  # Jacobian
                 else:
@@ -829,11 +825,14 @@ class Brightness():
         # now get secondary spectrum by interpolating in the brightness array
         # and multiplying by the Jacobian of the tranformation from (td,fd) to
         # (thx,thy)
-
         SS = griddata((np.ravel(self.X), np.ravel(self.Y)), np.ravel(self.B),
-                      (np.ravel(thetax), np.ravel(thetay)), method='linear') \
+                      (np.ravel(thetax), np.ravel(thetay)), method='linear')\
+            * np.ravel(amp)
+        SS += griddata((np.ravel(self.X), np.ravel(self.Y)), np.ravel(self.B),
+                       (np.ravel(thetax), np.ravel(-thetay)), method='linear')\
             * np.ravel(amp)
         SS = np.reshape(SS, (len(td), len(fd)))
+        self.jacobian = np.reshape(amp, (len(td), len(fd)))
 
         # now add the SS with the sign of td and fd changed
         # unfortunately that is not simply reversing the matrix
@@ -858,8 +857,8 @@ class Brightness():
         plt.pcolormesh(self.x, self.x, self.acf_efield)
         plt.grid(linewidth=0.2)
         plt.colorbar()
-        plt.title('ACF of Intensity for ar={0} and exponent={1}'.
-                  format(self.ar, self.exponent))
+        plt.title('ACF of Intensity for ar={0} for ar={0}, psi={1}, alpha={2}'.
+                  format(self.ar, self.psi, self.alpha))
         plt.xlabel('X = velocity axis')
         plt.ylabel('Y axis')
         plt.show()
@@ -869,8 +868,8 @@ class Brightness():
         plt.pcolormesh(self.x, self.x, 10*np.log10(self.B))
         plt.grid(linewidth=0.2)
         plt.colorbar()
-        plt.title('Brightness (dB) for ar={0} and exponent={1}'.
-                  format(self.ar, self.exponent))
+        plt.title('Brightness (dB) for ar={0}, psi={1}, alpha={2}'.
+                  format(self.ar, self.psi, self.alpha))
         plt.xlabel(r'$\theta_x$ = velocity axis')
         plt.ylabel(r'$\theta_y$ axis')
         plt.show()
@@ -884,8 +883,8 @@ class Brightness():
         vmin = medval - 3
         vmax = maxval - 3
         plt.clim((vmin, vmax))
-        plt.title('Delay-Doppler Spectrum (dB) for ar={0} and exponent={1}'.
-                  format(self.ar, self.exponent) +
+        plt.title('Delay-Doppler Spectrum (dB) for ar={0}, psi={1}, alpha={2}'.
+                  format(self.ar, self.psi, self.alpha) +
                   '\n Gradient Angle ({0}, {1}) Reference Angle ({2}, {3})'.
                   format(self.thetagx, self.thetagy,
                          self.thetarx, self.thetary))
@@ -904,8 +903,8 @@ class Brightness():
             # add a contour at zero as a dashed white line
             plt.contour(self.fd, self.td, self.acf, [0.0],
                         colors='r', linestyles='dotted')
-        plt.title('ACF (Time, Freq) for ar={0} and exponent={1}'.
-                  format(self.ar, self.exponent) +
+        plt.title('ACF (Time, Freq) for ar={0}, psi={1}, alpha={2}'.
+                  format(self.ar, self.psi, self.alpha) +
                   '\n Gradient Angle ({0}, {1}) Reference Angle ({2}, {3})'.
                   format(self.thetagx, self.thetagy,
                          self.thetarx, self.thetary))
@@ -919,7 +918,7 @@ class Brightness():
         """
         plot some cuts. One might want to take some cuts through the ACF. In
         particular the ACF cut in doppler at zero delay is invarient with phase
-        gradient and is also exp(-(time/t0)^exponent), so you can confirm that
+        gradient and is also exp(-(time/t0)^alpha), so you can confirm that
         the exponent is correct by examining that cut.
 
         the cut in frequency (the bandwidth) is very sensitive to ar and its
@@ -935,8 +934,8 @@ class Brightness():
         yl = plt.ylim()
         plt.ylim((mn - 10, yl[1]))
         plt.title('{0} Cuts in Doppler at '.format(self.ncuts) +
-                  'constant Delay for ar={0} and exponent={1}'.
-                  format(self.ar, self.exponent) +
+                  'constant Delay for ar={0}, psi={1}, and alpha={2}'.
+                  format(self.ar, self.psi, self.alpha) +
                   '\n Gradient Angle ({0}, {1}) Reference Angle ({2}, {3})'.
                   format(self.thetagx, self.thetagy,
                          self.thetarx, self.thetary))
@@ -951,8 +950,8 @@ class Brightness():
         ti = np.argwhere(self.td >= 0).squeeze()
         plt.semilogx(self.td[ti], self.LSS[ti, fi])
         plt.grid()
-        plt.title('Cut in Delay at zero Doppler for ar={0} and exponent={1}'.
-                  format(self.ar, self.exponent) +
+        plt.title('Cut in Delay at Doppler=0 for ar={}, psi={} and alpha={}'.
+                  format(self.ar, self.psi, self.alpha) +
                   '\n Gradient Angle ({0}, {1}) Reference Angle ({2}, {3})'.
                   format(self.thetagx, self.thetagy,
                          self.thetarx, self.thetary))
