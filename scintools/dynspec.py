@@ -566,7 +566,6 @@ class Dynspec:
                 fit_spectrum=False, subtract_artefacts=False, dpi=200):
         """
         Find the arc curvature with maximum power along it
-
             constraint: Only search for peaks between constraint[0] and
                 constraint[1]
         """
