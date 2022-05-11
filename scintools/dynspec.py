@@ -259,15 +259,15 @@ class Dynspec:
             plt.show()
 
     def plot_acf(self, method='acf1d', alpha=5/3, contour=False, filename=None,
-                 input_acf=None, input_t=None, input_f=None, fit=True,
-                 mcmc=False, display=True, crop=None, tlim=None, flim=None,
+                 input_acf=None, input_t=None, input_f=None, nscale=4,
+                 mcmc=False, display=True, crop=False, tlim=None, flim=None,
                  figsize=(9, 9), verbose=False, dpi=200):
         """
         Plot the ACF
         """
         if not hasattr(self, 'acf'):
             self.calc_acf()
-        if not hasattr(self, 'tau') and input_acf is None and fit:
+        if not hasattr(self, 'tau') and input_acf is None:
             self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc,
                                   verbose=verbose)
         if input_acf is None:
@@ -283,36 +283,26 @@ class Dynspec:
         arr[0][0] = arr[0][0] - wn  # Set the noise spike to zero for plotting
         arr = np.fft.fftshift(arr)
 
-        if crop == 'auto' or crop == 'manual':
-            if crop == 'auto':
-                if not fit:
-                    print("Can't auto crop without fitting!")
-                tlim = 5 * self.tau / 60
-                flim = 5 * self.dnu
-                if tlim > self.tobs / 60:
-                    tlim = self.tobs / 60
-                if flim > self.bw:
-                    flim = self.bw
-
-            tfactor = tlim * 60 / tspan
-            tspan = tlim * 60
-            tmin = int((-tfactor/2) * len(arr[0]))
-            tmax = int((tfactor/2) * len(arr[0]))
-
-            ffactor = flim / fspan
-            fspan = flim
-            fmin = int((-ffactor/2) * len(arr))
-            fmax = int((ffactor/2) * len(arr))
-
-            arr = arr[fmin:fmax, tmin:tmax]
-
-        elif crop is not None:
-            print('\n', "Unrecognized cropping mode. Please specify 'auto',",
-                  "'manual' or None.", "'auto' requires selecting a fitting " +
-                  "method. \n")
-
         t_delays = np.linspace(-tspan/60, tspan/60, np.shape(arr)[1])
         f_shifts = np.linspace(-fspan, fspan, np.shape(arr)[0])
+
+        if crop or (tlim is not None):
+            if tlim is None:
+                # Set limits automatically
+                tlim = nscale * self.tau / 60
+                flim = nscale * self.dnu
+            if tlim > self.tobs / 60:
+                tlim = self.tobs / 60
+            if flim > self.bw:
+                flim = self.bw
+
+            t_inds = np.argwhere(np.abs(t_delays) <= tlim).squeeze()
+            f_inds = np.argwhere(np.abs(f_shifts) <= flim).squeeze()
+            t_delays = t_delays[t_inds]
+            f_shifts = f_shifts[f_inds]
+
+            arr = arr[f_inds, :]
+            arr = arr[:, t_inds]
 
         if input_acf is None:  # Also plot scintillation scales axes
             fig, ax1 = plt.subplots(figsize=figsize)
@@ -324,16 +314,15 @@ class Dynspec:
             ax1.set_ylabel('Frequency lag (MHz)')
             ax1.set_xlabel('Time lag (mins)')
             miny, maxy = ax1.get_ylim()
-            if fit:
-                ax2 = ax1.twinx()
-                ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-                ax2.set_ylabel(r'Frequency lag / (dnu$_d = {0}$)'.
-                               format(round(self.dnu, 2)))
-                ax3 = ax1.twiny()
-                minx, maxx = ax1.get_xlim()
-                ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-                ax3.set_xlabel(r'Time lag/(tau$_d={0}$)'.format(round(
-                                                             self.tau/60, 2)))
+            ax2 = ax1.twinx()
+            ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
+            ax2.set_ylabel(r'Frequency lag / (dnu$_d = {0}$)'.
+                           format(round(self.dnu, 2)))
+            ax3 = ax1.twiny()
+            minx, maxx = ax1.get_xlim()
+            ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
+            ax3.set_xlabel(r'Time lag/(tau$_d={0}$)'.format(round(
+                                                         self.tau/60, 2)))
             fig.colorbar(im, pad=0.15)
         else:  # just plot acf without scales
             if contour:
@@ -924,7 +913,7 @@ class Dynspec:
 
         if logsteps:
             # Set fdopnew in equal steps in log space
-            fdoplin = np.abs(np.linspace(-maxnormfac, maxnormfac, nfdop))
+            fdoplin = np.abs(np.linspace(-maxnormfac, maxnormfac, int(nfdop)))
             fdop_pos = 10**np.linspace(np.log10(np.min(fdoplin)),
                                        np.log10(np.max(fdoplin)), int(nfdop/2))
             fdop_neg = -np.flip(fdop_pos, axis=0)
@@ -1248,16 +1237,22 @@ class Dynspec:
         return
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
-                         mcmc=False, full_frame=False, nscale=4,
+                         mcmc=False, full_frame=False, nscale=10,
                          nwalkers=100, steps=1000, burn=0.2, nitr=1,
                          lnsigma=True, verbose=False, progress=True,
                          display=True, filename=None, dpi=200, frac_err=0.2,
-                         nan_policy='raise', flux_estimate=False):
+                         nan_policy='raise', weighted=True):
         """
         Measure the scintillation timescale
             Method:
-                acf1d - takes a 1D cut through the centre of the ACF for
-                sspec - measures timescale from the secondary spectrum
+                nofit - Using the 0.5 and 1/e levels in the ACF to define the
+                    scale, and assumes the finite-scintle error dominates
+                    the uncertainty
+                acf1d - takes a 1D cut through the centre of the ACF and fits
+                    an exponential in frequency and a Gaussian-like curve
+                    in time
+                sspec - measures scintillation scales from the secondary
+                   spectrum, using the Fourier transform of the 1d models
                 acf2d_approx - uses an analytic approximation to the ACF
                     including a phase gradient (a shear to the ACF)
         """
@@ -1267,26 +1262,64 @@ class Dynspec:
         if not hasattr(self, 'sspec') and 'sspec' in method:
             self.calc_sspec()
 
-        ydata_f = self.acf[int(self.nchan):, int(self.nsub)]
+        nf = np.shape(self.acf)[0]
+        nt = np.shape(self.acf)[1]
+        ydata_f = self.acf[int(nf/2):, int(nt/2)]
         xdata_f = self.df * np.linspace(0, len(ydata_f), len(ydata_f))
-        ydata_t = self.acf[int(self.nchan), int(self.nsub):]
+        ydata_t = self.acf[int(nf/2), int(nt/2):]
         xdata_t = self.dt * np.linspace(0, len(ydata_t), len(ydata_t))
 
         nt = len(xdata_t)  # number of t-lag samples (along half of acf frame)
         nf = len(xdata_f)
-
-        # concatenate x and y arrays
-        xdata = np.array(np.concatenate((xdata_t, xdata_f)))
-        ydata = np.array(np.concatenate((ydata_t, ydata_f)))
 
         # Get initial parameter values from 1d fit
         # Estimate amp and white noise level
         wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
         amp = max([ydata_f[1], ydata_t[1]])
         # Estimate tau for initial guess. Closest index to 1/e power
-        tau = xdata_t[np.argmin(abs(ydata_t - amp/np.e))]
+        tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
-        dnu = xdata_f[np.argmin(abs(ydata_f - amp/2))]
+        dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
+
+        # crop arrays to nscale number of scales
+        t_inds = np.argwhere(xdata_t <= nscale*tau).squeeze()
+        f_inds = np.argwhere(xdata_f <= nscale*dnu).squeeze()
+        xdata_t = xdata_t[t_inds]
+        ydata_t = ydata_t[t_inds]
+        xdata_f = xdata_f[f_inds]
+        ydata_f = ydata_f[f_inds]
+
+        # concatenate x and y arrays
+        xdata = np.array(np.concatenate((xdata_t, xdata_f)))
+        ydata = np.array(np.concatenate((ydata_t, ydata_f)))
+
+        # Save values determined without fitting: over-write if improved
+        self.tau = tau
+        self.dnu = dnu
+        self.amp = amp
+        self.wn = wn
+        # Estimated number of scintles
+        tau_half = xdata_t[np.argmin(abs(ydata_t - amp/2))]  # half power
+        nscint = (1 + 0.2*self.bw/self.dnu) * (1 + 0.2*self.tobs/tau_half)
+        # Estimated errors
+        self.dnuerr = dnu / np.sqrt(nscint)
+        self.tauerr = tau / np.sqrt(nscint)
+        self.amperr = amp / np.sqrt(nscint)
+        self.wnerr = wn / np.sqrt(nscint)
+        self.tscat = 1/(2*np.pi*self.dnu)  # scattering timescale
+        self.nscint = nscint
+        self.scint_param_method = 'nofit'
+
+        flux_var_est = \
+            np.mean(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])**2
+        flux_var = np.var(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])
+        # Estimate of scint bandwidth
+        self.dnu_est = self.df * flux_var/flux_var_est
+        self.dnu_esterr = self.dnu_est / np.sqrt(nscint)
+        self.tscat_est = 1/(2*np.pi*self.dnu_est)  # scattering timescale
+
+        if method == 'nofit':  # Don't want to try fitting, then just exit
+            return
 
         # Define fit parameters
         params = Parameters()
@@ -1319,14 +1352,13 @@ class Dynspec:
         f_errors = 2/np.pi * np.arctan(xdata_f / dnu) / \
             np.sqrt(self.nchan)
         f_errors[f_errors == 0] = 1e-3
-        weights = 1/np.array(np.concatenate((t_errors, f_errors)))
+        if weighted:
+            weights = 1/np.array(np.concatenate((t_errors, f_errors)))
+        else:
+            weights = None
 
-        if (method == 'acf1d' or method == 'acf2d_approx' or
-           method == 'acf2d') and not hasattr(self, 'dnu'):
-            if method == 'acf2d_approx' or method == 'acf2d':
-                if verbose:
-                    print("\nDoing 1D fit to initialize fit values")
-            elif verbose:
+        if method == 'acf1d':
+            if verbose:
                 print("\nPerforming least-squares fit to 1D ACF model")
             chisqr = np.inf
             if mcmc:
@@ -1406,8 +1438,9 @@ class Dynspec:
 
             nc, nr = np.shape(ydata)
             weights_2d = np.ones(np.shape(ydata))
-            weights_2d = weights_2d / np.transpose([f_errors_2d])
-            weights_2d = weights_2d / [t_errors_2d]
+            if weighted:
+                weights_2d = weights_2d / np.transpose([f_errors_2d])
+                weights_2d = weights_2d / [t_errors_2d]
 
             wn_loc = np.unravel_index(np.argmax(ydata, axis=None),
                                       ydata.shape)
@@ -1639,27 +1672,28 @@ class Dynspec:
             #         params = results.params
             #         res = results
 
-        if flux_estimate:
-            flux_var_est = \
-                np.mean(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])**2
-            flux_var = np.var(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])
-            # Estimate of scint bandwidth
-            self.dnu_est = self.df * flux_var/flux_var_est
+        if res.params['tau'].stderr is None or \
+           res.params['dnu'].stderr is None:
+            print("\n Warning: Fit failed. Estimating values instead")
+            return
+        elif (res.params['tau'].stderr > res.params['tau'].value or
+              res.params['dnu'].stderr > res.params['dnu'].value):
+            print("\n Warning: Fit failed. Estimating values instead")
+        else:
+            self.scint_param_method = method
 
         # Done fitting - now define results
         self.tau = res.params['tau'].value
         self.dnu = res.params['dnu'].value
-        if self.dnu < self.df and not flux_estimate:
+        self.tscat = 1/(2*np.pi*self.dnu)  # scattering timescale
+        if self.dnu < self.df:
             print("Warning: Scint bandwidth < channel bandwidth.")
-            print("Recommend trying the flux variance estimation method with")
-            print("\t get_scint_params(flux_estimate=True).")
         # Compute finite scintle error
-        N = (1 + 0.2*self.bw/self.dnu) * (1 + 0.2*self.tobs/self.tau)
-        self.nscint = N
-        fse_tau = self.tau/(2*np.sqrt(N))
+        nscint = (1 + 0.2*self.bw/self.dnu) * (1 + 0.2*self.tobs/self.tau)
+        self.nscint = nscint
+        fse_tau = self.tau/(2*np.sqrt(nscint))
         fit_tau = res.params['tau'].stderr
-        print(res.params)
-        fse_dnu = self.dnu/(2*np.log(2)*np.sqrt(N))
+        fse_dnu = self.dnu/(2*np.log(2)*np.sqrt(nscint))
         fit_dnu = res.params['dnu'].stderr
 
         if verbose:
@@ -1673,6 +1707,7 @@ class Dynspec:
 
         self.tauerr = np.sqrt(fit_tau**2 + fse_tau**2)
         self.dnuerr = np.sqrt(fit_dnu**2 + fse_dnu**2)
+
         if 'sim:mb2=' not in self.name:
             self.wn = res.params['wn'].value
             self.wnerr = res.params['wn'].stderr

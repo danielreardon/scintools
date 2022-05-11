@@ -16,6 +16,7 @@ import csv
 from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter1d
 import pickle
 from astropy.time import Time
 
@@ -157,6 +158,10 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
         header += ",delmax"
         write_string += ",{0}".format(dyn.norm_delmax)
+
+    if hasattr(dyn, 'scint_param_method'):  # Method of scint measurement
+        header += ",scint_param_method"
+        write_string += ",{0}".format(dyn.scint_param_method)
 
     header += "\n"
     write_string += "\n"
@@ -585,11 +590,13 @@ def make_pickle(obj, filepath):
             f_out.write(bytes_out[idx:idx+max_bytes])
 
 
-def calculate_curvature_peak_probability(power_data, noise_level,
+def calculate_curvature_peak_probability(power_data, noise_level, smooth=True,
                                          curvatures=None, log=False):
     """
     Calculates the probability distribution
     """
+    if smooth:
+        power_data = gaussian_filter1d(power_data, noise_level)
     if np.shape(noise_level) == ():
         max_power = np.max(power_data)
     else:
