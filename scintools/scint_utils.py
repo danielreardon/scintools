@@ -95,6 +95,10 @@ def write_results(filename, dyn=None):
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
 
+    if hasattr(dyn, 'scint_param_method'):  # Method of scint measurement
+        header += ",scint_param_method"
+        write_string += ",{0}".format(dyn.scint_param_method)
+
     if hasattr(dyn, 'dnu_est'):  # Estimated scintillation bandwidth
         header += ",dnu_est"
         write_string += ",{0}".format(dyn.dnu_est)
@@ -158,10 +162,6 @@ def write_results(filename, dyn=None):
     if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
         header += ",delmax"
         write_string += ",{0}".format(dyn.norm_delmax)
-
-    if hasattr(dyn, 'scint_param_method'):  # Method of scint measurement
-        header += ",scint_param_method"
-        write_string += ",{0}".format(dyn.scint_param_method)
 
     header += "\n"
     write_string += "\n"
