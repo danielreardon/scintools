@@ -10,6 +10,7 @@ is a package for the analysis and simulation of pulsar scintillation data. This 
 * Free software under MIT license
 * `Limited documentation available here <https://scintools.readthedocs.io/en/latest/index.html>`_
 * Usage examples located in scintools/examples
+* Please email Daniel Reardon for further questions relating to usage: dreardon@swin.edu.au
 
 ===============================
 Referencing
