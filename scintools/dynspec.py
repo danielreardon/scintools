@@ -150,7 +150,8 @@ class Dynspec:
             fluxerrs = np.flip(fluxerrs, 0)
         # Finished reading, now setup dynamic spectrum
         self.dyn = fluxes  # initialise dynamic spectrum
-        self.dyn_err = np.nanmedian(fluxerrs)
+        self.dyn_err = fluxerrs
+        self.dyn_noise = np.nanmedian(fluxerrs)
         self.lamsteps = lamsteps
         if process:
             self.default_processing(lamsteps=lamsteps)  # do default processing
@@ -305,25 +306,25 @@ class Dynspec:
             arr = arr[:, t_inds]
 
         if input_acf is None:  # Also plot scintillation scales axes
+
             fig, ax1 = plt.subplots(figsize=figsize)
             if contour:
-                im = ax1.contourf(t_delays, f_shifts, arr)
+                ax1.contourf(t_delays, f_shifts, arr)
             else:
-                im = ax1.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
-                                    rasterized=True, shading='auto')
+                ax1.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
+                               rasterized=True, shading='auto')
             ax1.set_ylabel('Frequency lag (MHz)')
             ax1.set_xlabel('Time lag (mins)')
             miny, maxy = ax1.get_ylim()
             ax2 = ax1.twinx()
             ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-            ax2.set_ylabel(r'Frequency lag / (dnu$_d = {0}$)'.
+            ax2.set_ylabel(r'Frequency lag / ($\Delta\nu_d = {0}\,$MHz)'.
                            format(round(self.dnu, 2)))
             ax3 = ax1.twiny()
             minx, maxx = ax1.get_xlim()
             ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-            ax3.set_xlabel(r'Time lag/(tau$_d={0}$)'.format(round(
+            ax3.set_xlabel(r'Time lag/($\tau_d={0}\,$min)'.format(round(
                                                          self.tau/60, 2)))
-            fig.colorbar(im, pad=0.15)
         else:  # just plot acf without scales
             if contour:
                 plt.contourf(t_delays, f_shifts, arr)
@@ -2003,24 +2004,28 @@ class Dynspec:
         # Trim bottom
         while rowsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (0), axis=0)
+            self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
             self.freqs = np.delete(self.freqs, (0))
             rowsum = sum(abs(self.dyn[0][:]))
         rowsum = sum(abs(self.dyn[-1][:]))
         # Trim top
         while rowsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (-1), axis=0)
+            self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
             rowsum = sum(abs(self.dyn[-1][:]))
         # Trim left
         colsum = sum(abs(self.dyn[:][0]))
         while colsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (0), axis=1)
+            self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
             self.times = np.delete(self.times, (0))
             colsum = sum(abs(self.dyn[:][0]))
         colsum = sum(abs(self.dyn[:][-1]))
         # Trim right
         while colsum == 0 or np.isnan(rowsum):
             self.dyn = np.delete(self.dyn, (-1), axis=1)
+            self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
             self.times = np.delete(self.times, (-1))
             colsum = sum(abs(self.dyn[:][-1]))
         self.nchan = len(self.freqs)

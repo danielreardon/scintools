@@ -456,6 +456,7 @@ class ACF():
         self.use_t = use_t
         # self.psi = psi
         self.amp = amp
+        self.calc_acf()
 
         return
 
