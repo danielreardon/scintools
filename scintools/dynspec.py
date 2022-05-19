@@ -2036,7 +2036,7 @@ class Dynspec:
         self.mjd = self.mjd + self.times[0]/86400
 
     def refill(self, method='linear', zeros=True, filter_size=3,
-               noise=None):
+               noise=None, linear=True):
         """
         Replaces the nan values in array. Also replaces zeros by default
         """
@@ -2059,7 +2059,8 @@ class Dynspec:
             mask[np.isnan(array)] = 1
             inpainted = inpaint.inpaint_biharmonic(array, mask)
             self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
-        elif method == 'linear' or method == 'cubic' or method == 'nearest':
+        elif (method == 'linear' or method == 'cubic' or method == 'nearest') \
+          and linear:
             # do interpolation
             array = cp(self.dyn)
             self.dyn = interp_nan_2d(array, method=method)
