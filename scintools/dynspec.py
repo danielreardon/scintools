@@ -205,7 +205,7 @@ class Dynspec:
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
-                 figsize=(9, 9), dpi=200):
+                 figsize=(9, 9), dpi=200, title=None):
         """
         Plot the dynamic spectrum
         """
@@ -249,6 +249,9 @@ class Dynspec:
         else:
             plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax,
                            linewidth=0, rasterized=True)
+
+        if title is not None:
+            plt.title(title)
 
         if filename is not None:
             plt.savefig(filename, dpi=dpi, bbox_inches='tight',
@@ -2059,8 +2062,8 @@ class Dynspec:
             mask[np.isnan(array)] = 1
             inpainted = inpaint.inpaint_biharmonic(array, mask)
             self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
-        elif (method == 'linear' or method == 'cubic' or method == 'nearest') \
-          and linear:
+        elif (method == 'linear' or method == 'cubic' or
+              method == 'nearest') and linear:
             # do interpolation
             array = cp(self.dyn)
             self.dyn = interp_nan_2d(array, method=method)
