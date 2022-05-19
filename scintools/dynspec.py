@@ -25,9 +25,16 @@ from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter, wiener
 from scipy.io import loadmat
 from lmfit import Parameters
-from skimage.restoration import inpaint
-import corner
-
+try:
+    from skimage.restoration import inpaint
+except Exception as e:
+    print(e)
+    print("skimage not found: cannot use biharmonic inpainting")
+try:
+    import corner
+except Exception as e:
+    print(e)
+    print("Corner.py not found: cannot plot mcmc results")
 
 class Dynspec:
 
