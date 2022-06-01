@@ -370,10 +370,11 @@ def single_search(params):
         edges -- The bin edges for Theta-Theta
         name -- A string filename used if plotting
         plot -- A bool controlling if the result should be plotted
+        neta -- Number of curvatures to test
     """
     
     ## Reap Parameters
-    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad=params
+    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad,neta=params
 
     ## Verify units
     time2 = unit_checks(time2,'time2',u.s)
@@ -383,7 +384,7 @@ def single_search(params):
     edges = unit_checks(edges,'edges',u.mHz)
 
     ## Curvature Range to Search Over
-    etas = np.linspace(eta_low, eta_high, 100)
+    etas = np.linspace(eta_low, eta_high, neta)
 
     ## Calculate fD and tau arrays
     fd = fft_axis(time2, u.mHz, npad)
