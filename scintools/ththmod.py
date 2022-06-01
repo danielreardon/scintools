@@ -380,7 +380,7 @@ def single_search(params):
     time2 = unit_checks(time2,'time2',u.s)
     freq2 = unit_checks(freq2,'freq2',u.MHz)
     eta_low = unit_checks(eta_low,'eta_low',u.s**3)
-    eta_high = unit_checks(eta_low,'eta_low',u.s**3)
+    eta_high = unit_checks(eta_high,'eta_high',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
     ## Curvature Range to Search Over
