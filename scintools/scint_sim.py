@@ -813,9 +813,13 @@ class Brightness():
         c = -2 * R * sina / np.sqrt(1 - R**2)
 
         # ACF of electric field
-        Rho = np.exp(-(a * self.X**2 + b * self.Y**2 +
-                       c * self.X * self.Y)
-                     ** (self.alpha/2))/2
+        Rho = np.exp(-0.5*(a * self.X**2 + b * self.Y**2 +
+                           c * self.X * self.Y)
+                     ** (self.alpha/2))
+        # # Original code below with error
+        # Rho = np.exp(-(a * self.X**2 + b * self.Y**2 +
+        #                c * self.X * self.Y)
+        #              ** (self.alpha/2))/2
 
         self.x = x
         self.acf_efield = Rho
