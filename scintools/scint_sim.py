@@ -678,10 +678,10 @@ class ACF():
         plt.pcolormesh(self.tn_edges, self.fn_edges, self.acf)
         if contour:
             # put in contours at 0.2, 0.4, 0.6 and 0.8 in black
-            plt.contour(self.fn, self.tn, self.acf,
+            plt.contour(self.tn, self.fn, self.acf,
                         self.amp*[0.2, 0.4, 0.6, 0.8], colors='k')
-        plt.xlabel(r'Time lag ($t/\tau_d$)')
-        plt.ylabel(r'Frequency lag ($\nu/\Delta\nu_d$)')
+        plt.xlabel(r'Time lag ($\tau/\tau_{d,\rm{iso}}$)')
+        plt.ylabel(r'Frequency lag ($\nu/\Delta\nu_{d,\rm{iso}}$)')
         if display:
             plt.title('ACF of dynamic spectrum')
             plt.show()
