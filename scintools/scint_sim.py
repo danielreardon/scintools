@@ -417,24 +417,27 @@ class ACF():
 
     def __init__(self, V=1, psi=0, phasegrad=0, theta=0, ar=1, alpha=5/3,
                  spmax=4, dnumax=4, nf=51, nt=51, amp=1, wn=0,
-                 resolution_factor=2, spatial_factor=2, core_factor=2):
+                 spatial_factor=2, resolution_factor=1, core_factor=2):
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
 
-        Vx - Effective velocity in x direction
-        Vy - Effective velocity in y direction
-        phasegrad_x - phase gradient in x direction
-        phasegrad_y - phase gradient in y direction
-        ar - axial ratio of diffractive scintillation. Major axis defines x
-        alpha - spectral index
-        smax -
-        dnumax -
-        nf =
-        nt =
-
-        alpha = 5/3 assumes ISS spectrum is a Kolmogorov power-law with no
-        inner or outer scale
+        V - magnitude of velocity
+        psi - angle of velocity w.r.t the major axis of (brightness) anisotropy
+        phasegrad - magnitude of phase gradient
+        theta - angle of phase gradient w.r.t velocity vector
+        ar - axial ratio of anisotropy
+        alpha - structure function exponent (Kolmogorov = 5/3)
+        spmax - number of spatial scales to calculate ACF to
+            (ACF in time goes to spmax/V)
+        dnumax - number of frequency scales to calculate ACF to
+        nf - size of ACF in frequency. If not odd, returns nf+1
+        nt - size of ACF in frequency. If not odd, returns nt+1
+        amp - amplitude of ACF
+        wn - size of white-noise spike at the origin of ACF
+        spatial_factor - multiplier for spmax for calculating ACF e-field
+        resolution_factor - multiplier to default resolution for ACF e-field
+        core_factor - additional resolution multiplier for the first dnu sample
         """
 
         self.alpha = alpha
@@ -452,9 +455,9 @@ class ACF():
         self.spmax = spmax
         self.dnumax = dnumax
         if nf % 2 == 0:
-            nf -= 1  # make odd so the ACF has a centre
+            nf += 1  # make odd so the ACF has a centre
         if nt % 2 == 0:
-            nt -= 1  # make odd so the ACF has a centre
+            nt += 1  # make odd so the ACF has a centre
         self.nf = nf
         self.nt = nt
         self.sp_fac = spatial_factor
@@ -462,7 +465,7 @@ class ACF():
         self.core_fac = core_factor
 
         # default resolutions with sampling factors = 1
-        self.dsp = 2*spmax/(nt-1)
+        self.dsp = 4*spmax/(nt-1)
         self.ddnun = 2*dnumax/(nf-1)
 
         # calculate the ACF
@@ -658,7 +661,7 @@ class ACF():
 
         return
 
-    def plot_acf(self, display=True):
+    def plot_acf(self, display=True, contour=True):
         """
         Plots the simulated ACF
         """
@@ -673,10 +676,14 @@ class ACF():
         fn_edges = np.append(fn_edges, fn_edges[-1] + dfn)
 
         plt.pcolormesh(tn_edges, fn_edges, self.acf)
+        if contour:
+            # put in contours at 0.2, 0.4, 0.6 and 0.8 in black
+            plt.contour(self.fn, self.tn, self.acf,
+                        self.amp*[0.2, 0.4, 0.6, 0.8], colors='k')
         plt.xlabel(r'Time lag ($t/\tau_d$)')
         plt.ylabel(r'Frequency lag ($\nu/\Delta\nu_d$)')
-        plt.title('ACF of dynamic spectrum')
         if display:
+            plt.title('ACF of dynamic spectrum')
             plt.show()
 
     def plot_acf_efield(self, display=True):
