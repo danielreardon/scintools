@@ -565,7 +565,7 @@ class ACF():
         if phasegrad == 0:
             # calculate only one quadrant tn >= 0
             # equally spaced t array t= tn*S0
-            tn = np.arange(0, (spmax/V) + (dsp/V), (dsp/V))
+            tn = np.linspace(0, (spmax/V), int(np.ceil(self.nt/2)))
             snx = Vx*tn
             sny = Vy*tn
             gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
@@ -669,13 +669,13 @@ class ACF():
         #   since they are pixel edges, not centres
         dtn = np.abs(self.tn[1] - self.tn[0])
         tn_edges = self.tn - dtn/2
-        tn_edges = np.append(tn_edges, tn_edges[-1] + dtn)
+        self.tn_edges = np.append(tn_edges, tn_edges[-1] + dtn)
 
         dfn = np.abs(self.fn[1] - self.fn[0])
         fn_edges = self.fn - dfn/2
-        fn_edges = np.append(fn_edges, fn_edges[-1] + dfn)
+        self.fn_edges = np.append(fn_edges, fn_edges[-1] + dfn)
 
-        plt.pcolormesh(tn_edges, fn_edges, self.acf)
+        plt.pcolormesh(self.tn_edges, self.fn_edges, self.acf)
         if contour:
             # put in contours at 0.2, 0.4, 0.6 and 0.8 in black
             plt.contour(self.fn, self.tn, self.acf,
