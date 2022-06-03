@@ -413,91 +413,98 @@ class Simulation():
         plt.show()
 
 
-"""
-The code below is unfinished, but will eventually allow one to compute the ACF
-analytically, including a phase gradient. A dynamic spectrum with phase
-gradients (beyond those that arise naturally) can be simulated from this.
-"""
-
-
 class ACF():
 
-    def __init__(self, s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3,
-                 phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1,
-                 use_t=True, plot=False, display=True):
+    def __init__(self, V=1, psi=0, phasegrad=0, theta=0, ar=1, alpha=5/3,
+                 spmax=4, dnumax=4, nf=51, nt=51, amp=1, wn=0,
+                 resolution_factor=2, spatial_factor=2, core_factor=2):
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
 
-        s_max - number of coherence spatial scales to calculate over
-        dnu_max - number of decorrelation bandwidths to calculate over
-        ns - number of spatial steps
-        nf - number of decorrelation bandwidth steps
-        alpha - exponent for interstellar turbulence
-        ar - axial ratio of diffractive scintillation. Major axis defines x
-        phasegrad_x - phase gradient in x direction
-        phasegrad_y - phase gradient in y direction
         Vx - Effective velocity in x direction
         Vy - Effective velocity in y direction
+        phasegrad_x - phase gradient in x direction
+        phasegrad_y - phase gradient in y direction
+        ar - axial ratio of diffractive scintillation. Major axis defines x
+        alpha - spectral index
+        smax -
+        dnumax -
+        nf =
+        nt =
 
-        If ISS spectrum is a Kolmogorov power-law with no inner or outer scale,
-        alpha=5/3
+        alpha = 5/3 assumes ISS spectrum is a Kolmogorov power-law with no
+        inner or outer scale
         """
-        self.s_max = s_max
-        self.dnu_max = dnu_max
-        self.ns = ns
-        self.nf = nf
-        self.ar = ar
+
         self.alpha = alpha
-        self.phasegrad_x = phasegrad_x
-        self.phasegrad_y = phasegrad_y
-        self.V_x = V_x
-        self.V_y = V_y
-        self.use_t = use_t
-        # self.psi = psi
+        self.V = V
+        # anisotropy
+        self.ar = ar
+        self.psi = psi
+        # phase gradients
+        self.phasegrad = phasegrad
+        self.theta = theta
+        # amplitude and white noise spikes (for fitting to real data)
         self.amp = amp
+        self.wn = wn
+        # sampling parameters
+        self.spmax = spmax
+        self.dnumax = dnumax
+        if nf % 2 == 0:
+            nf -= 1  # make odd so the ACF has a centre
+        if nt % 2 == 0:
+            nt -= 1  # make odd so the ACF has a centre
+        self.nf = nf
+        self.nt = nt
+        self.sp_fac = spatial_factor
+        self.res_fac = resolution_factor
+        self.core_fac = core_factor
+
+        # default resolutions with sampling factors = 1
+        self.dsp = 2*spmax/(nt-1)
+        self.ddnun = 2*dnumax/(nf-1)
+
+        # calculate the ACF
         self.calc_acf()
 
         return
 
     def calc_acf(self, plot=False):
         """
-        computes 2-D ACF of intensity vs t and v where optimal sampling of t
-        and v is provided with the output ACF
+        Computes 2D ACF of intensity vs time and frequency where the
+        sampling in the output ACF is adjustable.
 
-        assume ISS spectrum is a Kolmogorov power-law with no inner or outer
-        scale
+        requires anisotropy and angular displacement due to phase gradient.
+        psi = 0, defines brightness distribution anisotropy aligned with V
+        theta = 0, defines phase gradient aligned with V
+        (Within the code, x-axis (see Vx, and sigxn parameters) is the major
+         axis of ACF-efield anisotropy, which is psi=90)
 
-        requires velocity and angular displacement due to phase gradient
-        (vectors) vectors are x, y where x = major axis of spatial structure,
-        i.e. density variations are elongated by "ar" in the x direction. y is
-        90deg CCW.
-
-        implement the integrals in Appendix A of Rickett, Coles et al ApJ 2014
+        implements the integrals in Appendix A of Rickett, Coles et al ApJ 2014
         on the analysis of the double pulsar scintillation equations A1 and A2.
         A2 has an error. It would be correct if nu were replaced by omega,
         i.e. had an extra 2*pi
 
-        coordinates are with respect to ar major axis so we don't have to
-        rotate the structure, we put V and sig vectors in the structure
-        coordinates.
+        coordinates in the code are with respect to ar major axis so we don't
+        have to rotate the structure, we put V and phasegrad into the
+        structure coordinates.
 
         The distance sn is normalized by So and the frequency dnun by \nu_{0.5}
         the spatial scale and the frequency scale respectively.
-        the phase gradient is normalized by the 1/s0, i.e. sigxn = gradphix*s0
+        the phase gradient is normalized by the 1/s0,
+        i.e. sigxn = gradphix * s0
 
         if there is no phase gradient then the acf is symmetric and only one
         quadrant needs to be calculated. Otherwise two quadrants are necessary.
-
-        new algorithm to compute same integral. Normalized integral is
-        game(sn, dnun) = -j/(2pi)^2 (1/dnun) sum sum (dsn)^2
-        game(snp,0)exp((j/4pi)(1/dnun) | sn - snp|^2
 
         the worst case sampling is when dnun is very small. Then the argument
         of the complex exponential becomes large and aliasing will occur. If
         dnun=0.01 and dsp=0.1 the alias will peak at snx = 5. Reducing the
         sampling dsp to 0.05 will push that alias out to snx = 8. However
-        halving dsp will increase the time by a factor of 4.
+        halving dsp will increase the time by a factor of 4. Sampling
+        characteristics can be tuned with spatial_factor, resolution_factor,
+        and core_factor parameters
 
         The frequency decorrelation is quite linear near the origin and looks
         quasi-exponential, the 0.5 width is dnun = 0.15. Sampling of 0.05 is
@@ -505,156 +512,203 @@ class ACF():
 
         dnun = 0.0 is divergent with this integral but can be obtained
         trivially from the ACF of the electric field directly
-
-        Use formula vec{S} = vec{V} t - 2 vec{vec{sigma_p}}}delta nu/nu
-        equation A6 to get equal t sampling. dt = ds / |V| and tmax= Smax + 2
-        |sigma_p| dnu/nu
         """
 
         alph2 = self.alpha/2
 
-        nf = self.nf
-        ns = self.ns
-        spmax = self.s_max
-        dnumax = self.dnu_max
-        sigxn = self.phasegrad_x
-        sigyn = self.phasegrad_y
-        V_x = self.V_x
-        V_y = self.V_y
+        spmax = self.spmax
+        dnumax = self.dnumax
+        ddnun = self.ddnun
+        dsp = self.dsp
+        phasegrad = self.phasegrad
+        theta = self.theta
+        V = self.V
         amp = self.amp
+        wn = self.wn
+        # arcs are enhanced when velocity is parallel to brightness
+        # distribution major axis (psi=0), which is perpendicular to ACF-efield
+        xi = 90 - self.psi  # velocity angle w.r.t ACF-efield
+        # calculate velocities parallel (Vx) and perpendicular (Vy) to e-field
+        Vx = V*np.cos(xi*np.pi/180)
+        Vy = V*np.sin(xi*np.pi/180)
+        # calculate angular offsets parallel (sigxn) and perpendicular (sigyn)
+        #    to V
+        sigxn = phasegrad * np.cos((xi - theta)*np.pi/180)
+        sigyn = phasegrad * np.sin((xi - theta)*np.pi/180)
 
-        Vmag = np.sqrt(self.V_x**2 + self.V_y**2)
-
-        dsp = 2 * spmax / (ns)
-        # ddnun = 2 * dnumax / nf
-
-        sqrtar = np.sqrt(self.ar)
+        ar = self.ar
+        sqrtar = np.sqrt(ar)
         # equally spaced dnu array dnu = dnun * nuhalf
-        dnun = np.linspace(0, dnumax, int(np.ceil(nf/2)))
+        dnun = np.arange(0, dnumax + ddnun, ddnun)
         ndnun = len(dnun)
+        sp_fac = self.sp_fac
+        res_fac = self.res_fac
+        core_fac = self.res_fac * self.core_fac
 
-        if sigxn == 0 and sigyn == 0:
+        # Calculate ACF of e-field
+        snp = np.arange(-sp_fac*spmax, sp_fac*spmax + dsp/res_fac, dsp/res_fac)
+        SNPX, SNPY = np.meshgrid(snp, snp)
+        # ACF of e-field
+        gammes = np.exp(-0.5*((SNPX/sqrtar)**2 +
+                              (SNPY*sqrtar)**2)**alph2)
+        # Increase spatial resolution by factor of res_fac, for first dnu step
+        snp2 = np.arange(-sp_fac*spmax, sp_fac*spmax + dsp/core_fac,
+                         dsp/core_fac)
+        SNPX2, SNPY2 = np.meshgrid(snp2, snp2)
+        # ACF of e-field
+        gammes2 = np.exp(-0.5*((SNPX2/sqrtar)**2 +
+                               (SNPY2*sqrtar)**2)**alph2)
+
+        if phasegrad == 0:
             # calculate only one quadrant tn >= 0
-            gammitv = np.zeros((int(ns/2), int(nf/2)))
             # equally spaced t array t= tn*S0
-            tn = np.arange(0.0, spmax/Vmag, dsp/Vmag)
-            snx = V_x*tn
-            sny = V_y*tn
-            snp = np.arange(-2*spmax, 2*spmax, dsp)
-            SNPX, SNPY = np.meshgrid(snp, snp)
-            gammes = np.exp(-0.5*((SNPX/sqrtar)**2 +
-                                  (SNPY*sqrtar)**2)**alph2)  # ACF of e-field
-
-            # compute dnun = 0 first
+            tn = np.arange(0, (spmax/V) + (dsp/V), (dsp/V))
+            snx = Vx*tn
+            sny = Vy*tn
+            gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
+            # compute dnun=0 first
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
                                          (sny*sqrtar)**2)**alph2)
-            # now do first dnu step with double spatial resolution
-            snp2 = np.arange(-2*spmax, 2*spmax, dsp/2)
-            SNPX2, SNPY2 = np.meshgrid(snp2, snp2)
-            gammes2 = np.exp(-0.5*((SNPX2/sqrtar)**2 +
-                                   (SNPY2*sqrtar)**2)**alph2)  # ACF of e-field
+            gammitv[0, 0] += wn/amp
             for isn in range(0, len(snx)):
                 ARG = ((SNPX2-snx[isn])**2 + (SNPY2-sny[isn])**2)/(2*dnun[1])
                 temp = gammes2 * np.exp(1j*ARG)
-                gammitv[isn, 1] = -1j*(dsp/2)**2 * \
-                    np.sum(temp)/((2*np.pi)*dnun[1])
-
-            # now do remainder of dnu array
+                gammitv[isn, 1] = -1j*((dsp/core_fac)**2 *
+                                       np.sum(temp)/((2*np.pi)*dnun[1]))
+            # Now do remainder of dnu array
             for idn in range(2, ndnun):
                 for isn in range(0, len(snx)):
                     ARG = ((SNPX-snx[isn])**2 +
                            (SNPY-sny[isn])**2)/(2*dnun[idn])
-                    temp = gammes*np.exp(1j * ARG)
-                    gammitv[isn, idn] = -1j*dsp**2 * \
-                        np.sum(temp)/((2*np.pi)*dnun[idn])
-
-            # equation A1 convert ACF of E to ACF of I
-            gammitv = np.real(gammitv * np.conj(gammitv)).squeeze()
-
-            nr, nc = np.shape(gammitv)
-            gam2 = np.zeros((nr, nc*2))
-            gam2[:, 1:nc] = np.fliplr(gammitv[:, 1:])
-            gam2[:, nc:] = gammitv
-
-            gam3 = np.zeros((nr*2, nc*2))
-            gam3[1:nr, :] = np.flipud(gam2[1:, :])
-            gam3[nr:, :] = gam2
-            gam3 = np.transpose(gam3)
-            nf, nt = np.shape(gam3)
-
-            t2 = np.linspace(-spmax/Vmag, spmax/Vmag, nt)
-            f2 = np.linspace(-dnumax, dnumax, nf)
-            s2 = t2*Vmag
-
-        else:
-            # calculate two quadrants -tmax t < tmax
-            if self.use_t:
-                # equally spaced t array t = tn*S0
-                tn = np.linspace(-spmax, spmax, ns)
-                snp = np.arange(-spmax*Vmag, spmax*Vmag, dsp)
-            else:
-                tn = np.linspace(-spmax/Vmag, spmax/Vmag, ns)
-                snp = np.arange(-spmax, spmax, dsp)
-            snx, sny = V_x * tn, V_y * tn
-            SNPX, SNPY = np.meshgrid(snp, snp)
-            gammes = np.exp(-0.5 * ((SNPX / sqrtar)**2 +
-                            (SNPY * sqrtar)**2)**alph2)  # ACF of E-field
-            # compute dnun = 0 first
-            gammitv = np.zeros((int(ns), int(np.ceil(nf / 2))))
-            gammitv[:, 0] = np.exp(-0.5 * ((snx / sqrtar)**2 +
-                                   (sny * sqrtar)**2)**alph2)
-            for idn in range(1, int(np.ceil(nf/2))):
-                snxt = snx - 2 * sigxn * dnun[idn]
-                snyt = sny - 2 * sigyn * dnun[idn]
-                for isn in range(ns):
-                    temp = gammes * np.exp(1j * ((SNPX - snxt[isn])**2 +
-                                                 (SNPY - snyt[isn])**2) /
-                                           (2 * dnun[idn]))
-                    gammitv[isn, idn] = -1j * dsp**2 * np.sum(temp[:]) /\
-                        ((2 * np.pi) * dnun[idn])
+                    temp = gammes * np.exp(1j*ARG)
+                    gammitv[isn, idn] = -1j*((dsp/res_fac)**2 * np.sum(temp) /
+                                             ((2*np.pi)*dnun[idn]))
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
-            gam3 = amp * np.transpose(np.conj(np.hstack((np.fliplr(np.flipud(
-                                                gammitv[:, 1:])), gammitv))))
 
-            # scale by amplitude and crop to match data
-            f2 = np.hstack((np.flip(-dnun[1:]), dnun))
+            # Build first half
+            nr, nc = np.shape(gammitv)
+            gam2 = np.zeros((nr, nc*2-1))
+            gam2[:, 0:nc-1] = np.fliplr(gammitv[:, 1:])
+            gam2[:, nc-1:] = gammitv
+            gam2 = gam2.squeeze()
+
+            # Build full ACF
+            gam3 = np.zeros((nr*2-1, nc*2-1))
+            gam3[0:nr-1, :] = np.flipud(gam2[1:, :])
+            gam3[nr-1:, :] = gam2
+            gam3 = np.transpose(gam3)
+
+            t2 = np.concatenate((np.flip(-tn[1:]), tn)).squeeze()
+            f2 = np.concatenate((np.flip(-dnun[1:]), dnun)).squeeze()
+            s2 = t2 * V
+
+        else:
+            # calculate two quadrants -tmax t < tmax
+            # equally spaced t array t= tn*S0
+            tn = np.linspace(-(spmax/V), (spmax/V), self.nt)
+            snx = V*np.cos(xi*np.pi/180)*tn
+            sny = V*np.sin(xi*np.pi/180)*tn
+            # compute dnun=0 first
+            gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
+            gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
+                                         (sny*sqrtar)**2)**alph2)
+            gammitv[np.argwhere(snx == 0), 0] += wn/amp
+            for isn in range(0, len(snx)):
+                snxt = snx - 2*sigxn*dnun[1]
+                snyt = sny - 2*sigyn*dnun[1]
+                ARG = ((SNPX2-snxt[isn])**2 + (SNPY2-snyt[isn])**2)/(2*dnun[1])
+                temp = gammes2 * np.exp(1j*ARG)
+                gammitv[isn, 1] = -1j*((dsp/core_fac)**2 *
+                                       np.sum(temp)/((2*np.pi)*dnun[1]))
+            for idn in range(2, ndnun):
+                snxt = snx - 2*sigxn*dnun[idn]
+                snyt = sny - 2*sigyn*dnun[idn]
+                for isn in range(0, len(snx)):
+                    ARG = ((SNPX-snxt[isn])**2 +
+                           (SNPY-snyt[isn])**2)/(2*dnun[idn])
+                    temp = gammes*np.exp(1j*ARG)
+                    gammitv[isn, idn] = -1j*((dsp/res_fac)**2 * np.sum(temp) /
+                                             ((2*np.pi)*dnun[idn]))
+
+            # equation A1 convert ACF of E to ACF of I
+            gammitv = np.real(gammitv * np.conj(gammitv))
+
+            # Build ACF
+            nr, nc = np.shape(gammitv)
+            gam3 = np.zeros((nr, nc*2-1))
+            gam3[:, 0:nc-1] = np.fliplr(np.flipud(gammitv[:, 1:]))
+            gam3[:, nc-1:] = gammitv
+            gam3 = np.transpose(gam3)
+
+            f2 = np.concatenate((np.flip(-dnun[1:]), dnun)).squeeze()
             t2 = tn
-            s2 = t2 * Vmag
+            s2 = t2 * V
 
         self.fn = f2
         self.tn = t2
         self.sn = s2
-        self.acf = gam3
+        self.snp = snp
+        self.acf = amp * gam3
+        self.acf_efield = gammes
 
         if plot:
             self.plot_acf()
 
         return
 
-    def calc_sspec(self):
-        arr = np.fft.fftshift(self.acf)
-        arr = np.fft.fft2(arr)
-        arr = np.fft.fftshift(arr)
-        arr = np.real(arr)
-        self.sspec = 10*np.log10(arr)
-
     def plot_acf(self, display=True):
         """
         Plots the simulated ACF
         """
+        # for plotting, we need to expand tn and fn,
+        #   since they are pixel edges, not centres
+        dtn = np.abs(self.tn[1] - self.tn[0])
+        tn_edges = self.tn - dtn/2
+        tn_edges = np.append(tn_edges, tn_edges[-1] + dtn)
 
-        plt.pcolormesh(self.tn, self.fn, self.acf)
-        plt.xlabel(r'Time lag ($s/s_d$)')
-        plt.ylabel(r'Frequency lag ($\nu/\nu_d$)')
+        dfn = np.abs(self.fn[1] - self.fn[0])
+        fn_edges = self.fn - dfn/2
+        fn_edges = np.append(fn_edges, fn_edges[-1] + dfn)
+
+        plt.pcolormesh(tn_edges, fn_edges, self.acf)
+        plt.xlabel(r'Time lag ($t/\tau_d$)')
+        plt.ylabel(r'Frequency lag ($\nu/\Delta\nu_d$)')
+        plt.title('ACF of dynamic spectrum')
         if display:
             plt.show()
+
+    def plot_acf_efield(self, display=True):
+        """
+        Plots the simulated ACF
+        """
+        # for plotting, we need to expand tn and fn,
+        #   since they are pixel edges, not centres
+        dsnp = np.abs(self.snp[1] - self.snp[0])
+        snp_edges = self.snp - dsnp/2
+        snp_edges = np.append(snp_edges, snp_edges[-1] + dsnp)
+
+        plt.pcolormesh(snp_edges, snp_edges, self.acf_efield)
+        plt.xlabel(r'$S_x$ ($x/s_d$)')
+        plt.ylabel(r'$S_y$ ($y/s_d$)')
+        plt.title('ACF of e-field')
+        if display:
+            plt.show()
+
+    def calc_sspec(self):
+        arr = np.fft.fftshift(self.acf)
+        arr = np.fft.fft2(arr)
+        arr = np.fft.fftshift(arr)
+        arr = np.sqrt(np.real(arr * np.conj(arr)))
+        self.sspec = 10*np.log10(arr)
 
     def plot_sspec(self, display=True):
         """
         Plots the simulated ACF
         """
+        if not hasattr(self, 'sspec'):
+            self.calc_sspec()
 
         plt.pcolormesh(self.tn, self.fn, self.sspec)
         plt.xlabel(r'Delay')
@@ -959,3 +1013,4 @@ class Brightness():
         plt.xlabel('Delay')
         plt.ylabel('Log Power')
         plt.show()
+
