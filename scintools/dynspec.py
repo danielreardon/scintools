@@ -1312,17 +1312,13 @@ class Dynspec:
         wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
         amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
         # Estimate tau for initial guess. Closest index to 1/e power
-        if np.argwhere(ydata_t < amp/np.e).squeeze() == []:
-            tau = self.dt
-        elif np.shape(np.argwhere(ydata_t < amp/np.e).squeeze()) == ():
-            tau = self.tobs
+        if np.argwhere(ydata_t < amp/np.e).squeeze().size == 0:
+            tau = self.tobs/2
         else:
             tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
-        if np.argwhere(ydata_f < amp/2).squeeze() == []:
-            dnu = self.df
-        elif np.shape(np.argwhere(ydata_f < amp/2).squeeze()) == ():
-            dnu = self.bw
+        if np.argwhere(ydata_f < amp/2).squeeze().size == 0:
+            dnu = self.bw/2
         else:
             dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
 
