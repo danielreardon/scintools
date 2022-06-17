@@ -1312,9 +1312,15 @@ class Dynspec:
         wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
         amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
         # Estimate tau for initial guess. Closest index to 1/e power
-        tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
+        if np.argwhere(ydata_t < amp/np.e).squeeze() == []:
+            tau = self.dt
+        else:
+            tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
-        dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
+        if np.argwhere(ydata_f < amp/2).squeeze() == []:
+            dnu = self.df
+        else:
+            dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
 
         # crop arrays to nscale number of scales, or 5 samples
         if nscale*tau <= 5*self.dt or nscale*dnu <= 5*self.df:
