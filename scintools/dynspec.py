@@ -1576,7 +1576,6 @@ class Dynspec:
                 print("\nPerforming least-squares fit to approximate 2D " +
                       "ACF model")
             chisqr = np.inf
-            print(params)
 
             for itr in range(nitr):
                 nfit = 5
