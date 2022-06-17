@@ -1313,12 +1313,12 @@ class Dynspec:
         amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
         # Estimate tau for initial guess. Closest index to 1/e power
         if np.argwhere(ydata_t < amp/np.e).squeeze().size == 0:
-            tau = self.tobs/2
+            tau = self.dt
         else:
             tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
         if np.argwhere(ydata_f < amp/2).squeeze().size == 0:
-            dnu = self.bw/2
+            dnu = self.df
         else:
             dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
 
@@ -1348,6 +1348,10 @@ class Dynspec:
         self.wn = wn
         # Estimated number of scintles
         tau_half = xdata_t[np.argmin(abs(ydata_t - amp/2))]  # half power
+        if tau_half < self.dt:
+            tau_half = self.dt
+        elif tau_half > self.tobs:
+            tau_half = self.tobs
         nscint = (1 + 0.2*self.bw/(2*self.dnu)) * \
             (1 + 0.2*self.tobs/(2*tau_half))
         # Estimated errors
