@@ -1310,7 +1310,7 @@ class Dynspec:
         # Get initial parameter values from 1d fit
         # Estimate amp and white noise level
         wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
-        amp = max([ydata_f[1], ydata_t[1]])
+        amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
         # Estimate tau for initial guess. Closest index to 1/e power
         tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
