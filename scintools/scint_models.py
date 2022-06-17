@@ -160,8 +160,7 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     dnu = parvals['dnu']
     tau = parvals['tau']
     alpha = parvals['alpha']
-    phasegrad = parvals['phasegrad']
-    freq = parvals['freq']
+    mu = parvals['phasegrad']*60  # min/MHz to s/MHz
     tobs = parvals['tobs']
     bw = parvals['bw']
     wn = parvals['wn']
@@ -171,9 +170,11 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     tdata = np.reshape(tdata, (nt, 1))
     fdata = np.reshape(fdata, (1, nf))
 
-    model = amp * np.exp(-(abs((tdata / tau) + 2 * phasegrad *
-                               ((dnu / np.log(2)) / freq)**(1 / 6) *
-                               (fdata / (dnu / np.log(2))))**(3 * alpha / 2) +
+    # model = amp * np.exp(-(abs((tdata / tau) + 2 * phasegrad *
+    #                           ((dnu / np.log(2)) / freq)**(1 / 6) *
+    #                           (fdata / (dnu / np.log(2))))**(3 * alpha / 2) +
+    #                     abs(fdata / (dnu / np.log(2)))**(3 / 2))**(2 / 3))
+    model = amp * np.exp(-(abs((tdata - mu*fdata)/tau)**(3 * alpha / 2) +
                          abs(fdata / (dnu / np.log(2)))**(3 / 2))**(2 / 3))
 
     # multiply by triangle function
@@ -201,14 +202,13 @@ def scint_acf_model_2d(params, ydata, weights):
     dnu = np.abs(parvals['dnu'])
     alpha = parvals['alpha']
     ar = np.abs(parvals['ar'])
-    phasegrad_x = parvals['phasegrad_x']
-    phasegrad_y = parvals['phasegrad_y']
+    # if ar < 1:
+    #     ar = 1
+    psi = parvals['psi']
+    phasegrad = parvals['phasegrad']
+    theta = parvals['theta']
     wn = parvals['wn']
     amp = parvals['amp']
-
-    V_x = parvals['v_x']
-    V_y = parvals['v_y']
-    # psi = parvals['psi']
 
     tobs = parvals['tobs']
     bw = parvals['bw']
@@ -221,10 +221,9 @@ def scint_acf_model_2d(params, ydata, weights):
     taumax = (nt_crop / nt) * tobs / tau
     dnumax = (nf_crop / nf) * bw / dnu
 
-    acf = ACF(s_max=taumax, dnu_max=dnumax, ns=nt_crop, nf=nf_crop, ar=ar,
-              alpha=alpha, phasegrad_x=phasegrad_x, phasegrad_y=phasegrad_y,
-              amp=amp, V_x=V_x, V_y=V_y, psi=None)
-    acf.calc_acf()
+    acf = ACF(taumax=taumax, dnumax=dnumax, nt=nt_crop, nf=nf_crop, ar=ar,
+              alpha=alpha, phasegrad=phasegrad, theta=theta,
+              amp=amp, wn=wn, psi=psi)
     model = acf.acf
 
     triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-taumax*tau,
@@ -242,11 +241,6 @@ def scint_acf_model_2d(params, ydata, weights):
     if weights is None:
         weights = np.ones(np.shape(ydata))
         # weights = 1/model
-
-    # add white noise spike
-    model = np.fft.fftshift(model)
-    model[-1, -1] += wn
-    model = np.fft.ifftshift(model)
 
     return (ydata - model) * weights
 

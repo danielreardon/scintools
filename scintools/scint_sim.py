@@ -416,8 +416,9 @@ class Simulation():
 class ACF():
 
     def __init__(self, V=1, psi=0, phasegrad=0, theta=0, ar=1, alpha=5/3,
-                 spmax=4, dnumax=4, nf=51, nt=51, amp=1, wn=0,
-                 spatial_factor=2, resolution_factor=1, core_factor=2):
+                 taumax=4, dnumax=4, nf=51, nt=51, amp=1, wn=0,
+                 spatial_factor=2, resolution_factor=1, core_factor=2,
+                 auto_sampling=True, plot=False, display=True):
         """
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
@@ -428,8 +429,8 @@ class ACF():
         theta - angle of phase gradient w.r.t velocity vector
         ar - axial ratio of anisotropy
         alpha - structure function exponent (Kolmogorov = 5/3)
-        spmax - number of spatial scales to calculate ACF to
-            (ACF in time goes to spmax/V)
+        taumax - number of time scales to calculate ACF to
+            (ACF in space goes to taumax*V)
         dnumax - number of frequency scales to calculate ACF to
         nf - size of ACF in frequency. If not odd, returns nf+1
         nt - size of ACF in frequency. If not odd, returns nt+1
@@ -438,6 +439,11 @@ class ACF():
         spatial_factor - multiplier for spmax for calculating ACF e-field
         resolution_factor - multiplier to default resolution for ACF e-field
         core_factor - additional resolution multiplier for the first dnu sample
+        auto_sampling - (bool) decide whether to adjust spatial sampling
+            automatically to avoid artefacts.
+            Warning: computation time blows up for large ar
+        plot - (bool) choose whether to plot after computing
+        display - (bool) choose whether to display to screen immediately
         """
 
         self.alpha = alpha
@@ -452,7 +458,8 @@ class ACF():
         self.amp = amp
         self.wn = wn
         # sampling parameters
-        self.spmax = spmax
+        self.taumax = taumax
+        spmax = taumax*V
         self.dnumax = dnumax
         if nf % 2 == 0:
             nf += 1  # make odd so the ACF has a centre
@@ -460,23 +467,33 @@ class ACF():
             nt += 1  # make odd so the ACF has a centre
         self.nf = nf
         self.nt = nt
-        self.sp_fac = spatial_factor
-        self.res_fac = resolution_factor
-        self.core_fac = core_factor
+        if auto_sampling:
+            # calculate to 6 spatial scales along major axis
+            self.sp_fac = 6 * ar/spmax
+            # adjust to 81 pixels (10 pixels per scale), double at ar=3
+            self.res_fac = (1 + ar/3)*81/nt
+            # doubled
+            self.core_fac = 3
+        else:
+            self.sp_fac = spatial_factor
+            self.res_fac = resolution_factor
+            self.core_fac = core_factor
 
         # default resolutions with sampling factors = 1
         self.dsp = 4*spmax/(nt-1)
-        self.ddnun = 2*dnumax/(nf-1)
 
         # calculate the ACF
         self.calc_acf()
+
+        if plot:
+            self.plot_acf(display=display)
 
         return
 
     def calc_acf(self, plot=False):
         """
         Computes 2D ACF of intensity vs time and frequency where the
-        sampling in the output ACF is adjustable.
+        sampling in the output ACF can be handled automatically.
 
         requires anisotropy and angular displacement due to phase gradient.
         psi = 0, defines brightness distribution anisotropy aligned with V
@@ -519,13 +536,12 @@ class ACF():
 
         alph2 = self.alpha/2
 
-        spmax = self.spmax
+        V = self.V
+        spmax = self.taumax * V
         dnumax = self.dnumax
-        ddnun = self.ddnun
         dsp = self.dsp
         phasegrad = self.phasegrad
         theta = self.theta
-        V = self.V
         amp = self.amp
         wn = self.wn
         # arcs are enhanced when velocity is parallel to brightness
@@ -542,7 +558,9 @@ class ACF():
         ar = self.ar
         sqrtar = np.sqrt(ar)
         # equally spaced dnu array dnu = dnun * nuhalf
-        dnun = np.arange(0, dnumax + ddnun, ddnun)
+        dnun = np.linspace(0, dnumax, int(np.ceil(self.nf/2)))
+        ddnun = np.abs(dnun[1] - dnun[0])
+        self.ddnun = ddnun
         ndnun = len(dnun)
         sp_fac = self.sp_fac
         res_fac = self.res_fac
@@ -661,7 +679,7 @@ class ACF():
 
         return
 
-    def plot_acf(self, display=True, contour=True):
+    def plot_acf(self, display=True, contour=True, filled=False):
         """
         Plots the simulated ACF
         """
@@ -675,15 +693,21 @@ class ACF():
         fn_edges = self.fn - dfn/2
         self.fn_edges = np.append(fn_edges, fn_edges[-1] + dfn)
 
-        plt.pcolormesh(self.tn_edges, self.fn_edges, self.acf)
-        if contour:
-            # put in contours at 0.2, 0.4, 0.6 and 0.8 in black
-            plt.contour(self.tn, self.fn, self.acf,
-                        self.amp*[0.2, 0.4, 0.6, 0.8], colors='k')
+        if not filled:
+            plt.pcolormesh(self.tn_edges, self.fn_edges, self.acf)
+            if contour:
+                plt.contour(self.tn, self.fn, self.acf,
+                            self.amp*[0.2, 0.4, 0.6, 0.8], colors='k')
+
+        else:
+            plt.contourf(self.tn, self.fn, self.acf,
+                         self.amp*[0, 0.1, 0.2, 0.3, 0.4, 0.5,
+                                   0.6, 0.7, 0.8, 0.9, 1])
+
         plt.xlabel(r'Time lag ($\tau/\tau_{d,\rm{iso}}$)')
-        plt.ylabel(r'Frequency lag ($\nu/\Delta\nu_{d,\rm{iso}}$)')
+        plt.ylabel(r'Frequency lag ($\Delta\nu/\Delta\nu_{d,\rm{iso}}$)')
         if display:
-            plt.title('ACF of dynamic spectrum')
+            plt.title('ACF of intensity')
             plt.show()
 
     def plot_acf_efield(self, display=True):
@@ -697,9 +721,9 @@ class ACF():
         snp_edges = np.append(snp_edges, snp_edges[-1] + dsnp)
 
         plt.pcolormesh(snp_edges, snp_edges, self.acf_efield)
-        plt.xlabel(r'$S_x$ ($x/s_d$)')
-        plt.ylabel(r'$S_y$ ($y/s_d$)')
-        plt.title('ACF of e-field')
+        plt.xlabel(r'$S_x$ ($x/s_{d,\rm{iso}}$)')
+        plt.ylabel(r'$S_y$ ($y/s_{d,\rm{iso}}$)')
+        plt.title('ACF of electric field')
         if display:
             plt.show()
 

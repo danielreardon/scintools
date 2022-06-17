@@ -95,6 +95,10 @@ def write_results(filename, dyn=None):
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
 
+    if hasattr(dyn, 'fse_tau'):  # Finite scintle error timescale and bandwidth
+        header += ",fse_tau,fse_dnu"
+        write_string += ",{0},{1}".format(dyn.fse_tau, dyn.fse_dnu)
+
     if hasattr(dyn, 'scint_param_method'):  # Method of scint measurement
         header += ",scint_param_method"
         write_string += ",{0}".format(dyn.scint_param_method)
@@ -111,27 +115,29 @@ def write_results(filename, dyn=None):
         header += ",ar,arerr"
         write_string += ",{0},{1}".format(dyn.ar, dyn.arerr)
 
-    if hasattr(dyn, 'sigma_x'):  # Phase gradient in x,y
-        header += ",sigma_x,sigma_xerr,sigma_y,sigma_yerr"
-        write_string += ",{0},{1},{2},{3}".format(dyn.sigma_x,
-                                                  dyn.sigma_xerr,
-                                                  dyn.sigma_y,
-                                                  dyn.sigma_yerr)
-
-    if hasattr(dyn, 'v_x'):  # Velocity in x,y
-        header += ",v_x,v_xerr,v_y,v_yerr"
-        write_string += ",{0},{1},{2},{3}".format(dyn.v_x,
-                                                  dyn.v_xerr,
-                                                  dyn.v_y,
-                                                  dyn.v_yerr)
-
     if hasattr(dyn, 'acf_tilt'):  # Tilt in the ACF (MHz/min)
         header += ",acf_tilt,acf_tilt_err"
         write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
 
+    if hasattr(dyn, 'fse_tilt'):  # Finite scintle error, tilt
+        header += ",fse_tilt"
+        write_string += ",{0}".format(dyn.fse_tilt)
+
     if hasattr(dyn, 'phasegrad'):  # Phase gradient (shear to the ACF)
         header += ",phasegrad,phasegraderr"
         write_string += ",{0},{1}".format(dyn.phasegrad, dyn.phasegraderr)
+
+    if hasattr(dyn, 'fse_phasegrad'):  # Finite scintle error, phase gradient
+        header += ",fse_phasegrad"
+        write_string += ",{0}".format(dyn.fse_phasegrad)
+
+    if hasattr(dyn, 'theta'):  # Phase gradient angle relative to V
+        header += ",theta,thetaerr"
+        write_string += ",{0},{1}".format(dyn.theta, dyn.thetaerr)
+
+    if hasattr(dyn, 'psi'):  # Anisotropy angle relative to V
+        header += ",psi,psierr"
+        write_string += ",{0},{1}".format(dyn.psi, dyn.psierr)
 
     if hasattr(dyn, 'eta'):  # Arc curvature
         header += ",eta,etaerr"
