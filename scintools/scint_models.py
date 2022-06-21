@@ -28,23 +28,21 @@ from scipy.ndimage import gaussian_filter
 
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
-           steps=1000, burn=0.2, progress=True, get_ci=False,
+           steps=1000, burn=0.2, progress=True, get_ci=False, workers=1,
            nan_policy='raise', max_nfev=None, thin=10, is_weighted=True):
 
     # Do fit
-    maxfev = [0 if max_nfev is None else max_nfev]
-    maxfev = int(maxfev[0])
-    func = Minimizer(model, params, fcn_args=args, nan_policy=nan_policy,
-                     max_nfev=maxfev)
-    results = func.minimize()
     if mcmc:
-        func = Minimizer(model, results.params, fcn_args=args)
+        func = Minimizer(model, params, fcn_args=args)
         mcmc_results = func.emcee(nwalkers=nwalkers, steps=steps,
                                   burn=int(burn * steps), pos=pos,
                                   is_weighted=is_weighted, progress=progress,
-                                  thin=thin)
+                                  thin=thin, workers=workers)
         results = mcmc_results
-
+    else:
+        func = Minimizer(model, params, fcn_args=args, nan_policy=nan_policy,
+                         max_nfev=max_nfev)
+        results = func.minimize()
     if get_ci:
         if results.errorbars:
             ci = conf_interval(func, results)
@@ -127,24 +125,8 @@ def scint_acf_model(params, xdata, ydata, weights):
     Fit both tau (tau_acf_model) and dnu (dnu_acf_model) simultaneously
     """
 
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
-
-    parvals = params.valuesdict()
-
-    nt = parvals['nt']
-
-    # Scintillation timescale model
-    xdata_t = xdata[:nt]
-    ydata_t = ydata[:nt]
-    weights_t = weights[:nt]
-    residuals_t = tau_acf_model(params, xdata_t, ydata_t, weights_t)
-
-    # Scintillation bandwidth model
-    xdata_f = xdata[nt:]
-    ydata_f = ydata[nt:]
-    weights_f = weights[nt:]
-    residuals_f = dnu_acf_model(params, xdata_f, ydata_f, weights_f)
+    residuals_t = tau_acf_model(params, xdata[0], ydata[0], weights[0])
+    residuals_f = dnu_acf_model(params, xdata[1], ydata[1], weights[1])
 
     return np.concatenate((residuals_t, residuals_f))
 
@@ -202,8 +184,6 @@ def scint_acf_model_2d(params, ydata, weights):
     dnu = np.abs(parvals['dnu'])
     alpha = parvals['alpha']
     ar = np.abs(parvals['ar'])
-    # if ar < 1:
-    #     ar = 1
     psi = parvals['psi']
     phasegrad = parvals['phasegrad']
     theta = parvals['theta']
@@ -214,12 +194,11 @@ def scint_acf_model_2d(params, ydata, weights):
     bw = parvals['bw']
     nt = parvals['nt']
     nf = parvals['nf']
+    nf_crop, nt_crop = np.shape(ydata)
 
-    nt_crop = len(ydata[0])
-    nf_crop = len(ydata)
-
-    taumax = (nt_crop / nt) * tobs / tau
-    dnumax = (nf_crop / nf) * bw / dnu
+    dt, df = 2 * tobs / nt, 2 * bw / nf
+    taumax = nt_crop * dt / tau
+    dnumax = nf_crop * df / dnu
 
     acf = ACF(taumax=taumax, dnumax=dnumax, nt=nt_crop, nf=nf_crop, ar=ar,
               alpha=alpha, phasegrad=phasegrad, theta=theta,

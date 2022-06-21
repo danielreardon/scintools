@@ -1279,7 +1279,7 @@ class Dynspec:
                          nwalkers=100, steps=1000, burn=0.2, nitr=1,
                          lnsigma=True, verbose=False, progress=True,
                          display=True, filename=None, dpi=200, frac_err=0.2,
-                         nan_policy='raise', weighted=True):
+                         nan_policy='raise', weighted=True, workers=1):
         """
         Measure the scintillation timescale
             Method:
@@ -1300,12 +1300,11 @@ class Dynspec:
         if not hasattr(self, 'sspec') and 'sspec' in method:
             self.calc_sspec()
 
-        nf = np.shape(self.acf)[0]
-        nt = np.shape(self.acf)[1]
+        nf, nt = np.shape(self.acf)
         ydata_f = self.acf[int(nf/2):, int(nt/2)]
-        xdata_f = self.df * np.linspace(0, len(ydata_f), len(ydata_f))
+        xdata_f = self.df * np.linspace(0, len(ydata_f)-1, len(ydata_f))
         ydata_t = self.acf[int(nf/2), int(nt/2):]
-        xdata_t = self.dt * np.linspace(0, len(ydata_t), len(ydata_t))
+        xdata_t = self.dt * np.linspace(0, len(ydata_t)-1, len(ydata_t))
 
         # Get initial parameter values from 1d fit
         # Estimate amp and white noise level
@@ -1313,33 +1312,33 @@ class Dynspec:
         amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
         # Estimate tau for initial guess. Closest index to 1/e power
         if np.argwhere(ydata_t < amp/np.e).squeeze().size == 0:
-            tau = self.dt
+            if ydata_t[1] < 0:
+                tau = self.dt
+            else:
+                tau = self.tobs
         else:
             tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
         if np.argwhere(ydata_f < amp/2).squeeze().size == 0:
-            dnu = self.df
+            if ydata_f[1] < 0:
+                dnu = self.df
+            else:
+                dnu = self.bw
         else:
             dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
 
         # crop arrays to nscale number of scales, or 5 samples
-        if nscale*tau <= 5*self.dt or nscale*dnu <= 5*self.df:
-            t_inds = np.argwhere(xdata_t <= 5*self.dt).squeeze()
-            f_inds = np.argwhere(xdata_f <= 5*self.df).squeeze()
-        else:
-            t_inds = np.argwhere(xdata_t <= nscale*tau).squeeze()
-            f_inds = np.argwhere(xdata_f <= nscale*dnu).squeeze()
-        xdata_t = xdata_t[t_inds]
-        ydata_t = ydata_t[t_inds]
-        xdata_f = xdata_f[f_inds]
-        ydata_f = ydata_f[f_inds]
-
-        nt = len(xdata_t)  # number of t-lag samples (along half of acf frame)
-        nf = len(xdata_f)
-
-        # concatenate x and y arrays
-        xdata = np.array(np.concatenate((xdata_t, xdata_f)))
-        ydata = np.array(np.concatenate((ydata_t, ydata_f)))
+        if not full_frame:
+            if nscale*tau <= 5*self.dt or nscale*dnu <= 5*self.df:
+                t_inds = np.argwhere(xdata_t <= 5*self.dt).squeeze()
+                f_inds = np.argwhere(xdata_f <= 5*self.df).squeeze()
+            else:
+                t_inds = np.argwhere(xdata_t <= nscale*tau).squeeze()
+                f_inds = np.argwhere(xdata_f <= nscale*dnu).squeeze()
+            xdata_t = xdata_t[t_inds]
+            ydata_t = ydata_t[t_inds]
+            xdata_f = xdata_f[f_inds]
+            ydata_f = ydata_f[f_inds]
 
         # Save values determined without fitting: over-write if improved
         self.tau = tau
@@ -1390,13 +1389,13 @@ class Dynspec:
             # No white noise in simulation. Don't fit or conf. int. will break
             params['wn'].value = 0
             params['wn'].vary = False
-        params.add('nt', value=nt, vary=False)
-        params.add('nf', value=nf, vary=False)
         if alpha is None:
             params.add('alpha', value=5/3, vary=True,
                        min=-np.inf, max=np.inf)
         else:
             params.add('alpha', value=alpha, vary=False)
+        params.add('nt', value=nt, vary=False)
+        params.add('nf', value=nf, vary=False)
 
         # Create weights array
         t_errors = 2/np.pi * np.arctan(xdata_t / tau) / \
@@ -1406,80 +1405,27 @@ class Dynspec:
             np.sqrt(self.nchan)
         f_errors[f_errors == 0] = 1e-3
         if weighted:
-            weights = 1/np.array(np.concatenate((t_errors, f_errors)))
+            weights_t = 1/t_errors
+            weights_f = 1/f_errors
         else:
-            weights = None
+            weights_t = None
+            weights_f = None
 
         if method == 'acf1d':
             if verbose:
                 print("\nPerforming least-squares fit to 1D ACF model")
-            chisqr = np.inf
-            if mcmc:
-                nitr = 1
-            for itr in range(nitr):
-                results = fitter(scint_acf_model, params,
-                                 (xdata, ydata, weights),
-                                 nan_policy=nan_policy, mcmc=mcmc, burn=burn,
-                                 nwalkers=nwalkers, steps=steps)
-                if results.chisqr < chisqr:
-                    chisqr = results.chisqr
-                    params = results.params
-                    res = results
+            nfit = 4
+            # max_nfev = 2000 * (nfit + 1)  # lmfit default
+            max_nfev = 10000 * (nfit + 1)
+            results = fitter(scint_acf_model, params,
+                             ((xdata_t, xdata_f), (ydata_t, ydata_f),
+                              (weights_t, weights_f)), max_nfev=max_nfev,
+                             nan_policy=nan_policy)
 
-        if method == 'acf2d_approx' or method == 'acf2d':
+        elif method == 'acf2d_approx' or method == 'acf2d':
 
-            if hasattr(self, 'dnu'):
-                dnu = self.dnu
-                tau = self.tau
-                amp = self.amp
-                wn = self.wn
-                params['tau'].value = tau
-                params['dnu'].value = dnu
-                params['amp'].value = amp
-                params['wn'].value = wn
-            else:
-                dnu = params['dnu'].value
-                tau = params['tau'].value
-                amp = params['amp'].value
-                wn = params['wn'].value
-
-            pos_array = []
-            if mcmc:
-                for i in range(nwalkers):
-                    pos_i = []
-                    pos_i.append(np.random.normal(
-                                    loc=self.tau,
-                                    scale=2*self.tauerr))  # tau
-                    pos_i.append(np.random.normal(
-                                    loc=self.dnu,
-                                    scale=2*self.dnuerr))  # dnu
-                    pos_i.append(np.random.normal(
-                                    loc=self.amp,
-                                    scale=2*self.amperr))  # amp
-                    pos_i.append(np.random.normal(
-                                    loc=self.wn,
-                                    scale=self.wnerr))  # wn
-                    pos_i.append(np.random.normal(loc=0,
-                                                  scale=10))  # phs
-                    if lnsigma:
-                        pos_i.append(np.random.uniform(low=0,
-                                                       high=10))
-
-                    pos_array.append(pos_i)
-                pos = np.array(pos_array).squeeze()
-            else:
-                pos = None
-
-            if verbose:
-                print('1D tau estimate:', tau,
-                      '\n1D dnu estimate:', dnu)
-
-            ydata = np.copy(self.acf)
-
-            tticks = np.linspace(-self.tobs, self.tobs,
-                                 len(ydata[0, :]) + 1)[:-1]
-            fticks = np.linspace(-self.bw, self.bw,
-                                 len(ydata[:, 0]) + 1)[:-1]
+            tticks = np.linspace(-self.tobs, self.tobs, nt + 1)[:-1]
+            fticks = np.linspace(-self.bw, self.bw, nf + 1)[:-1]
 
             # Create weights array
             t_errors_2d = 2/np.pi * np.arctan(np.abs(tticks) / tau) / \
@@ -1489,26 +1435,25 @@ class Dynspec:
                 np.sqrt(self.nchan)
             f_errors_2d[f_errors_2d == 0] = 1e-3
 
-            nc, nr = np.shape(ydata)
-            weights_2d = np.ones(np.shape(ydata))
+            weights_2d = np.ones(np.shape(self.acf))
             if weighted:
                 weights_2d = weights_2d / np.transpose([f_errors_2d])
                 weights_2d = weights_2d / [t_errors_2d]
 
-            wn_loc = np.unravel_index(np.argmax(ydata, axis=None),
-                                      ydata.shape)
+            wn_loc = np.unravel_index(np.argmax(self.acf, axis=None),
+                                      self.acf.shape)
 
             fleft = wn_loc[0]
-            fright = np.shape(ydata)[0] - wn_loc[0] - 1
+            fright = nf - wn_loc[0] - 1
             fmin = wn_loc[0] - min(fleft, fright)
             fmax = wn_loc[0] + min(fleft, fright) + 1
 
             tleft = wn_loc[1]
-            tright = np.shape(ydata)[1] - wn_loc[1] - 1
+            tright = nt - wn_loc[1] - 1
             tmin = wn_loc[1] - min(tleft, tright)
             tmax = wn_loc[1] + min(tleft, tright) + 1
 
-            ydata_centered = ydata[fmin:fmax, tmin:tmax]
+            ydata_centered = self.acf[fmin:fmax, tmin:tmax]
             weights_centered = weights_2d[fmin:fmax, tmin:tmax]
             tdata_centered = tticks[tmin:tmax]
             fdata_centered = fticks[fmin:fmax]
@@ -1517,39 +1462,29 @@ class Dynspec:
                 ntau = nscale
                 ndnu = nscale
 
-                if (self.tobs / tau) > 2:
-                    while ntau > (self.tobs / tau):
-                        ntau = ntau - 1
-                        if verbose:
-                            print('nscale too large for time axis, ' +
-                                  'decreasing to', ntau)
-
+                if ntau > (self.tobs / tau):
+                    if verbose:
+                        print('WARNING: nscale exceeds range in time lag')
+                    tmin = 0
+                    tmax = nt
+                else:
                     tframe = int(round(ntau * (tau / self.dt)))
                     tmin = int(np.floor(
                         np.shape(ydata_centered)[1] / 2)) - tframe
                     tmax = int(np.floor(
                         np.shape(ydata_centered)[1] / 2)) + tframe + 1
 
-                else:
+                if ndnu > (self.bw / dnu):
+                    if verbose:
+                        print('WARNING: nscale exceeds range in frequency lag')
                     tmin = 0
-                    tmax = len(tticks)
-
-                if (self.bw / dnu) > 2:
-                    while ndnu > (self.bw / dnu):
-                        ndnu = ndnu - 1
-                        if verbose:
-                            print('nscale too large for frequency axis, ' +
-                                  'decreasing to', ndnu)
-
+                    tmax = nf
+                else:
                     fframe = int(round(ndnu * (dnu / self.df)))
                     fmin = int(np.floor(
                         np.shape(ydata_centered)[0] / 2)) - fframe
                     fmax = int(np.floor(
                         np.shape(ydata_centered)[0] / 2)) + fframe + 1
-
-                else:
-                    fmin = 0
-                    fmax = len(fticks)
 
                 ydata_2d = ydata_centered[fmin:fmax, tmin:tmax]
                 weights_2d = weights_centered[fmin:fmax, tmin:tmax]
@@ -1560,104 +1495,107 @@ class Dynspec:
                 tdata = tdata_centered
                 fdata = fdata_centered
 
-            params.add('tobs', value=self.tobs, vary=False)
-            params.add('bw', value=self.bw, vary=False)
-            params.add('freq', value=self.freq, vary=False)
             params.add('phasegrad', value=0, vary=True,
-                       min=-np.Inf, max=np.Inf)
+                       min=-np.inf, max=np.inf)
             if hasattr(self, 'acf_tilt'):  # if have a confident measurement
                 if self.acf_tilt_err is not None:
                     params['phasegrad'].value = self.acf_tilt
-            if method == 'acf2d':
-                if verbose:
-                    print("\nDoing approximate 2D fit to initialize fit",
-                          "values")
+            params.add('tobs', value=self.tobs, vary=False)
+            params.add('bw', value=self.bw, vary=False)
+            params.add('freq', value=self.freq, vary=False)
+
+            if method == 'acf2d' and verbose:
+                print("\nPerforming approximate 2D fit to initialize fit",
+                      "values")
             elif verbose:
                 print("\nPerforming least-squares fit to approximate 2D " +
                       "ACF model")
-            chisqr = np.inf
 
-            for itr in range(nitr):
-                nfit = 5
-                # max_nfev = 2000 * (nfit + 1)  # lmfit default
-                max_nfev = 10000 * (nfit + 1)
-                results = fitter(scint_acf_model_2d_approx, params,
-                                 (tdata, fdata, ydata_2d, None),
-                                 mcmc=mcmc, max_nfev=max_nfev,
-                                 nan_policy=nan_policy, pos=pos,
-                                 is_weighted=(not lnsigma))
-                if results.chisqr < chisqr:
-                    chisqr = results.chisqr
-                    params = results.params
-                    res = results
+            pos_array = []
+            if mcmc:
+                for i in range(nwalkers):
+                    pos_i = []
+                    pos_i.append(np.random.normal(
+                                    loc=self.tau,
+                                    scale=2*self.tauerr))
+                    pos_i.append(np.random.normal(
+                                    loc=self.dnu,
+                                    scale=2*self.dnuerr))
+                    pos_i.append(np.random.normal(
+                                    loc=self.amp,
+                                    scale=2*self.amperr))
+                    if 'sim:mb2=' not in self.name:
+                        pos_i.append(np.random.normal(
+                                        loc=self.wn,
+                                        scale=self.wnerr))
+                    if alpha is None:
+                        pos_i.append(np.random.normal(loc=5/3, scale=0.1))
+                    pos_i.append(np.random.uniform(low=0,
+                                                   high=5))  # phase grad
+                    if lnsigma:
+                        pos_i.append(np.random.uniform(low=0,
+                                                       high=10))
+
+                    pos_array.append(pos_i)
+                pos = np.array(pos_array).squeeze()
+            else:
+                pos = None
+            nfit = 5
+            # max_nfev = 2000 * (nfit + 1)  # lmfit default
+            max_nfev = 10000 * (nfit + 1)
+            results = fitter(scint_acf_model_2d_approx, params,
+                             (tdata, fdata, ydata_2d, None),
+                             max_nfev=max_nfev, nan_policy=nan_policy)
 
             if method == 'acf2d':
 
-                dnu = params['dnu'].value
-                tau = params['tau'].value
                 if verbose:
-                    print('2D tau estimate:', tau,
-                          '\n2D dnu estimate:', dnu)
+                    print('2D tau estimate:', results.params['tau'].value,
+                          '\n2D dnu estimate:', results.params['dnu'].value)
 
+                params2d = results.params
+                params2d.add('ar', value=2,
+                             vary=False, min=-np.inf, max=np.inf)
+                params2d.add('theta', value=0,
+                             vary=False, min=-np.inf, max=np.inf)
+                params2d.add('psi', value=60,
+                             vary=True, min=-np.inf, max=np.inf)
                 chisqr = np.inf
                 for itr in range(nitr):
-                    params.add('ar', value=2,
-                               vary=False, min=-np.inf, max=np.inf)
-                    params.add('phasegrad', value=params['phasegrad'].value,
-                               vary=True, min=-np.inf, max=np.inf)
-                    params.add('theta', value=0,
-                               vary=False, min=-np.inf, max=np.inf)
-                    params.add('psi', value=60,
-                               vary=True, min=-np.inf, max=np.inf)
-
-                    from lmfit import Parameter
-
-                    params['nf'] = Parameter(name='nf',
-                                             value=np.shape(ydata_centered)[0],
-                                             vary=False)
-                    params['nt'] = Parameter(name='nt',
-                                             value=np.shape(ydata_centered)[1],
-                                             vary=False)
-
                     if mcmc:
                         pos_array = []
                         for i in range(nwalkers):
                             pos_i = []
                             pos_i.append(np.random.normal(
-                                            loc=params['tau'].value,
-                                            scale=params['tau'].value/2))
+                                loc=results.params['tau'].value,
+                                scale=results.params['tau'].value/2))
                             pos_i.append(np.random.normal(
-                                            loc=params['dnu'].value,
-                                            scale=params['dnu'].value/2))
+                                loc=results.params['dnu'].value,
+                                scale=results.params['dnu'].value/2))
                             pos_i.append(np.random.normal(
-                                            loc=params['amp'].value,
-                                            scale=params['amp'].value/4))
-                            pos_i.append(np.random.normal(
-                                            loc=params['wn'].value,
-                                            scale=params['wn'].value/4))
+                                loc=results.params['amp'].value,
+                                scale=results.params['amp'].value/2))
+                            if 'sim:mb2=' not in self.name:
+                                pos_i.append(np.random.normal(
+                                    loc=results.params['wn'].value,
+                                    scale=results.params['wn'].value/2))
                             if alpha is None:
                                 pos_i.append(np.random.normal(
-                                             loc=params['alpha'].value,
-                                             scale=params['alpha'].value))
-                            # pos_i.append(
-                            #    1 + np.abs(np.random.uniform(low=0,
-                            #                                 high=4)))  # ar
-                            # phasegrad
+                                    loc=results.params['alpha'].value,
+                                    scale=results.params['alpha'].value/2))
+                            pos_i.append(np.random.normal(
+                                loc=results.params['phasegrad'].value,
+                                scale=results.params['phasegrad'].value/2))
                             pos_i.append(np.random.uniform(low=0,
-                                                           high=5))
-                            pos_i.append(np.random.uniform(low=0,
-                                                           high=90))  # phi
+                                                           high=90))  # psi
                             if lnsigma:
                                 pos_i.append(np.random.uniform(low=0,
                                                                high=10))
 
                             pos_array.append(pos_i)
-
                         pos = np.array(pos_array)
-                        print(np.shape(pos))
                     else:
                         pos = None
-
                     if verbose:
                         if mcmc:
                             print("\nPerforming mcmc posterior sample for",
@@ -1668,17 +1606,15 @@ class Dynspec:
                     nfit = 9
                     # max_nfev = 2000 * (nfit + 1)  # lmfit default
                     max_nfev = 10000 * (nfit + 1)
-                    results = fitter(scint_acf_model_2d, params,
-                                     (ydata_2d, None), mcmc=mcmc,
-                                     pos=pos, nwalkers=nwalkers,
-                                     steps=steps, burn=burn,
-                                     progress=progress,
-                                     max_nfev=max_nfev, nan_policy=nan_policy,
-                                     is_weighted=(not lnsigma))
-                    if results.chisqr < chisqr:
-                        chisqr = results.chisqr
-                        params = results.params
-                        res = results
+                    res = fitter(scint_acf_model_2d, params2d,
+                                 (ydata_2d, None), mcmc=mcmc, pos=pos,
+                                 nwalkers=nwalkers, steps=steps, burn=burn,
+                                 progress=progress, workers=workers,
+                                 max_nfev=max_nfev, nan_policy=nan_policy,
+                                 is_weighted=(not lnsigma))
+                    if res.chisqr < chisqr:
+                        chisqr = res.chisqr
+                        results = res
 
         elif method == 'sspec':
             '''
@@ -1715,19 +1651,19 @@ class Dynspec:
             #         params = results.params
             #         res = results
 
-        if res.params['tau'].stderr is None or \
-           res.params['dnu'].stderr is None:
+        if results.params['tau'].stderr is None or \
+           results.params['dnu'].stderr is None:
             print("\n Warning: Fit failed")
             return
-        elif (res.params['tau'].stderr > res.params['tau'].value or
-              res.params['dnu'].stderr > res.params['dnu'].value):
+        elif (results.params['tau'].stderr > results.params['tau'].value or
+              results.params['dnu'].stderr > results.params['dnu'].value):
             print("\n Warning: Fit failed")
         else:
             self.scint_param_method = method
 
         # Done fitting - now define results
-        self.tau = res.params['tau'].value
-        self.dnu = res.params['dnu'].value
+        self.tau = results.params['tau'].value
+        self.dnu = results.params['dnu'].value
         self.tscat = 1/(2*np.pi*self.dnu)  # scattering timescale
         if self.dnu < self.df:
             print("Warning: Scint bandwidth < channel bandwidth.")
@@ -1736,9 +1672,9 @@ class Dynspec:
             (1 + 0.2*self.tobs/(2*self.tau*np.log(2)))
         self.nscint = nscint
         self.fse_tau = self.tau/(2*np.sqrt(nscint))
-        fit_tau = res.params['tau'].stderr
+        fit_tau = results.params['tau'].stderr
         self.fse_dnu = self.dnu/(2*np.sqrt(nscint))
-        fit_dnu = res.params['dnu'].stderr
+        fit_dnu = results.params['dnu'].stderr
 
         if verbose:
             print("\nFinite scintle errors (tau, dnu):\n",
@@ -1754,37 +1690,35 @@ class Dynspec:
         self.tauerr = fit_tau
         self.dnuerr = fit_dnu
 
+        self.amp = results.params['amp'].value
+        self.amperr = results.params['amp'].stderr
         if 'sim:mb2=' not in self.name:
-            self.wn = res.params['wn'].value
-            self.wnerr = res.params['wn'].stderr
-            self.amp = res.params['amp'].value
-            self.amperr = res.params['amp'].stderr
+            self.wn = results.params['wn'].value
+            self.wnerr = results.params['wn'].stderr
         else:
             self.wn = 0
-        if method == 'acf2d_approx':
-            self.phasegrad = res.params['phasegrad'].value
-            fit_ph = res.params['phasegrad'].stderr
+        if alpha is None:
+            self.talpha = results.params['alpha'].value
+            self.talphaerr = results.params['alpha'].stderr
+        else:
+            self.talpha = alpha
+            self.talphaerr = 0
+        if method[:5] == 'acf2d':
+            self.phasegrad = results.params['phasegrad'].value
+            fit_ph = results.params['phasegrad'].stderr
             if fit_ph is None:
                 fit_ph = np.inf
             fse_ph = self.phasegrad * np.sqrt((self.fse_dnu/self.dnu)**2 +
                                               (self.fse_tau/self.tau)**2)
             self.phasegraderr = fit_ph
             self.fse_phasegrad = fse_ph
-        elif method == 'acf2d':
-            self.ar = res.params['ar'].value
-            self.arerr = res.params['ar'].stderr
-            self.phasegrad = res.params['phasegrad'].value
-            self.phasegraderr = res.params['phasegrad'].stderr
-            self.theta = res.params['theta'].value
-            self.thetaerr = res.params['theta'].stderr
-            self.psi = res.params['psi'].value
-            self.psierr = res.params['psi'].stderr
-        if alpha is None:
-            self.talpha = res.params['alpha'].value
-            self.talphaerr = res.params['alpha'].stderr
-        else:
-            self.talpha = alpha
-            self.talphaerr = 0
+            if method == 'acf2d':
+                self.ar = results.params['ar'].value
+                self.arerr = results.params['ar'].stderr
+                self.theta = results.params['theta'].value
+                self.thetaerr = results.params['theta'].stderr
+                self.psi = results.params['psi'].value
+                self.psierr = results.params['psi'].stderr
 
         if verbose:
             print("\n\t ACF FIT PARAMETERS\n")
@@ -1795,103 +1729,91 @@ class Dynspec:
             if alpha is None:
                 print("alpha:\t\t\t{val} +/- {err}".format(val=self.talpha,
                       err=self.talphaerr))
-            if method == 'acf2d_approx':
+            if method[:5] == 'acf2d':
                 err = np.sqrt(self.phasegraderr**2 + fse_ph**2)
                 print("phase grad:\t\t{val} +/- {err}".
                       format(val=self.phasegrad, err=err))
-            elif method == 'acf2d':
-                print("ar:\t\t{val} +/- {err}".format(val=self.ar,
-                      err=self.arerr))
-                err = np.sqrt(self.phasegraderr**2 + fse_ph**2)
-                print("phase gradient:\t\t{val} +/- {err}".format(
-                        val=self.phasegrad, err=err))
-                print("theta:\t\t{val} +/- {err}".format(
-                        val=self.theta, err=self.thetaerr))
-                print("psi:\t\t{val} +/- {err}".format(val=self.psi,
-                      err=self.psierr))
+                if method == 'acf2d':
+                    print("ar:\t\t{val} +/- {err}".format(val=self.ar,
+                          err=self.arerr))
+                    print("theta:\t\t{val} +/- {err}".format(
+                            val=self.theta, err=self.thetaerr))
+                    print("psi:\t\t{val} +/- {err}".format(val=self.psi,
+                          err=self.psierr))
 
         if plot:
-            # get models:
             if method == 'acf1d':
-                # Get tau model
-                t_residuals = tau_acf_model(res.params, xdata_t, ydata_t,
-                                            None)
-                tmodel = ydata_t - t_residuals
-                # Get dnu model
-                f_residuals = dnu_acf_model(res.params, xdata_f, ydata_f,
-                                            None)
-                fmodel = ydata_f - f_residuals
+                tmodel = -tau_acf_model(results.params, xdata_t,
+                                        np.zeros(len(xdata_t)), None)
+                fmodel = -dnu_acf_model(results.params, xdata_f,
+                                        np.zeros(len(xdata_f)), None)
 
-                if display or filename is not None:
-                    plt.figure(figsize=(9, 6))
-                plt.subplot(2, 1, 1)
-                plt.plot(xdata_t, ydata_t)
-                plt.plot(xdata_t, tmodel)
+                fig = plt.subplots(2, 1, figsize=(8, 6))
+                fig[1][0].plot(xdata_t, ydata_t, label='data')
+                fig[1][0].fill_between(xdata_t, ydata_t+t_errors,
+                                       ydata_t-t_errors, color='C0',
+                                       alpha=0.4, label='error')
+                fig[1][0].plot(xdata_t, tmodel, label='model')
                 # plot 95% white noise level assuming no correlation
-                xl = plt.xlim()
-                plt.plot([0, xl[1]], [0, 0], 'k--')
-                plt.plot([0, xl[1]],
-                         [1/np.sqrt(self.nsub), 1/np.sqrt(self.nsub)],
-                         ':', color='crimson')
-                plt.plot([0, xl[1]],
-                         [-1/np.sqrt(self.nsub), -1/np.sqrt(self.nsub)],
-                         ':', color='crimson')
-                plt.plot(xdata_t, t_errors, color='crimson')
-                plt.xlabel('Time lag (s)')
-                plt.tight_layout()
+                xl = fig[1][0].get_xlim()
+                fig[1][0].plot([0, xl[1]], [0, 0], 'k--')
+                fig[1][0].plot([0, xl[1]],
+                               [1/np.sqrt(self.nsub), 1/np.sqrt(self.nsub)],
+                               ':', color='crimson',
+                               label=r'$\pm 1/\sqrt{n_\mathrm{sub}}$')
+                fig[1][0].plot([0, xl[1]],
+                               [-1/np.sqrt(self.nsub), -1/np.sqrt(self.nsub)],
+                               ':', color='crimson')
+                fig[1][0].set_xlabel('Time lag (s)')
+                fig[1][0].legend()
+                fig[0].tight_layout()
 
-                plt.subplot(2, 1, 2)
-                plt.plot(xdata_f, ydata_f)
-                plt.plot(xdata_f, fmodel)
+                fig[1][1].plot(xdata_f, ydata_f, label='data')
+                fig[1][1].fill_between(xdata_f, ydata_f+f_errors,
+                                       ydata_f-f_errors, color='C0',
+                                       alpha=0.4, label='error')
+                fig[1][1].plot(xdata_f, fmodel, label='model')
                 # plot 95% white noise level assuming no correlation
-                xl = plt.xlim()
-                plt.plot([0, xl[1]], [0, 0], 'k--')
-                plt.plot([0, xl[1]],
-                         [1/np.sqrt(self.nchan), 1/np.sqrt(self.nchan)],
-                         ':', color='crimson')
-                plt.plot([0, xl[1]],
-                         [-1/np.sqrt(self.nchan), -1/np.sqrt(self.nchan)],
-                         ':', color='crimson')
-                plt.plot(xdata_f, f_errors, color='crimson')
-                plt.xlabel('Frequency lag (MHz)')
-                plt.tight_layout()
+                xl = fig[1][1].get_xlim()
+                fig[1][1].plot([0, xl[1]], [0, 0], 'k--')
+                fig[1][1].plot([0, xl[1]],
+                               [1/np.sqrt(self.nchan), 1/np.sqrt(self.nchan)],
+                               ':', color='crimson',
+                               label=r'$\pm 1/\sqrt{n_\mathrm{chan}}$')
+                fig[1][1].plot([0, xl[1]],
+                               [-1/np.sqrt(self.nchan),
+                                -1/np.sqrt(self.nchan)],
+                               ':', color='crimson')
+                fig[1][1].set_xlabel('Frequency lag (MHz)')
+                fig[1][1].legend()
+                fig[0].tight_layout()
 
                 if filename is not None:
                     filename_name = filename.split('.')[0]
                     filename_extension = filename.split('.')[-1]
-                    plt.savefig(filename_name + '_1Dfit.' + filename_extension,
-                                dpi=dpi, bbox_inches='tight',
-                                pad_inches=0.1)
-                    if display:
-                        plt.show()
-                    plt.close()
-                elif display:
+                    fig[0].savefig(
+                        filename_name + '_1Dfit.' + filename_extension,
+                        dpi=dpi, bbox_inches='tight', pad_inches=0.1)
+                if display:
                     plt.show()
+                plt.close(fig[0])
 
-            elif method == 'acf2d_approx' or method == 'acf2d':
-
-                weights = np.ones(np.shape(ydata_centered))
+            elif method[:5] == 'acf2d':
+                weights = np.ones(np.shape(ydata_2d))
                 if method == 'acf2d_approx':
-                    model = -scint_acf_model_2d_approx(res.params,
-                                                       tdata_centered,
-                                                       fdata_centered,
-                                                       np.zeros(np.shape(
-                                                           ydata_centered)),
-                                                       np.ones(np.shape(
-                                                           weights)))
+                    model = -scint_acf_model_2d_approx(
+                        results.params, tdata, fdata,
+                        np.zeros(np.shape(ydata_2d)), None)
                 else:
-                    model = -scint_acf_model_2d(res.params, np.zeros(
-                                                np.shape(ydata_centered)),
-                                                np.ones(np.shape(weights)))
-                residuals = (ydata_centered - model) * weights
-                if nscale is not None and not full_frame:
-                    model = model[fmin:fmax, tmin:tmax]
-                    residuals = residuals[fmin:fmax, tmin:tmax]
+                    model = -scint_acf_model_2d(results.params,
+                                                np.zeros(np.shape(ydata_2d)),
+                                                None)
+                residuals = (ydata_2d - model) * weights
 
+                fig = plt.subplots(1, 3, sharey=True, figsize=(15, 5))
                 data = [(ydata_2d, 'data'), (model, 'model'),
                         (residuals, 'residuals')]
-                for d in data:
-
+                for i, d in enumerate(data):
                     if d[1] != 'residuals':
                         # subtract the white noise spike from data and model
                         arr = np.fft.ifftshift(d[0])
@@ -1900,34 +1822,35 @@ class Dynspec:
                     else:
                         arr = d[0]
 
-                    plt.pcolormesh(tdata/60, fdata, arr, linewidth=0,
-                                   rasterized=True, shading='auto')
+                    mesh = fig[1][i].pcolormesh(tdata/60, fdata, arr,
+                                                linewidth=0, rasterized=True,
+                                                shading='auto')
                     if d[1] == 'residuals':
-                        plt.clim(vmin=-1, vmax=1)  # fractional error
-                    plt.title(d[1])
-                    plt.xlabel('Time lag (mins)')
-                    plt.ylabel('Frequency lag (MHz)')
-                    if filename is not None:
-                        filename_name = filename.split('.')[0]
-                        filename_extension = filename.split('.')[-1]
-                        plt.savefig(filename_name + '_2Dfit_{0}.'.format(d[1])
-                                    + filename_extension, dpi=dpi,
-                                    bbox_inches='tight', pad_inches=0.1)
-                        if display:
-                            plt.show()
-                        plt.close()
-                    elif display:
-                        plt.show()
+                        mesh.set_clim(vmin=-1, vmax=1)  # fractional error
+                    fig[1][i].set_title(d[1])
+                    fig[1][i].set_xlabel('Time lag (mins)')
+                    if i == 0:
+                        fig[1][i].set_ylabel('Frequency lag (MHz)')
+                fig[0].tight_layout()
+                if filename is not None:
+                    filename_name = filename.split('.')[0]
+                    filename_extension = filename.split('.')[-1]
+                    fig[0].savefig(filename_name + '_2Dfit.'
+                                   + filename_extension, dpi=dpi,
+                                   bbox_inches='tight', pad_inches=0.1)
+                if display:
+                    plt.show()
+                plt.close(fig[0])
 
             elif method == 'sspec':
                 '''
                 sspec plotting routine
                 '''
 
-            if mcmc and method == "acf2d" and plot:
-                corner.corner(res.flatchain,
-                              labels=res.var_names,
-                              truths=list(res.params.valuesdict().
+            if mcmc and method == "acf2d":
+                corner.corner(results.flatchain,
+                              labels=results.var_names,
+                              truths=list(results.params.valuesdict().
                                           values()))
                 if filename is not None:
                     filename_name = filename.split('.')[0]
@@ -1935,13 +1858,11 @@ class Dynspec:
                     plt.savefig(filename_name + '_corner.'
                                 + filename_extension, dpi=dpi,
                                 bbox_inches='tight', pad_inches=0.1)
-                    if display:
-                        plt.show()
-                    plt.close()
-                elif display:
+                if display:
                     plt.show()
+                plt.close()
 
-        return res
+        return results
 
     def cut_dyn(self, tcuts=0, fcuts=0, plot=False, filename=None, dpi=200,
                 lamsteps=False, maxfdop=np.inf, figsize=(8, 13), display=True):
