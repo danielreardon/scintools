@@ -1210,8 +1210,8 @@ class Dynspec:
             1/float(params[0].squeeze())**2
 
         # Compute finite scintle error
-        N = (1 + 0.2*self.bw/(2*self.dnu)) * \
-            (1 + 0.2*self.tobs/(2*self.tau*np.log(2)))  # 2*half power
+        N = (1 + 0.2*self.bw/(self.dnu)) * \
+            (1 + 0.2*self.tobs/(self.tau*np.log(2)))  # 2*half power
         fse_tau = self.tau/(2*np.sqrt(N))
         fse_dnu = self.dnu/(2*np.sqrt(N))
 
@@ -1352,8 +1352,8 @@ class Dynspec:
             tau_half = self.dt
         elif tau_half > self.tobs:
             tau_half = self.tobs
-        nscint = (1 + 0.2*self.bw/(2*self.dnu)) * \
-            (1 + 0.2*self.tobs/(2*tau_half))
+        nscint = (1 + 0.2*self.bw/(self.dnu)) * \
+            (1 + 0.2*self.tobs/(tau_half))
         # Estimated errors
         self.dnuerr = dnu / np.sqrt(nscint)
         self.tauerr = tau / np.sqrt(nscint)
@@ -1688,8 +1688,8 @@ class Dynspec:
         if self.dnu < self.df:
             print("Warning: Scint bandwidth < channel bandwidth.")
         # Compute finite scintle error
-        nscint = (1 + 0.2*self.bw/(2*self.dnu)) * \
-            (1 + 0.2*self.tobs/(2*self.tau*np.log(2)))
+        nscint = (1 + 0.2*self.bw/(self.dnu)) * \
+            (1 + 0.2*self.tobs/(self.tau*np.log(2)))
         self.nscint = nscint
         self.fse_tau = self.tau/(2*np.sqrt(nscint))
         fit_tau = results.params['tau'].stderr
