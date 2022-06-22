@@ -1279,7 +1279,8 @@ class Dynspec:
                          nwalkers=100, steps=1000, burn=0.2, nitr=1,
                          lnsigma=True, verbose=False, progress=True,
                          display=True, filename=None, dpi=200, frac_err=0.2,
-                         nan_policy='raise', weighted=True, workers=1):
+                         nan_policy='raise', weighted=True, workers=1,
+                         tau_vary_2d=True, tau_input=None):
         """
         Measure the scintillation timescale
             Method:
@@ -1306,7 +1307,7 @@ class Dynspec:
         ydata_t = self.acf[int(nf/2), int(nt/2):]
         xdata_t = self.dt * np.linspace(0, len(ydata_t)-1, len(ydata_t))
 
-        # Get initial parameter values from 1d fit
+        # Get initial parameter values for 1d fit
         # Estimate amp and white noise level
         wn = min([ydata_f[0]-ydata_f[1], ydata_t[0]-ydata_t[1]])
         amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
@@ -1375,10 +1376,10 @@ class Dynspec:
 
         # Define fit parameters
         params = Parameters()
-        params.add('tau', value=tau, vary=True, min=-np.inf, max=np.inf)
-        params.add('dnu', value=dnu, vary=True, min=-np.inf, max=np.inf)
-        params.add('amp', value=amp, vary=True, min=-np.inf, max=np.inf)
-        params.add('wn', value=wn, vary=True, min=-np.inf, max=np.inf)
+        params.add('tau', value=tau, vary=True, min=0, max=np.inf)
+        params.add('dnu', value=dnu, vary=True, min=0, max=np.inf)
+        params.add('amp', value=amp, vary=True, min=0, max=np.inf)
+        params.add('wn', value=wn, vary=True, min=0, max=np.inf)
         if verbose:
             print('Initial guesses:',
                   '\ntau:', tau,
@@ -1411,9 +1412,12 @@ class Dynspec:
             weights_t = None
             weights_f = None
 
-        if method == 'acf1d':
+        if method == 'acf1d' or method == 'acf2d_approx' or method == 'acf2d':
             if verbose:
-                print("\nPerforming least-squares fit to 1D ACF model")
+                if method == 'acf2d_approx' or method == 'acf2d':
+                    print("\nInitialising model with 1D fit")
+                else:
+                    print("\nPerforming least-squares fit to 1D ACF model")
             nfit = 4
             # max_nfev = 2000 * (nfit + 1)  # lmfit default
             max_nfev = 10000 * (nfit + 1)
@@ -1422,7 +1426,18 @@ class Dynspec:
                               (weights_t, weights_f)), max_nfev=max_nfev,
                              nan_policy=nan_policy)
 
-        elif method == 'acf2d_approx' or method == 'acf2d':
+        # overwrite initial value if successful:
+        if results.params['dnu'].stderr is not None:
+            params['tau'].value = results.params['tau'].value
+            params['dnu'].value = results.params['dnu'].value
+            params['wn'].value = results.params['wn'].value
+            params['amp'].value = results.params['amp'].value
+
+        if method == 'acf2d_approx' or method == 'acf2d':
+
+            params['tau'].vary = tau_vary_2d
+            if tau_input is not None:
+                params['tau'].value = tau_input
 
             tticks = np.linspace(-self.tobs, self.tobs, nt + 1)[:-1]
             fticks = np.linspace(-self.bw, self.bw, nf + 1)[:-1]
@@ -1515,9 +1530,10 @@ class Dynspec:
             if mcmc:
                 for i in range(nwalkers):
                     pos_i = []
-                    pos_i.append(np.random.normal(
-                                    loc=self.tau,
-                                    scale=2*self.tauerr))
+                    if tau_vary_2d:
+                        pos_i.append(np.random.normal(
+                                        loc=self.tau,
+                                        scale=2*self.tauerr))
                     pos_i.append(np.random.normal(
                                     loc=self.dnu,
                                     scale=2*self.dnuerr))
@@ -1569,9 +1585,10 @@ class Dynspec:
                         pos_array = []
                         for i in range(nwalkers):
                             pos_i = []
-                            pos_i.append(np.random.normal(
-                                loc=results.params['tau'].value,
-                                scale=results.params['tau'].value/2))
+                            if tau_vary_2d:
+                                pos_i.append(np.random.normal(
+                                    loc=results.params['tau'].value,
+                                    scale=results.params['tau'].value/2))
                             pos_i.append(np.random.normal(
                                 loc=results.params['dnu'].value,
                                 scale=results.params['dnu'].value/2))
