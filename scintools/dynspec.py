@@ -1047,7 +1047,7 @@ class Dynspec:
                 plt.ylim(bottom*0.9, top*1.1)
                 plt.xlim(-maxnormfac, maxnormfac)
                 if filename is not None:
-                    filename_name = filename.split('.')[0]
+                    filename_name = ''.join(filename.split('.')[0:-1])
                     if '+' in filename_name:
                         filename_name = filename_name.split('+')[0]
                     filename_extension = filename.split('.')[-1]
@@ -1114,7 +1114,7 @@ class Dynspec:
                 plt.grid(which='both', axis='both')
 
                 if filename is not None:
-                    filename_name = filename.split('.')[0]
+                    filename_name = ''.join(filename.split('.')[0:-1])
                     if '+' in filename_name:
                         filename_name = filename_name.split('+')[0]
                     filename_extension = filename.split('.')[-1]
@@ -1230,7 +1230,7 @@ class Dynspec:
             plt.xlabel('Time lag (mins)')
             plt.title('Peak measurements, and weighted fit')
             if filename is not None:
-                filename_name = filename.split('.')[0]
+                filename_name = ''.join(filename.split('.')[0:-1])
                 filename_extension = filename.split('.')[-1]
                 plt.savefig(filename_name + '_tilt_fit.' + filename_extension,
                             dpi=dpi, bbox_inches='tight',
@@ -1261,7 +1261,7 @@ class Dynspec:
             plt.title(r'Tilt = {0} $\pm$ {1} (min/MHz)'.format(
                     round(self.acf_tilt, 3), round(err, 3)))
             if filename is not None:
-                filename_name = filename.split('.')[0]
+                filename_name = ''.join(filename.split('.')[0:-1])
                 filename_extension = filename.split('.')[-1]
                 plt.savefig(filename_name + '_tilt_acf.' + filename_extension,
                             dpi=dpi, bbox_inches='tight',
@@ -1809,7 +1809,7 @@ class Dynspec:
                 fig[0].tight_layout()
 
                 if filename is not None:
-                    filename_name = filename.split('.')[0]
+                    filename_name = ''.join(filename.split('.')[0:-1])
                     filename_extension = filename.split('.')[-1]
                     fig[0].savefig(
                         filename_name + '_1Dfit.' + filename_extension,
@@ -1853,7 +1853,7 @@ class Dynspec:
                         fig[1][i].set_ylabel('Frequency lag (MHz)')
                 fig[0].tight_layout()
                 if filename is not None:
-                    filename_name = filename.split('.')[0]
+                    filename_name = ''.join(filename.split('.')[0:-1])
                     filename_extension = filename.split('.')[-1]
                     fig[0].savefig(filename_name + '_2Dfit.'
                                    + filename_extension, dpi=dpi,
@@ -1873,7 +1873,7 @@ class Dynspec:
                               truths=list(results.params.valuesdict().
                                           values()))
                 if filename is not None:
-                    filename_name = filename.split('.')[0]
+                    filename_name = ''.join(filename.split('.')[0:-1])
                     filename_extension = filename.split('.')[-1]
                     plt.savefig(filename_name + '_corner.'
                                 + filename_extension, dpi=dpi,
@@ -1951,7 +1951,7 @@ class Dynspec:
         if plot:
             plt.figure(1)
             if filename is not None:
-                filename_name = filename.split('.')[0]
+                filename_name = ''.join(filename.split('.')[0:-1])
                 filename_extension = filename.split('.')[1]
                 plt.savefig(filename_name + '_dynspec.' + filename_extension,
                             figsize=(9, 15), dpi=dpi, bbox_inches='tight',
