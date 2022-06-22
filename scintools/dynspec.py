@@ -1967,34 +1967,57 @@ class Dynspec:
         """
         self.dyn[np.isnan(self.dyn)] = 0  # fill NaNs with zero
 
-        rowsum = sum(abs(self.dyn[0][:]))
+        nc = len(self.dyn[0, :])
+        nr = len(self.dyn[:, 0])
+
         # Trim bottom
+        if len(np.argwhere(self.dyn[0, :] == 0)) > 0.9*nc:
+            self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
+        rowsum = sum(abs(self.dyn[0, :]))
         while rowsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=0)
             self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
             self.freqs = np.delete(self.freqs, (0))
-            rowsum = sum(abs(self.dyn[0][:]))
-        rowsum = sum(abs(self.dyn[-1][:]))
+            if len(np.argwhere(self.dyn[0, :] == 0)) > 0.9*nc:
+                self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
+            rowsum = sum(abs(self.dyn[0, :]))
+
         # Trim top
+        if len(np.argwhere(self.dyn[-1, :] == 0)) > 0.9*nc:
+            self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
+        rowsum = sum(abs(self.dyn[-1, :]))
         while rowsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=0)
             self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
-            rowsum = sum(abs(self.dyn[-1][:]))
+            if len(np.argwhere(self.dyn[-1, :] == 0)) > 0.9*nc:
+                self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
+            rowsum = sum(abs(self.dyn[-1, :]))
+
         # Trim left
-        colsum = sum(abs(self.dyn[:][0]))
+        if len(np.argwhere(self.dyn[:, 0] == 0)) > 0.9*nr:
+            self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
+        colsum = sum(abs(self.dyn[:, 0]))
         while colsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=1)
             self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
             self.times = np.delete(self.times, (0))
-            colsum = sum(abs(self.dyn[:][0]))
-        colsum = sum(abs(self.dyn[:][-1]))
+            if len(np.argwhere(self.dyn[:, 0] == 0)) > 0.9*nr:
+                self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
+            colsum = sum(abs(self.dyn[:, 0]))
+
         # Trim right
+        if len(np.argwhere(self.dyn[:, -1] == 0)) > 0.9*nr:
+            self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
+        colsum = sum(abs(self.dyn[:, -1]))
         while colsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=1)
             self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
             self.times = np.delete(self.times, (-1))
-            colsum = sum(abs(self.dyn[:][-1]))
+            if len(np.argwhere(self.dyn[:, -1] == 0)) > 0.9*nr:
+                self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
+            colsum = sum(abs(self.dyn[:, -1]))
+
         self.nchan = len(self.freqs)
         self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
         self.freq = round(np.mean(self.freqs), 2)
