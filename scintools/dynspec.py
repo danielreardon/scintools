@@ -1544,8 +1544,11 @@ class Dynspec:
             # max_nfev = 2000 * (nfit + 1)  # lmfit default
             max_nfev = 10000 * (nfit + 1)
             results = fitter(scint_acf_model_2d_approx, params,
-                             (tdata, fdata, ydata_2d, None),
-                             max_nfev=max_nfev, nan_policy=nan_policy)
+                             (tdata, fdata, ydata_2d, None), mcmc=mcmc,
+                             max_nfev=max_nfev, nan_policy=nan_policy,
+                             pos=pos, steps=steps, burn=burn,
+                             progress=progress, workers=workers,
+                             is_weighted=(not lnsigma))
 
             if method == 'acf2d':
 
@@ -1962,31 +1965,32 @@ class Dynspec:
         """
         Find and remove the band edges
         """
+        self.dyn[np.isnan(self.dyn)] = 0  # fill NaNs with zero
 
         rowsum = sum(abs(self.dyn[0][:]))
         # Trim bottom
-        while rowsum == 0 or np.isnan(rowsum):
+        while rowsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=0)
             self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
             self.freqs = np.delete(self.freqs, (0))
             rowsum = sum(abs(self.dyn[0][:]))
         rowsum = sum(abs(self.dyn[-1][:]))
         # Trim top
-        while rowsum == 0 or np.isnan(rowsum):
+        while rowsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=0)
             self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
             rowsum = sum(abs(self.dyn[-1][:]))
         # Trim left
         colsum = sum(abs(self.dyn[:][0]))
-        while colsum == 0 or np.isnan(rowsum):
+        while colsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=1)
             self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
             self.times = np.delete(self.times, (0))
             colsum = sum(abs(self.dyn[:][0]))
         colsum = sum(abs(self.dyn[:][-1]))
         # Trim right
-        while colsum == 0 or np.isnan(rowsum):
+        while colsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=1)
             self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
             self.times = np.delete(self.times, (-1))
@@ -2027,10 +2031,10 @@ class Dynspec:
             # do interpolation
             array = cp(self.dyn)
             self.dyn = interp_nan_2d(array, method=method)
-        else:
-            # Fill with the mean
-            meanval = np.mean(self.dyn[is_valid(self.dyn)])
-            self.dyn[np.isnan(self.dyn)] = meanval
+
+        # Fill with the mean
+        meanval = np.mean(self.dyn[is_valid(self.dyn)])
+        self.dyn[np.isnan(self.dyn)] = meanval
 
     def filter_dyn(self, method='wiener', filter_size=3, noise=None,
                    return_array=False):
