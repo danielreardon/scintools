@@ -1660,9 +1660,9 @@ class Dynspec:
             return
         elif (results.params['tau'].stderr > results.params['tau'].value or
               results.params['dnu'].stderr > results.params['dnu'].value):
-            print("\n Warning: Fit failed")
-        else:
-            self.scint_param_method = method
+            print("\n Warning: Parameters unconstraiend")
+
+        self.scint_param_method = method
 
         # Done fitting - now define results
         self.tau = results.params['tau'].value
