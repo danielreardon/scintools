@@ -1707,8 +1707,8 @@ class Dynspec:
         if fit_tau is None:
             fit_tau = np.inf
 
-        self.tauerr = fit_tau
-        self.dnuerr = fit_dnu
+        self.tauerr = np.sqrt(fit_tau**2 + self.fse_tau**2)
+        self.dnuerr = np.sqrt(fit_dnu**2 + self.fse_dnu**2)
 
         self.amp = results.params['amp'].value
         self.amperr = results.params['amp'].stderr
