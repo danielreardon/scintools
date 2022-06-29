@@ -20,7 +20,8 @@ from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          scint_acf_model_2d, tau_acf_model, dnu_acf_model,\
                          fit_parabola, fit_log_parabola, fitter, \
                          powerspectrum_model
-from scintools.scint_utils import is_valid, svd_model, interp_nan_2d
+from scintools.scint_utils import is_valid, svd_model, interp_nan_2d,\
+    centres_to_edges
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter, wiener
 from scipy.io import loadmat
@@ -243,19 +244,25 @@ class Dynspec:
             plt.figure(figsize=figsize)
         if input_dyn is None:
             if lamsteps:
-                plt.pcolormesh(self.times/60, self.lam, dyn,
+                tedges = centres_to_edges(self.times/60)
+                lamedges = centres_to_edges(self.lam)
+                plt.pcolormesh(tedges, lamedges, dyn,
                                vmin=vmin, vmax=vmax, linewidth=0,
                                rasterized=True, shading='auto')
                 plt.ylabel('Wavelength (m)')
             else:
-                plt.pcolormesh(self.times/60, self.freqs, dyn,
+                tedges = centres_to_edges(self.times/60)
+                fedges = centres_to_edges(self.freqs)
+                plt.pcolormesh(tedges, fedges, dyn,
                                vmin=vmin, vmax=vmax, linewidth=0,
                                rasterized=True, shading='auto')
                 plt.ylabel('Frequency (MHz)')
             plt.xlabel('Time (mins)')
             # plt.colorbar()  # arbitrary units
         else:
-            plt.pcolormesh(input_x, input_y, dyn, vmin=vmin, vmax=vmax,
+            xedges = centres_to_edges(input_x)
+            yedges = centres_to_edges(input_y)
+            plt.pcolormesh(xedges, yedges, dyn, vmin=vmin, vmax=vmax,
                            linewidth=0, rasterized=True)
 
         if title is not None:
@@ -280,8 +287,13 @@ class Dynspec:
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau') and input_acf is None:
-            self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc,
-                                  verbose=verbose)
+            try:
+                self.get_scint_params(method=method, alpha=alpha, mcmc=mcmc,
+                                      verbose=verbose)
+            except Exception as e:
+                print(e)
+                print("Could not determine scintillation scales for plot")
+
         if input_acf is None:
             arr = self.acf
             tspan = self.tobs
@@ -291,7 +303,8 @@ class Dynspec:
             tspan = max(input_t) - min(input_t)
             fspan = max(input_f) - min(input_f)
         arr = np.fft.ifftshift(arr)
-        wn = arr[0][0] - arr[0][1]  # subtract the white noise spike
+        # subtract the white noise spike
+        wn = arr[0][0] - max([arr[1][0], arr[0][1]])
         arr[0][0] = arr[0][0] - wn  # Set the noise spike to zero for plotting
         arr = np.fft.fftshift(arr)
 
@@ -322,25 +335,28 @@ class Dynspec:
             if contour:
                 ax1.contourf(t_delays, f_shifts, arr)
             else:
-                ax1.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
+                ax1.pcolormesh(t_delays, f_shifts, arr[:, 1:], linewidth=0,
                                rasterized=True, shading='auto')
-            ax1.set_ylabel('Frequency lag (MHz)')
-            ax1.set_xlabel('Time lag (mins)')
+            ax1.set_ylabel(r'Frequency shift, $\Delta\nu$ (MHz)')
+            ax1.set_xlabel(r'Time lag, $\tau$ (mins)')
             miny, maxy = ax1.get_ylim()
-            ax2 = ax1.twinx()
-            ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
-            ax2.set_ylabel(r'Frequency lag / ($\Delta\nu_d = {0}\,$MHz)'.
-                           format(round(self.dnu, 2)))
-            ax3 = ax1.twiny()
-            minx, maxx = ax1.get_xlim()
-            ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
-            ax3.set_xlabel(r'Time lag/($\tau_d={0}\,$min)'.format(round(
-                                                         self.tau/60, 2)))
+            if hasattr(self, 'tau'):
+                ax2 = ax1.twinx()
+                ax2.set_ylim(miny/self.dnu, maxy/self.dnu)
+                ax2.set_ylabel(r'$\Delta\nu$ / ($\Delta\nu_d = {0}\,$MHz)'.
+                               format(round(self.dnu, 2)))
+                ax3 = ax1.twiny()
+                minx, maxx = ax1.get_xlim()
+                ax3.set_xlim(minx/(self.tau/60), maxx/(self.tau/60))
+                ax3.set_xlabel(r'$\tau$/($\tau_d={0}\,$min)'.format(round(
+                                                             self.tau/60, 2)))
         else:  # just plot acf without scales
             if contour:
                 plt.contourf(t_delays, f_shifts, arr)
             else:
-                plt.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
+                tedges = centres_to_edges(t_delays)
+                fedges = centres_to_edges(f_shifts)
+                plt.pcolormesh(tedges, fedges, arr, linewidth=0,
                                rasterized=True, shading='auto')
             plt.ylabel('Frequency lag (MHz)')
             plt.xlabel('Time lag (mins)')
@@ -411,12 +427,16 @@ class Dynspec:
             plt.figure(figsize=figsize)
         if input_sspec is None:
             if lamsteps:
-                plt.pcolormesh(xplot, self.beta[:ind], sspec[:ind, :],
+                xedges = centres_to_edges(xplot)
+                betaedges = centres_to_edges(self.beta[:ind])
+                plt.pcolormesh(xedges, betaedges, sspec[:ind, :],
                                vmin=vmin, vmax=vmax, linewidth=0,
                                rasterized=True, shading='auto')
                 plt.ylabel(r'$f_\lambda$ (m$^{-1}$)')
             else:
-                plt.pcolormesh(xplot, self.tdel[:ind], sspec[:ind, :],
+                xedges = centres_to_edges(xplot)
+                tdeledges = centres_to_edges(self.tdel[:ind])
+                plt.pcolormesh(xedges, tdeledges, sspec[:ind, :],
                                vmin=vmin, vmax=vmax, linewidth=0,
                                rasterized=True, shading='auto')
                 plt.ylabel(r'$f_\nu$ ($\mu$s)')
@@ -434,7 +454,9 @@ class Dynspec:
             plt.ylim(bottom, top)
 
         else:
-            plt.pcolormesh(xplot, input_y, sspec, vmin=vmin, vmax=vmax,
+            xedges = centres_to_edges(xplot)
+            yedges = centres_to_edges(input_y)
+            plt.pcolormesh(xedges, yedges, sspec, vmin=vmin, vmax=vmax,
                            linewidth=0, rasterized=True, shading='auto')
         if colorbar:
             plt.colorbar()
@@ -494,7 +516,8 @@ class Dynspec:
         vmin = medval - 3
         vmax = maxval - 3
 
-        plt.pcolormesh(xyaxes, xyaxes, scat_im, vmin=vmin, vmax=vmax,
+        xyedges = centres_to_edges(xyaxes)
+        plt.pcolormesh(xyedges, xyedges, scat_im, vmin=vmin, vmax=vmax,
                        linewidth=0, rasterized=True, shading='auto')
         plt.title('Scattered image')
         if use_angle:
@@ -1063,7 +1086,9 @@ class Dynspec:
                 if display or (filename is not None):
                     plt.figure(figsize=figsize)
                 np.ma.set_fill_value(normSspec, np.nan)
-                plt.pcolormesh(fdopnew, tdel, np.ma.filled(normSspec),
+                fdopedges = centres_to_edges(fdopnew)
+                tdeledges = centres_to_edges(tdel)
+                plt.pcolormesh(fdopedges, tdeledges, np.ma.filled(normSspec),
                                vmin=vmin, vmax=vmax, linewidth=0,
                                rasterized=True, shading='auto')
                 if lamsteps:
@@ -1241,7 +1266,9 @@ class Dynspec:
             elif display:
                 plt.show()
 
-            plt.pcolormesh(t_delays, f_shifts, acf, linewidth=0,
+            tedges = centres_to_edges(t_delays)
+            fedges = centres_to_edges(f_shifts)
+            plt.pcolormesh(tedges, fedges, acf, linewidth=0,
                            rasterized=True, shading='auto')
             plt.plot(peak_array, y_array, 'r', alpha=0.5)
             plt.plot(peak_array, yfit, 'k', alpha=0.5)
@@ -1724,6 +1751,16 @@ class Dynspec:
             self.talpha = alpha
             self.talphaerr = 0
         if method[:5] == 'acf2d':
+            weights = np.ones(np.shape(ydata_2d))
+            if method == 'acf2d_approx':
+                model = -scint_acf_model_2d_approx(
+                    results.params, tdata, fdata,
+                    np.zeros(np.shape(ydata_2d)), None)
+            else:
+                model = -scint_acf_model_2d(results.params,
+                                            np.zeros(np.shape(ydata_2d)),
+                                            None)
+            self.acf_model = model
             self.phasegrad = results.params['phasegrad'].value
             fit_ph = results.params['phasegrad'].stderr
             if fit_ph is None:
@@ -1784,7 +1821,7 @@ class Dynspec:
                 fig[1][0].plot([0, xl[1]],
                                [-1/np.sqrt(self.nsub), -1/np.sqrt(self.nsub)],
                                ':', color='crimson')
-                fig[1][0].set_xlabel('Time lag (s)')
+                fig[1][0].set_xlabel(r'$\tau$ (s)')
                 fig[1][0].legend()
                 fig[0].tight_layout()
 
@@ -1804,7 +1841,7 @@ class Dynspec:
                                [-1/np.sqrt(self.nchan),
                                 -1/np.sqrt(self.nchan)],
                                ':', color='crimson')
-                fig[1][1].set_xlabel('Frequency lag (MHz)')
+                fig[1][1].set_xlabel(r'$\Delta\nu$ (MHz)')
                 fig[1][1].legend()
                 fig[0].tight_layout()
 
@@ -1842,16 +1879,18 @@ class Dynspec:
                     else:
                         arr = d[0]
 
-                    mesh = fig[1][i].pcolormesh(tdata/60, fdata, arr,
+                    tedges = centres_to_edges(tdata/60)
+                    fedges = centres_to_edges(fdata)
+                    mesh = fig[1][i].pcolormesh(tedges, fedges, arr,
                                                 linewidth=0, rasterized=True,
                                                 shading='auto')
                     if d[1] == 'residuals':
                         mesh.set_clim(vmin=-1, vmax=1)  # fractional error
                     fig[1][i].set_title(d[1])
-                    fig[1][i].set_xlabel('Time lag (mins)')
+                    fig[1][i].set_xlabel(r'$\tau$ (mins)')
                     if i == 0:
-                        fig[1][i].set_ylabel('Frequency lag (MHz)')
-                fig[0].tight_layout()
+                        fig[1][i].set_ylabel(r'$\Delta\nu$ (MHz)')
+                plt.tight_layout()
                 if filename is not None:
                     filename_name = ''.join(filename.split('.')[0:-1])
                     filename_extension = filename.split('.')[-1]

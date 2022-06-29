@@ -584,6 +584,16 @@ def interp_nan_2d(array, method='linear'):
     return array
 
 
+def centres_to_edges(arr):
+    """
+    Take an array of pixel-centres, and return an array of pixel-edges
+        assumes the pixel-centres are evenly spaced
+    """
+    darr = np.abs(arr[1] - arr[0])
+    arr_edges = arr - darr/2
+    return np.append(arr_edges, arr_edges[-1] + darr)
+
+
 def make_pickle(obj, filepath):
     """
     pickle.write, which works for very large files
