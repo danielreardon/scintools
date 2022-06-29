@@ -18,7 +18,9 @@ from scipy.optimize import fsolve
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter1d
 import pickle
+from astropy import units as u
 from astropy.time import Time
+from astropy.coordinates import SkyCoord
 
 
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
@@ -450,6 +452,61 @@ def get_true_anomaly(mjds, pars):
         U += 2*np.pi
 
     return U
+
+
+def differential_velocity(params, sun_velocity=220, screen_velocity=220,
+                          radius=8):
+    """
+    Approximates the differential velocity between the scattering screen and
+    the Sun assuming zero-inclination circular galactic orbits. Useful for
+    determining the intrinsic ISM velocity.
+
+    Parameters
+    ----------
+    params : dict
+        Parameters list containing the pulsar RAJ and DECJ, pulsar distance d,
+        screen fractional distance s, and anisotropy angle psi.
+    sun_velocity : float, optional
+        Orbital speed of the Sun in km/s. The default is 220.
+    screen_velocity : float, optional
+        Orbital speed of the scattering screen in km/s. The default of 220
+        assumes a flat galactic rotation curve.
+    radius : float, optional
+        Radius of the Sun's orbit about the galactic center in kpc. The default
+        is 8.
+
+    Returns
+    -------
+    v_ra, v_dec : float
+        The RA and dec components of the differential velocity in km/s.
+
+    """
+
+    c_icrs = SkyCoord('{0} {1}'.format(params['RAJ'].value,
+                                       params['DECJ'].value),
+                      unit=(u.radian, u.radian), frame='icrs')
+    c_gal = c_icrs.galactic
+    long = 2 * np.pi - c_gal.l.radian
+
+    dscr = (1 - params['s'].value) * params['d'].value
+    # radial position of screen
+    rscr = np.sqrt(dscr**2 + radius**2 - (2 * dscr * radius * np.cos(long)))
+    costheta = radius / rscr - (dscr * np.cos(long) / rscr)
+    # angle between screen orbital velocity and transverse direction
+    phi = long + np.arccos(costheta)
+
+    vtrans_scr = screen_velocity * np.cos(phi)  # screen transverse velocity
+    vtrans_sun = sun_velocity * np.cos(long)  # sun velocity in same direction
+    diff_vel = vtrans_scr - vtrans_sun
+
+    c_new = SkyCoord(l=c_gal.l.degree+1, b=c_gal.b.degree, unit=(u.deg, u.deg),
+                     frame='galactic')
+    ra_diff = c_new.icrs.ra.radian - c_icrs.ra.radian
+    dec_diff = c_new.icrs.dec.radian - c_icrs.dec.radian
+    # angle of velocity on the sky as measured east from the dec axis
+    angle = np.pi / 2 - np.arctan(dec_diff / ra_diff)
+
+    return diff_vel * np.sin(angle), diff_vel * np.cos(angle)
 
 
 def slow_FT(dynspec, freqs):
