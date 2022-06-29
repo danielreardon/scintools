@@ -20,7 +20,7 @@ from scipy.ndimage import gaussian_filter1d
 import pickle
 from astropy import units as u
 from astropy.time import Time
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, get_body_barycentric
 
 
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
@@ -268,9 +268,6 @@ def get_ssb_delay(mjds, raj, decj):
     arrival times to barycentric.
     """
 
-    from astropy.time import Time
-    from astropy.coordinates import get_body_barycentric, SkyCoord
-    from astropy import units as u
     from astropy.constants import au, c
 
     coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
