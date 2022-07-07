@@ -2017,7 +2017,7 @@ class Dynspec:
         self.cutdyn = cutdyn
         self.cutsspec = cutsspec
 
-    def trim_edges(self):
+    def trim_edges(self, bandwagon_frac=0.5):
         """
         Find and remove the band edges
         """
@@ -2027,50 +2027,50 @@ class Dynspec:
         nr = len(self.dyn[:, 0])
 
         # Trim bottom
-        if len(np.argwhere(self.dyn[0, :] == 0)) > 0.9*nc:
+        if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
             self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
         rowsum = sum(abs(self.dyn[0, :]))
         while rowsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=0)
             self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
             self.freqs = np.delete(self.freqs, (0))
-            if len(np.argwhere(self.dyn[0, :] == 0)) > 0.9*nc:
+            if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
                 self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
             rowsum = sum(abs(self.dyn[0, :]))
 
         # Trim top
-        if len(np.argwhere(self.dyn[-1, :] == 0)) > 0.9*nc:
+        if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
             self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
         rowsum = sum(abs(self.dyn[-1, :]))
         while rowsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=0)
             self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
-            if len(np.argwhere(self.dyn[-1, :] == 0)) > 0.9*nc:
+            if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
                 self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
             rowsum = sum(abs(self.dyn[-1, :]))
 
         # Trim left
-        if len(np.argwhere(self.dyn[:, 0] == 0)) > 0.9*nr:
+        if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
             self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
         colsum = sum(abs(self.dyn[:, 0]))
         while colsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=1)
             self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
             self.times = np.delete(self.times, (0))
-            if len(np.argwhere(self.dyn[:, 0] == 0)) > 0.9*nr:
+            if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
                 self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
             colsum = sum(abs(self.dyn[:, 0]))
 
         # Trim right
-        if len(np.argwhere(self.dyn[:, -1] == 0)) > 0.9*nr:
+        if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
             self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
         colsum = sum(abs(self.dyn[:, -1]))
         while colsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=1)
             self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
             self.times = np.delete(self.times, (-1))
-            if len(np.argwhere(self.dyn[:, -1] == 0)) > 0.9*nr:
+            if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
                 self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
             colsum = sum(abs(self.dyn[:, -1]))
 
