@@ -42,9 +42,27 @@ class Dynspec:
 
     def __init__(self, filename=None, dyn=None, verbose=True, process=True,
                  lamsteps=False):
-        """"
+        """
         Initialise a dynamic spectrum object by either reading from file
             or from existing object
+
+        Parameters
+        ----------
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        dyn : TYPE, optional
+            DESCRIPTION. The default is None.
+        verbose : TYPE, optional
+            DESCRIPTION. The default is True.
+        process : TYPE, optional
+            DESCRIPTION. The default is True.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
         """
 
         if filename:
@@ -60,6 +78,17 @@ class Dynspec:
         """
         Defines dynamic spectra addition, which is concatination in time,
             with the gaps filled
+
+        Parameters
+        ----------
+        other : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        TYPE
+            DESCRIPTION.
+
         """
 
         print("Now adding {} ...".format(other.name))
@@ -108,9 +137,25 @@ class Dynspec:
 
         return Dynspec(dyn=newdyn, verbose=False, process=False)
 
-    def load_file(self, filename, verbose=True, process=True, lamsteps=False):
+    def load_file(self, filename, verbose=True, process=False, lamsteps=False):
         """
         Load a dynamic spectrum from psrflux-format file
+
+        Parameters
+        ----------
+        filename : TYPE
+            DESCRIPTION.
+        verbose : TYPE, optional
+            DESCRIPTION. The default is True.
+        process : TYPE, optional
+            DESCRIPTION. The default is True.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
         """
 
         start = time.time()
@@ -164,7 +209,7 @@ class Dynspec:
         self.dyn_noise = np.nanmedian(fluxerrs)
         self.lamsteps = lamsteps
         if process:
-            self.default_processing(lamsteps=lamsteps)  # do default processing
+            self.auto_processing(lamsteps=lamsteps)  # do automatic processing
         end = time.time()
         if verbose:
             print("...LOADED in {0} seconds\n".format(round(end-start, 2)))
@@ -173,7 +218,22 @@ class Dynspec:
     def write_file(self, filename=None, verbose=True, note=None):
         """
         Writes the dynspec object to psrflux-format file
+
+        Parameters
+        ----------
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        verbose : TYPE, optional
+            DESCRIPTION. The default is True.
+        note : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        None.
+
         """
+
         if filename is None:
             ext = self.name.split('.')[-1]
             fname = '.'.join(self.name.split('.')[0:-1]) + '.processed.' + ext
@@ -204,7 +264,23 @@ class Dynspec:
 
     def load_dyn_obj(self, dyn, verbose=True, process=True, lamsteps=False):
         """
-        Load in a dynamic spectrum object of different type.
+        Load in a dynamic spectrum object of different type
+
+        Parameters
+        ----------
+        dyn : TYPE
+            DESCRIPTION.
+        verbose : TYPE, optional
+            DESCRIPTION. The default is True.
+        process : TYPE, optional
+            DESCRIPTION. The default is True.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
         """
 
         start = time.time()
@@ -232,25 +308,64 @@ class Dynspec:
             print("...LOADED in {0} seconds\n".format(round(end-start, 2)))
             self.info()
 
-    def default_processing(self, lamsteps=False):
+    def auto_processing(self, lamsteps=False):
         """
-        Default processing of a Dynspec object
+        Automatic processing of a Dynspec object, using common utilities
+
+        Parameters
+        ----------
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
+
         """
 
         self.trim_edges()  # remove zeros on band edges
-        # self.refill()  # refill and zeroed regions with linear interpolation
-        # self.correct_dyn()  # correct by svd
-        # self.calc_acf()  # calculate the ACF
+        self.refill()  # refill and zeroed regions with linear interpolation
+        self.correct_dyn()  # correct by svd
+        self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
-        # self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
+        self.calc_sspec(lamsteps=lamsteps)  # Calculate secondary spectrum
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
                  figsize=(9, 9), dpi=200, title=None):
         """
         Plot the dynamic spectrum
+
+        Parameters
+        ----------
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        input_dyn : TYPE, optional
+            DESCRIPTION. The default is None.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_x : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_y : TYPE, optional
+            DESCRIPTION. The default is None.
+        trap : TYPE, optional
+            DESCRIPTION. The default is False.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        figsize : TYPE, optional
+            DESCRIPTION. The default is (9, 9).
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        None.
+
         """
+
         if input_dyn is None:
             if lamsteps:
                 if not hasattr(self, 'lamdyn'):
@@ -316,7 +431,48 @@ class Dynspec:
                  figsize=(9, 9), verbose=False, dpi=200):
         """
         Plot the ACF
+
+        Parameters
+        ----------
+        method : TYPE, optional
+            DESCRIPTION. The default is 'acf1d'.
+        alpha : TYPE, optional
+            DESCRIPTION. The default is 5/3.
+        contour : TYPE, optional
+            DESCRIPTION. The default is False.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_acf : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_t : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_f : TYPE, optional
+            DESCRIPTION. The default is None.
+        nscale : TYPE, optional
+            DESCRIPTION. The default is 4.
+        mcmc : TYPE, optional
+            DESCRIPTION. The default is False.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        crop : TYPE, optional
+            DESCRIPTION. The default is False.
+        tlim : TYPE, optional
+            DESCRIPTION. The default is None.
+        flim : TYPE, optional
+            DESCRIPTION. The default is None.
+        figsize : TYPE, optional
+            DESCRIPTION. The default is (9, 9).
+        verbose : TYPE, optional
+            DESCRIPTION. The default is False.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+
+        Returns
+        -------
+        None.
+
         """
+
         if not hasattr(self, 'acf'):
             self.calc_acf()
         if not hasattr(self, 'tau') and input_acf is None:
@@ -411,7 +567,56 @@ class Dynspec:
                    overplot_curvature=None, dpi=200):
         """
         Plot the secondary spectrum
+
+        Parameters
+        ----------
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        input_sspec : TYPE, optional
+            DESCRIPTION. The default is None.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_x : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_y : TYPE, optional
+            DESCRIPTION. The default is None.
+        trap : TYPE, optional
+            DESCRIPTION. The default is False.
+        prewhite : TYPE, optional
+            DESCRIPTION. The default is False.
+        plotarc : TYPE, optional
+            DESCRIPTION. The default is False.
+        maxfdop : TYPE, optional
+            DESCRIPTION. The default is np.inf.
+        delmax : TYPE, optional
+            DESCRIPTION. The default is None.
+        ref_freq : TYPE, optional
+            DESCRIPTION. The default is 1400.
+        cutmid : TYPE, optional
+            DESCRIPTION. The default is 0.
+        startbin : TYPE, optional
+            DESCRIPTION. The default is 0.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        colorbar : TYPE, optional
+            DESCRIPTION. The default is True.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+        figsize : TYPE, optional
+            DESCRIPTION. The default is (9, 9).
+        subtract_artefacts : TYPE, optional
+            DESCRIPTION. The default is False.
+        overplot_curvature : TYPE, optional
+            DESCRIPTION. The default is None.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+
+        Returns
+        -------
+        None.
+
         """
+
         if input_sspec is None:
             if lamsteps:
                 if not hasattr(self, 'lamsspec'):
@@ -512,7 +717,49 @@ class Dynspec:
                      filename=None, dpi=200):
         """
         Plot the scattered image
+
+        Parameters
+        ----------
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        plot_log : TYPE, optional
+            DESCRIPTION. The default is True.
+        colorbar : TYPE, optional
+            DESCRIPTION. The default is True.
+        title : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_scat_im : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_fdop : TYPE, optional
+            DESCRIPTION. The default is None.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        trap : TYPE, optional
+            DESCRIPTION. The default is False.
+        clean : TYPE, optional
+            DESCRIPTION. The default is True.
+        use_angle : TYPE, optional
+            DESCRIPTION. The default is False.
+        use_spatial : TYPE, optional
+            DESCRIPTION. The default is False.
+        s : TYPE, optional
+            DESCRIPTION. The default is None.
+        veff : TYPE, optional
+            DESCRIPTION. The default is None.
+        d : TYPE, optional
+            DESCRIPTION. The default is None.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+
+        Returns
+        -------
+        xyaxes : TYPE
+            DESCRIPTION.
+
         """
+
         c = 299792458.0  # m/s
         if input_scat_im is None:
             if not hasattr(self, 'scat_im'):
@@ -579,41 +826,6 @@ class Dynspec:
 
         return xyaxes
 
-    def plot_all(self, dyn=1, sspec=3, acf=2, norm_sspec=4, colorbar=True,
-                 lamsteps=False, filename=None, display=True):
-        """
-        Plots multiple figures in one
-        """
-
-        # Dynamic Spectrum
-        plt.subplot(2, 2, dyn)
-        self.plot_dyn(lamsteps=lamsteps)
-        plt.title("Dynamic Spectrum")
-
-        # Autocovariance Function
-        plt.subplot(2, 2, acf)
-        self.plot_acf(subplot=True)
-        plt.title("Autocovariance")
-
-        # Secondary Spectrum
-        plt.subplot(2, 2, sspec)
-        self.plot_sspec(lamsteps=lamsteps)
-        plt.title("Secondary Spectrum")
-
-        # Normalised Secondary Spectrum
-        plt.subplot(2, 2, norm_sspec)
-        self.norm_sspec(plot=True, scrunched=False, lamsteps=lamsteps,
-                        plot_fit=False)
-        plt.title("Normalised fdop secondary spectrum")
-
-        if filename is not None:
-            plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
-            if display:
-                plt.show()
-            plt.close()
-        elif display:
-            plt.show()
-
     def fit_arc(self, asymm=False, plot=False, delmax=None, numsteps=1e4,
                 startbin=3, cutmid=3, lamsteps=False, etamax=None, etamin=None,
                 low_power_diff=-1, figsize=(9, 9), high_power_diff=-0.5,
@@ -625,6 +837,71 @@ class Dynspec:
         Find the arc curvature with maximum power along it
             constraint: Only search for peaks between constraint[0] and
                 constraint[1]
+
+        Parameters
+        ----------
+        asymm : TYPE, optional
+            DESCRIPTION. The default is False.
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        delmax : TYPE, optional
+            DESCRIPTION. The default is None.
+        numsteps : TYPE, optional
+            DESCRIPTION. The default is 1e4.
+        startbin : TYPE, optional
+            DESCRIPTION. The default is 3.
+        cutmid : TYPE, optional
+            DESCRIPTION. The default is 3.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        etamax : TYPE, optional
+            DESCRIPTION. The default is None.
+        etamin : TYPE, optional
+            DESCRIPTION. The default is None.
+        low_power_diff : TYPE, optional
+            DESCRIPTION. The default is -1.
+        figsize : TYPE, optional
+            DESCRIPTION. The default is (9, 9).
+        high_power_diff : TYPE, optional
+            DESCRIPTION. The default is -0.5.
+        ref_freq : TYPE, optional
+            DESCRIPTION. The default is 1400.
+        constraint : TYPE, optional
+            DESCRIPTION. The default is [0, np.inf].
+        nsmooth : TYPE, optional
+            DESCRIPTION. The default is 5.
+        efac : TYPE, optional
+            DESCRIPTION. The default is 1.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        noise_error : TYPE, optional
+            DESCRIPTION. The default is True.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        figN : TYPE, optional
+            DESCRIPTION. The default is None.
+        log_parabola : TYPE, optional
+            DESCRIPTION. The default is False.
+        logsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        plot_spec : TYPE, optional
+            DESCRIPTION. The default is False.
+        fit_spectrum : TYPE, optional
+            DESCRIPTION. The default is False.
+        subtract_artefacts : TYPE, optional
+            DESCRIPTION. The default is False.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+
+        Raises
+        ------
+        ValueError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
         """
 
         if not hasattr(self, 'tdel'):
@@ -911,6 +1188,60 @@ class Dynspec:
                    figsize=(9, 9), subtract_artefacts=False, dpi=200):
         """
         Normalise fdop axis using arc curvature
+
+        Parameters
+        ----------
+        eta : TYPE, optional
+            DESCRIPTION. The default is None.
+        delmax : TYPE, optional
+            DESCRIPTION. The default is None.
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        startbin : TYPE, optional
+            DESCRIPTION. The default is 1.
+        maxnormfac : TYPE, optional
+            DESCRIPTION. The default is 5.
+        minnormfac : TYPE, optional
+            DESCRIPTION. The default is 0.
+        cutmid : TYPE, optional
+            DESCRIPTION. The default is 3.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is True.
+        scrunched : TYPE, optional
+            DESCRIPTION. The default is True.
+        plot_fit : TYPE, optional
+            DESCRIPTION. The default is True.
+        ref_freq : TYPE, optional
+            DESCRIPTION. The default is 1400.
+        numsteps : TYPE, optional
+            DESCRIPTION. The default is None.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        unscrunched : TYPE, optional
+            DESCRIPTION. The default is True.
+        logsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        powerspec : TYPE, optional
+            DESCRIPTION. The default is True.
+        interp_nan : TYPE, optional
+            DESCRIPTION. The default is False.
+        fit_spectrum : TYPE, optional
+            DESCRIPTION. The default is False.
+        powerspec_cut : TYPE, optional
+            DESCRIPTION. The default is False.
+        figsize : TYPE, optional
+            DESCRIPTION. The default is (9, 9).
+        subtract_artefacts : TYPE, optional
+            DESCRIPTION. The default is False.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+
+        Returns
+        -------
+        None.
+
         """
 
         # Maximum value delay axis (us @ ref_freq)
@@ -1192,6 +1523,38 @@ class Dynspec:
         """
         Estimates the tilt in the ACF, which is proportional to the phase
             gradient parallel to Veff
+
+        Parameters
+        ----------
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        tmax : TYPE, optional
+            DESCRIPTION. The default is None.
+        fmax : TYPE, optional
+            DESCRIPTION. The default is None.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        nscale : TYPE, optional
+            DESCRIPTION. The default is 0.5.
+        nscaleplot : TYPE, optional
+            DESCRIPTION. The default is 2.
+        nmin : TYPE, optional
+            DESCRIPTION. The default is 5.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+        method : TYPE, optional
+            DESCRIPTION. The default is 'acf1d'.
+        tmaxplot : TYPE, optional
+            DESCRIPTION. The default is None.
+        fmaxplot : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        None.
+
         """
         if not hasattr(self, 'acf'):
             self.calc_acf()
@@ -1343,17 +1706,71 @@ class Dynspec:
                          tau_vary_2d=True, tau_input=None):
         """
         Measure the scintillation timescale
-            Method:
-                nofit - Using the 0.5 and 1/e levels in the ACF to define the
-                    scale, and assumes the finite-scintle error dominates
-                    the uncertainty
-                acf1d - takes a 1D cut through the centre of the ACF and fits
-                    an exponential in frequency and a Gaussian-like curve
-                    in time
-                sspec - measures scintillation scales from the secondary
-                   spectrum, using the Fourier transform of the 1d models
-                acf2d_approx - uses an analytic approximation to the ACF
-                    including a phase gradient (a shear to the ACF)
+
+        Method:
+            nofit - Using the 0.5 and 1/e levels in the ACF to define the
+                scale, and assumes the finite-scintle error dominates
+                the uncertainty
+            acf1d - takes a 1D cut through the centre of the ACF and fits
+                an exponential in frequency and a Gaussian-like curve
+                in time
+            sspec - (N/A) measures scintillation scales from the secondary
+               spectrum, using the Fourier transform of the 1d models
+            acf2d_approx - uses an analytic approximation to the ACF
+                including a phase gradient (a shear to the ACF)
+
+        Parameters
+        ----------
+        method : TYPE, optional
+            DESCRIPTION. The default is "acf1d".
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        alpha : TYPE, optional
+            DESCRIPTION. The default is 5/3.
+        mcmc : TYPE, optional
+            DESCRIPTION. The default is False.
+        full_frame : TYPE, optional
+            DESCRIPTION. The default is False.
+        nscale : TYPE, optional
+            DESCRIPTION. The default is 5.
+        nwalkers : TYPE, optional
+            DESCRIPTION. The default is 100.
+        steps : TYPE, optional
+            DESCRIPTION. The default is 1000.
+        burn : TYPE, optional
+            DESCRIPTION. The default is 0.2.
+        nitr : TYPE, optional
+            DESCRIPTION. The default is 1.
+        lnsigma : TYPE, optional
+            DESCRIPTION. The default is True.
+        verbose : TYPE, optional
+            DESCRIPTION. The default is False.
+        progress : TYPE, optional
+            DESCRIPTION. The default is True.
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+        frac_err : TYPE, optional
+            DESCRIPTION. The default is 0.2.
+        nan_policy : TYPE, optional
+            DESCRIPTION. The default is 'raise'.
+        weighted : TYPE, optional
+            DESCRIPTION. The default is True.
+        workers : TYPE, optional
+            DESCRIPTION. The default is 1.
+        tau_vary_2d : TYPE, optional
+            DESCRIPTION. The default is True.
+        tau_input : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Returns
+        -------
+        results : TYPE
+            DESCRIPTION.
+
         """
 
         if not hasattr(self, 'acf'):
@@ -1962,10 +2379,34 @@ class Dynspec:
         """
         Cuts the dynamic spectrum into tcuts+1 segments in time and
                 fcuts+1 segments in frequency
+
+        Parameters
+        ----------
+        tcuts : TYPE, optional
+            DESCRIPTION. The default is 0.
+        fcuts : TYPE, optional
+            DESCRIPTION. The default is 0.
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        filename : TYPE, optional
+            DESCRIPTION. The default is None.
+        dpi : TYPE, optional
+            DESCRIPTION. The default is 200.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        maxfdop : TYPE, optional
+            DESCRIPTION. The default is np.inf.
+        figsize : TYPE, optional
+            DESCRIPTION. The default is (8, 13).
+        display : TYPE, optional
+            DESCRIPTION. The default is True.
+
+        Returns
+        -------
+        None.
+
         """
 
-        if filename is not None:
-            plt.ioff()  # turn off interactive plotting
         nchan = len(self.freqs)  # re-define in case of trimming
         nsub = len(self.times)
         fnum = np.floor(nchan/(fcuts + 1))
@@ -2054,7 +2495,18 @@ class Dynspec:
     def trim_edges(self, bandwagon_frac=0.5):
         """
         Find and remove the band edges
+
+        Parameters
+        ----------
+        bandwagon_frac : TYPE, optional
+            DESCRIPTION. The default is 0.5.
+
+        Returns
+        -------
+        None.
+
         """
+
         self.dyn[np.isnan(self.dyn)] = 0  # fill NaNs with zero
 
         nc = len(self.dyn[0, :])
@@ -2119,7 +2571,26 @@ class Dynspec:
                noise=None, linear=True):
         """
         Replaces the nan values in array. Also replaces zeros by default
+
+        Parameters
+        ----------
+        method : TYPE, optional
+            DESCRIPTION. The default is 'linear'.
+        zeros : TYPE, optional
+            DESCRIPTION. The default is True.
+        filter_size : TYPE, optional
+            DESCRIPTION. The default is 3.
+        noise : TYPE, optional
+            DESCRIPTION. The default is None.
+        linear : TYPE, optional
+            DESCRIPTION. The default is True.
+
+        Returns
+        -------
+        None.
+
         """
+
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
 
@@ -2149,20 +2620,30 @@ class Dynspec:
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
 
-    def filter_dyn(self, method='wiener', filter_size=3, noise=None,
-                   return_array=False):
-        """
-        Apply a filter to the dynamic spectrum, or return the filtered result
-        """
-        if not return_array:
-            self.dyn = wiener(self.dyn, mysize=filter_size, noise=noise)
-        else:
-            return wiener(self.dyn, mysize=filter_size, noise=noise)
-
     def correct_dyn(self, svd=True, nmodes=1, frequency=False, time=True,
                     lamsteps=False, nsmooth=5):
         """
-        Correct for gain variations in time and frequency
+        Correct for apparent flux variations in time and frequency
+
+        Parameters
+        ----------
+        svd : TYPE, optional
+            DESCRIPTION. The default is True.
+        nmodes : TYPE, optional
+            DESCRIPTION. The default is 1.
+        frequency : TYPE, optional
+            DESCRIPTION. The default is False.
+        time : TYPE, optional
+            DESCRIPTION. The default is True.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        nsmooth : TYPE, optional
+            DESCRIPTION. The default is 5.
+
+        Returns
+        -------
+        None.
+
         """
 
         if lamsteps:
@@ -2214,6 +2695,51 @@ class Dynspec:
         (B(tx,ty) vs B(0,0)).
 
         The x axis of the image is aligned with the velocity.
+
+        Parameters
+        ----------
+        input_sspec : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_eta : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_fdop : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_tdel : TYPE, optional
+            DESCRIPTION. The default is None.
+        sampling : TYPE, optional
+            DESCRIPTION. The default is 64.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        trap : TYPE, optional
+            DESCRIPTION. The default is False.
+        ref_freq : TYPE, optional
+            DESCRIPTION. The default is 1400.
+        clean : TYPE, optional
+            DESCRIPTION. The default is True.
+        s : TYPE, optional
+            DESCRIPTION. The default is None.
+        veff : TYPE, optional
+            DESCRIPTION. The default is None.
+        d : TYPE, optional
+            DESCRIPTION. The default is None.
+        fit_arc : TYPE, optional
+            DESCRIPTION. The default is True.
+        plotarc : TYPE, optional
+            DESCRIPTION. The default is False.
+        plot_fit : TYPE, optional
+            DESCRIPTION. The default is False.
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        plot_log : TYPE, optional
+            DESCRIPTION. The default is True.
+        use_angle : TYPE, optional
+            DESCRIPTION. The default is False.
+        use_spatial : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Returns
+        -------
+        None.
 
         """
 
@@ -2346,6 +2872,46 @@ class Dynspec:
                    return_sspec=False):
         """
         Calculate secondary spectrum
+
+        Parameters
+        ----------
+        prewhite : TYPE, optional
+            DESCRIPTION. The default is False.
+        halve : TYPE, optional
+            DESCRIPTION. The default is True.
+        plot : TYPE, optional
+            DESCRIPTION. The default is False.
+        lamsteps : TYPE, optional
+            DESCRIPTION. The default is False.
+        input_dyn : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_x : TYPE, optional
+            DESCRIPTION. The default is None.
+        input_y : TYPE, optional
+            DESCRIPTION. The default is None.
+        trap : TYPE, optional
+            DESCRIPTION. The default is False.
+        window : TYPE, optional
+            DESCRIPTION. The default is 'blackman'.
+        window_frac : TYPE, optional
+            DESCRIPTION. The default is 0.1.
+        return_sspec : TYPE, optional
+            DESCRIPTION. The default is False.
+
+        Raises
+        ------
+        RuntimeError
+            DESCRIPTION.
+
+        Returns
+        -------
+        fdop : TYPE
+            DESCRIPTION.
+        yaxis : TYPE
+            DESCRIPTION.
+        sec : TYPE
+            DESCRIPTION.
+
         """
 
         if input_dyn is None:  # use self dynamic spectrum
@@ -2463,6 +3029,23 @@ class Dynspec:
                  window_frac=0.1):
         """
         Calculate autocovariance function
+
+        Parameters
+        ----------
+        method : TYPE, optional
+            DESCRIPTION. The default is 'direct'.
+        input_dyn : TYPE, optional
+            DESCRIPTION. The default is None.
+        normalise : TYPE, optional
+            DESCRIPTION. The default is True.
+        window_frac : TYPE, optional
+            DESCRIPTION. The default is 0.1.
+
+        Returns
+        -------
+        arr : TYPE
+            DESCRIPTION.
+
         """
 
         if method == 'direct':  # simply FFT2 and IFFT2
@@ -2505,6 +3088,22 @@ class Dynspec:
         """
         Crops dynamic spectrum in frequency to be between fmin and fmax (MHz)
             and in time between tmin and tmax (mins)
+
+        Parameters
+        ----------
+        fmin : TYPE, optional
+            DESCRIPTION. The default is 0.
+        fmax : TYPE, optional
+            DESCRIPTION. The default is np.inf.
+        tmin : TYPE, optional
+            DESCRIPTION. The default is 0.
+        tmax : TYPE, optional
+            DESCRIPTION. The default is np.inf.
+
+        Returns
+        -------
+        None.
+
         """
 
         # Crop frequencies
@@ -2532,7 +3131,21 @@ class Dynspec:
 
     def zap(self, method='median', sigma=7, m=3):
         """
-        Basic zapping of dynamic spectrum
+        Basic zapping (RFI mitigation) of dynamic spectrum
+
+        Parameters
+        ----------
+        method : TYPE, optional
+            DESCRIPTION. The default is 'median'.
+        sigma : TYPE, optional
+            DESCRIPTION. The default is 7.
+        m : TYPE, optional
+            DESCRIPTION. The default is 3.
+
+        Returns
+        -------
+        None.
+
         """
 
         if method == 'median':
@@ -2547,6 +3160,24 @@ class Dynspec:
                   window='hanning', spacing='auto'):
         """
         Rescales the dynamic spectrum to specified shape
+
+        Parameters
+        ----------
+        scale : TYPE, optional
+            DESCRIPTION. The default is 'lambda'.
+        factor : TYPE, optional
+            DESCRIPTION. The default is 1.
+        window_frac : TYPE, optional
+            DESCRIPTION. The default is 0.1.
+        window : TYPE, optional
+            DESCRIPTION. The default is 'hanning'.
+        spacing : TYPE, optional
+            DESCRIPTION. The default is 'auto'.
+
+        Returns
+        -------
+        None.
+
         """
 
         if scale == 'lambda':
@@ -2632,7 +3263,12 @@ class Dynspec:
 
     def info(self):
         """
-        print properties of object
+        Print properties of object
+
+        Returns
+        -------
+        None.
+
         """
 
         print("\t OBSERVATION PROPERTIES\n")
@@ -2647,17 +3283,56 @@ class Dynspec:
 
 
 class BasicDyn():
-    """
-    Define a basic dynamic spectrum object from an array of fluxes
-        and other variables, which can then be passed to the dynspec
-        class to access its functions with:
-    BasicDyn_Object = BasicDyn(dyn)
-    Dynspec_Object = Dynspec(BasicDyn_Object)
-    """
 
     def __init__(self, dyn, name="BasicDyn", header=["BasicDyn"], times=[],
                  freqs=[], nchan=None, nsub=None, bw=None, df=None,
                  freq=None, tobs=None, dt=None, mjd=None):
+        """
+        Define a basic dynamic spectrum object from an array of fluxes
+            and other variables, which can then be passed to the dynspec
+            class to access its functions with:
+        BasicDyn_Object = BasicDyn(dyn)
+        Dynspec_Object = Dynspec(BasicDyn_Object)
+
+        Parameters
+        ----------
+        dyn : TYPE
+            DESCRIPTION.
+        name : TYPE, optional
+            DESCRIPTION. The default is "BasicDyn".
+        header : TYPE, optional
+            DESCRIPTION. The default is ["BasicDyn"].
+        times : TYPE, optional
+            DESCRIPTION. The default is [].
+        freqs : TYPE, optional
+            DESCRIPTION. The default is [].
+        nchan : TYPE, optional
+            DESCRIPTION. The default is None.
+        nsub : TYPE, optional
+            DESCRIPTION. The default is None.
+        bw : TYPE, optional
+            DESCRIPTION. The default is None.
+        df : TYPE, optional
+            DESCRIPTION. The default is None.
+        freq : TYPE, optional
+            DESCRIPTION. The default is None.
+        tobs : TYPE, optional
+            DESCRIPTION. The default is None.
+        dt : TYPE, optional
+            DESCRIPTION. The default is None.
+        mjd : TYPE, optional
+            DESCRIPTION. The default is None.
+
+        Raises
+        ------
+        ValueError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
 
         # Set parameters from input
         if times.size == 0 or freqs.size == 0:
@@ -2679,11 +3354,27 @@ class BasicDyn():
 
 
 class MatlabDyn():
-    """
-    Imports simulated dynamic spectra from Matlab code by Coles et al. (2010)
-    """
 
     def __init__(self, matfilename):
+        """
+        Imports simulated dynamic spectra from Matlab code by
+            Coles et al. (2010)
+
+        Parameters
+        ----------
+        matfilename : TYPE
+            DESCRIPTION.
+
+        Raises
+        ------
+        NameError
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
 
         self.matfile = loadmat(matfilename)  # reads matfile to a dictionary
         try:
@@ -2718,11 +3409,21 @@ class MatlabDyn():
 
 
 class SimDyn():
-    """
-    Imports Simulation() object from scint_sim to Dynspec class
-    """
 
     def __init__(self, sim):
+        """
+        Imports Simulation() object from scint_sim to Dynspec class
+
+        Parameters
+        ----------
+        sim : TYPE
+            DESCRIPTION.
+
+        Returns
+        -------
+        None.
+
+        """
 
         self.name =\
             'sim:mb2={0}_ar={1}_psi={2}_dlam={3}'.format(sim.mb2, sim.ar,
@@ -2752,11 +3453,32 @@ class SimDyn():
 
 
 class HoloDyn():
-    """
-    Imports model dynamic spectrum from holography code. Walker et al. (2008).
-    """
 
     def __init__(self, holofile, imholofile=None, df=1, dt=1, fmin=0, mjd=0):
+        """
+        Imports model dynamic spectrum from holography code of
+            Walker et al. (2008).
+
+        Parameters
+        ----------
+        holofile : TYPE
+            DESCRIPTION.
+        imholofile : TYPE, optional
+            DESCRIPTION. The default is None.
+        df : TYPE, optional
+            DESCRIPTION. The default is 1.
+        dt : TYPE, optional
+            DESCRIPTION. The default is 1.
+        fmin : TYPE, optional
+            DESCRIPTION. The default is 0.
+        mjd : TYPE, optional
+            DESCRIPTION. The default is 0.
+
+        Returns
+        -------
+        None.
+
+        """
 
         from astropy.io import fits
         redata_hdu = fits.open(holofile)
@@ -2790,7 +3512,36 @@ def sort_dyn(dynfiles, outdir=None, min_nsub=10, min_nchan=50, min_tsub=10,
              min_freq=0, max_freq=5000, remove_nan_sspec=False, verbose=True,
              max_frac_bw=2):
     """
-    Sorts dynamic spectra into good and bad files based on some conditions
+    Sorts list of dynamic spectra into good and bad files based on some
+        user-defined conditions
+
+    Parameters
+    ----------
+    dynfiles : TYPE
+        DESCRIPTION.
+    outdir : TYPE, optional
+        DESCRIPTION. The default is None.
+    min_nsub : TYPE, optional
+        DESCRIPTION. The default is 10.
+    min_nchan : TYPE, optional
+        DESCRIPTION. The default is 50.
+    min_tsub : TYPE, optional
+        DESCRIPTION. The default is 10.
+    min_freq : TYPE, optional
+        DESCRIPTION. The default is 0.
+    max_freq : TYPE, optional
+        DESCRIPTION. The default is 5000.
+    remove_nan_sspec : TYPE, optional
+        DESCRIPTION. The default is False.
+    verbose : TYPE, optional
+        DESCRIPTION. The default is True.
+    max_frac_bw : TYPE, optional
+        DESCRIPTION. The default is 2.
+
+    Returns
+    -------
+    None.
+
     """
 
     if verbose:
