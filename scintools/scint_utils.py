@@ -727,13 +727,6 @@ def make_dynspec(archive, template=None, phasebin=1):
     return
 
 
-def remove_duplicates(dyn_files):
-    """
-    Filters out dynamic spectra from simultaneous observations
-    """
-    return dyn_files
-
-
 def curvature_log_likelihood(power, nfdop, noise, model_nfdop):
     """
     Calculates the log likelihood of a model prediction for nfdop by taking
