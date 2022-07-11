@@ -16,7 +16,7 @@ is a package for the analysis and simulation of pulsar scintillation data. This 
 Referencing
 ===============================
 
-If your work makes use of Scintools, please cite `Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_ and provide a url link to this github page.
+If your work makes use of Scintools, please cite `Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_ and provide a url link to this github page. If utilising scintools for scintillation timescale and/or bandwidth measurements via the autocorrelation function, also cite `Reardon et al. (2019) <https://ui.adsabs.harvard.edu/abs/2019MNRAS.485.4389R>`_ . If you use the *ththmod.py* module, cite `Baker et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp.3341B>`_ . If using the electromagnetic simulation software (*Simulation* class in *scint_sim.py*), also cite `Coles et al. (2010) <https://ui.adsabs.harvard.edu/abs/2010ApJ...717.1206C>`_
 
 Below is a list of works that use Scintools\:
 
