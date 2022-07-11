@@ -1423,13 +1423,14 @@ class Dynspec:
         self.nscint = nscint
         self.scint_param_method = 'nofit'
 
-        flux_var_est = \
-            np.mean(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])**2
+        mean = np.mean(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])
+        flux_var_est = mean**2
         flux_var = np.var(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])
         # Estimate of scint bandwidth
         self.dnu_est = self.df * flux_var/flux_var_est
         self.dnu_esterr = self.dnu_est / np.sqrt(nscint)
         self.tscat_est = 1/(2*np.pi*self.dnu_est)  # scattering timescale
+        self.modulation_index = np.sqrt(flux_var)/mean
 
         if method == 'nofit':  # Don't want to try fitting, then just exit
             return
