@@ -176,7 +176,7 @@ class Dynspec:
         """
         if filename is None:
             ext = self.name.split('.')[-1]
-            fname = '.'.join(self.name.split('.')[0:-1]) + '.new.' + ext
+            fname = '.'.join(self.name.split('.')[0:-1]) + '.processed.' + ext
         else:
             fname = filename
         # now write to file
