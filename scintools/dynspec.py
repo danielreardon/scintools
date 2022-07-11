@@ -2510,6 +2510,7 @@ class Dynspec:
         # Crop frequencies
         crop_array = np.array((self.freqs > fmin)*(self.freqs < fmax))
         self.dyn = self.dyn[crop_array, :]
+        self.dyn_err = self.dyn_err[crop_array, :]
         self.freqs = self.freqs[crop_array]
         self.nchan = len(self.freqs)
         self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
@@ -2524,6 +2525,7 @@ class Dynspec:
             self.tobs = self.tobs - tmin
         crop_array = np.array((self.times > tmin)*(self.times < tmax))
         self.dyn = self.dyn[:, crop_array]
+        self.dyn_err = self.dyn[:, crop_array]
         self.nsub = len(self.dyn[0, :])
         self.times = np.linspace(self.dt/2, self.tobs - self.dt/2, self.nsub)
         self.mjd = self.mjd + tmin/86400
