@@ -127,6 +127,7 @@ class Dynspec:
                         # MJD of start of obs
                         self.mjd = float(str.split(headline)[1])
         self.name = os.path.basename(filename)
+        self.filename = filename  # full path
         self.header = head
         rawdata = np.loadtxt(filename).transpose()  # read file
         self.times = np.unique(rawdata[2]*60)  # time since obs start (secs)
@@ -168,6 +169,38 @@ class Dynspec:
         if verbose:
             print("...LOADED in {0} seconds\n".format(round(end-start, 2)))
             self.info()
+
+    def write_file(self, filename=None, verbose=True, note=None):
+        """
+        Writes the dynspec object to psrflux-format file
+        """
+        if filename is None:
+            ext = self.name.split('.')[-1]
+            fname = '.'.join(self.name.split('.')[0:-1]) + '.new.' + ext
+        else:
+            fname = filename
+        # now write to file
+        with open(fname, 'w') as fn:
+            fn.write("# Scintools-modified dynamic spectrum " +
+                     "in psrflux format\n")
+            fn.write("# Created using write_file method in Dynspec class\n")
+            if note is not None:
+                fn.write("# Note: {0}\n".format(note))
+            fn.write("# Original header begins below:\n")
+            fn.write("#\n")
+            for line in self.header:
+                fn.write("# {} \n".format(line))
+
+            for i in range(len(self.times)):
+                ti = self.times[i]/60
+                for j in range(len(self.freqs)):
+                    fi = self.freqs[j]
+                    di = self.dyn[j, i]
+                    di_err = self.dyn_err[j, i]
+                    fn.write("{0} {1} {2} {3} {4} {5}\n".
+                             format(i, j, ti, fi, di, di_err))
+        if verbose:
+            print("Wrote dynamic spectrum file as {}".format(fname))
 
     def load_dyn_obj(self, dyn, verbose=True, process=True, lamsteps=False):
         """
