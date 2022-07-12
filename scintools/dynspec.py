@@ -2574,7 +2574,7 @@ class Dynspec:
         self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
         self.mjd = self.mjd + self.times[0]/86400
 
-    def refill(self, method='linear', zeros=True, filter_size=[5, 40],
+    def refill(self, method='linear', zeros=True, filter_size=None,
                noise=None, linear=True):
         """
         Replaces the nan values in array. Also replaces zeros by default
@@ -2609,7 +2609,8 @@ class Dynspec:
             inpainted = inpaint.inpaint_biharmonic(array, mask)
             self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
         elif method == 'median':
-            if filter_size[0] == 5 and filter_size[1] == 40:
+            if filter_size is None:
+                filter_size = [self.tobs/self.dt/10, self.bw/self.df/10]
                 print("Warning: Median filter size set to default")
             arr = cp(self.dyn)
             arr[np.isnan(arr)] = np.mean(arr[is_valid(arr)])
