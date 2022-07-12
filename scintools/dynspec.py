@@ -2610,11 +2610,12 @@ class Dynspec:
             self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
         elif method == 'median':
             if filter_size is None:
-                filter_size = [self.tobs/self.dt/10, self.bw/self.df/10]
+                filter_size = [int(self.tobs/self.dt/10),
+                               int(self.bw/self.df/10)]
                 print("Warning: Median filter size set to default")
-            arr = cp(self.dyn)
-            arr[np.isnan(arr)] = np.mean(arr[is_valid(arr)])
-            ds_med = median_filter(arr, size=filter_size)
+            array = cp(self.dyn)
+            array[np.isnan(array)] = np.mean(array[is_valid(array)])
+            ds_med = median_filter(array, size=filter_size)
             self.dyn[np.isnan(self.dyn)] = ds_med[np.isnan(self.dyn)]
         elif (method == 'linear' or method == 'cubic' or
               method == 'nearest') and linear:
@@ -3130,7 +3131,7 @@ class Dynspec:
             self.tobs = self.tobs - tmin
         crop_array = np.array((self.times > tmin)*(self.times < tmax))
         self.dyn = self.dyn[:, crop_array]
-        self.dyn_err = self.dyn[:, crop_array]
+        self.dyn_err = self.dyn_err[:, crop_array]
         self.nsub = len(self.dyn[0, :])
         self.times = np.linspace(self.dt/2, self.tobs - self.dt/2, self.nsub)
         self.mjd = self.mjd + tmin/86400

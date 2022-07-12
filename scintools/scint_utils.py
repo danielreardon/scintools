@@ -386,6 +386,15 @@ def mjd_to_year(mjd):
     return yrs
 
 
+def longest_run_of_zeros(arr):
+    count = 0
+    max_count = 0
+    for num in arr:
+        count = count + 1 if num == 0 else 0
+        max_count = max(max_count, count)
+    return max_count
+
+
 def pars_to_params(pars, params=None):
     """
     Converts a dictionary of par file parameters from read_par() to an
