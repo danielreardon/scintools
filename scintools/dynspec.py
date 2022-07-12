@@ -23,7 +23,8 @@ from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
 from scintools.scint_utils import is_valid, svd_model, interp_nan_2d,\
     centres_to_edges
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
-from scipy.signal import convolve2d, medfilt, savgol_filter, wiener
+from scipy.signal import convolve2d, medfilt, savgol_filter
+from scipy.ndimage import median_filter
 from scipy.io import loadmat
 from lmfit import Parameters
 try:
@@ -40,7 +41,7 @@ except Exception as e:
 
 class Dynspec:
 
-    def __init__(self, filename=None, dyn=None, verbose=True, process=True,
+    def __init__(self, filename=None, dyn=None, verbose=True, process=False,
                  lamsteps=False):
         """
         Initialise a dynamic spectrum object by either reading from file
@@ -168,9 +169,10 @@ class Dynspec:
                 if line.startswith("#"):
                     headline = str.strip(line[1:])
                     head.append(headline)
-                    if str.split(headline)[0] == 'MJD0:':
-                        # MJD of start of obs
-                        self.mjd = float(str.split(headline)[1])
+                    if str.split(headline) != []:
+                        if str.split(headline)[0] == 'MJD0:':
+                            # MJD of start of obs
+                            self.mjd = float(str.split(headline)[1])
         self.name = os.path.basename(filename)
         self.filename = filename  # full path
         self.header = head
@@ -235,8 +237,9 @@ class Dynspec:
         """
 
         if filename is None:
-            ext = self.name.split('.')[-1]
-            fname = '.'.join(self.name.split('.')[0:-1]) + '.processed.' + ext
+            ext = self.filename.split('.')[-1]
+            fname = '.'.join(self.filename.split('.')[0:-1]) + \
+                '.processed.' + ext
         else:
             fname = filename
         # now write to file
@@ -1182,7 +1185,7 @@ class Dynspec:
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=True,
                    scrunched=True, plot_fit=True, ref_freq=1400,
-                   numsteps=None,  filename=None, display=True,
+                   numsteps=None,  filename=None, display=True, weighted=True,
                    unscrunched=True, logsteps=False, powerspec=True,
                    interp_nan=False, fit_spectrum=False, powerspec_cut=False,
                    figsize=(9, 9), subtract_artefacts=False, dpi=200):
@@ -1218,6 +1221,8 @@ class Dynspec:
         filename : TYPE, optional
             DESCRIPTION. The default is None.
         display : TYPE, optional
+            DESCRIPTION. The default is True.
+        weighted : TYPE, optional
             DESCRIPTION. The default is True.
         unscrunched : TYPE, optional
             DESCRIPTION. The default is True.
@@ -1374,7 +1379,6 @@ class Dynspec:
         alpha = -11/3
         index = np.argmin(np.abs(xdata - 10))
         amp = ydata[index] * xdata[index]**-alpha
-        # Median of last 10%
         wn = np.min(ydata)
         if fit_spectrum:
 
@@ -1402,7 +1406,10 @@ class Dynspec:
 
         # Now define weights for the normalised spectrum sum
         arc_spectrum = amp*xdata**alpha
-        self.weights = 10*np.log10(arc_spectrum)
+        if weighted:
+            self.weights = 10*np.log10(arc_spectrum)
+        else:
+            self.weights = np.ones(np.shape(arc_spectrum))
 
         # make average
         if powerspec_cut:
@@ -2567,7 +2574,7 @@ class Dynspec:
         self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
         self.mjd = self.mjd + self.times[0]/86400
 
-    def refill(self, method='linear', zeros=True, filter_size=3,
+    def refill(self, method='linear', zeros=True, filter_size=[5, 40],
                noise=None, linear=True):
         """
         Replaces the nan values in array. Also replaces zeros by default
@@ -2594,22 +2601,20 @@ class Dynspec:
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
 
-        if method == 'wiener':
-            print('Warning: currently in testing')
-            if noise is None:
-                noise = self.dyn_err
-            array = cp(self.dyn)
-            # array[np.isnan(self.dyn)] = np.mean(self.dyn[is_valid(self.dyn)])
-            array = wiener(interp_nan_2d(array, method='nearest'),
-                           mysize=filter_size, noise=noise)
-            self.dyn[np.isnan(self.dyn)] = array[np.isnan(self.dyn)]
-        elif method == 'biharmonic':
+        if method == 'biharmonic':
             array = cp(self.dyn)
             # Create mask
             mask = np.zeros(np.shape(array))
             mask[np.isnan(array)] = 1
             inpainted = inpaint.inpaint_biharmonic(array, mask)
             self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
+        elif method == 'median':
+            if filter_size[0] == 5 and filter_size[1] == 40:
+                print("Warning: Median filter size set to default")
+            arr = cp(self.dyn)
+            arr[np.isnan(arr)] = np.mean(arr[is_valid(arr)])
+            ds_med = median_filter(arr, size=filter_size)
+            self.dyn[np.isnan(self.dyn)] = ds_med[np.isnan(self.dyn)]
         elif (method == 'linear' or method == 'cubic' or
               method == 'nearest') and linear:
             # do interpolation
@@ -2934,16 +2939,16 @@ class Dynspec:
 
         if window is not None:
             # Window the dynamic spectrum
-            if window == 'hanning':
+            if window.lower() == 'hanning':
                 cw = np.hanning(np.floor(window_frac*nt))
                 sw = np.hanning(np.floor(window_frac*nf))
-            elif window == 'hamming':
+            elif window.lower() == 'hamming':
                 cw = np.hamming(np.floor(window_frac*nt))
                 sw = np.hamming(np.floor(window_frac*nf))
-            elif window == 'blackman':
+            elif window.lower() == 'blackman':
                 cw = np.blackman(np.floor(window_frac*nt))
                 sw = np.blackman(np.floor(window_frac*nf))
-            elif window == 'bartlett':
+            elif window.lower() == 'bartlett':
                 cw = np.bartlett(np.floor(window_frac*nt))
                 sw = np.bartlett(np.floor(window_frac*nf))
             else:
