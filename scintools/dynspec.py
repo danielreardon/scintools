@@ -24,7 +24,6 @@ from scintools.scint_utils import is_valid, svd_model, interp_nan_2d,\
     centres_to_edges
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
-from scipy.ndimage import median_filter
 from scipy.io import loadmat
 from lmfit import Parameters
 try:
@@ -2574,21 +2573,19 @@ class Dynspec:
         self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
         self.mjd = self.mjd + self.times[0]/86400
 
-    def refill(self, method='linear', zeros=True, filter_size=None,
-               noise=None, linear=True):
+    def refill(self, method='biharmonic', zeros=True, kernel_size=5,
+               linear=True):
         """
         Replaces the nan values in array. Also replaces zeros by default
 
         Parameters
         ----------
         method : TYPE, optional
-            DESCRIPTION. The default is 'linear'.
+            DESCRIPTION. The default is 'biharmonic'.
         zeros : TYPE, optional
             DESCRIPTION. The default is True.
         filter_size : TYPE, optional
             DESCRIPTION. The default is 3.
-        noise : TYPE, optional
-            DESCRIPTION. The default is None.
         linear : TYPE, optional
             DESCRIPTION. The default is True.
 
@@ -2609,13 +2606,11 @@ class Dynspec:
             inpainted = inpaint.inpaint_biharmonic(array, mask)
             self.dyn[np.isnan(self.dyn)] = inpainted[np.isnan(self.dyn)]
         elif method == 'median':
-            if filter_size is None:
-                filter_size = [int(self.tobs/self.dt/10),
-                               int(self.bw/self.df/10)]
-                print("Warning: Median filter size set to default")
             array = cp(self.dyn)
+            if kernel_size == 5:
+                print("Warning: kernel size is set to default.")
             array[np.isnan(array)] = np.mean(array[is_valid(array)])
-            ds_med = median_filter(array, size=filter_size)
+            ds_med = medfilt(array, kernel_size=kernel_size)
             self.dyn[np.isnan(self.dyn)] = ds_med[np.isnan(self.dyn)]
         elif (method == 'linear' or method == 'cubic' or
               method == 'nearest') and linear:
@@ -2627,8 +2622,8 @@ class Dynspec:
         meanval = np.mean(self.dyn[is_valid(self.dyn)])
         self.dyn[np.isnan(self.dyn)] = meanval
 
-    def correct_dyn(self, svd=True, nmodes=1, frequency=False, time=True,
-                    lamsteps=False, nsmooth=5):
+    def correct_dyn(self, svd=True, nmodes=1, frequency=True, time=True,
+                    lamsteps=False, nsmooth=None):
         """
         Correct for apparent flux variations in time and frequency
 
@@ -2665,7 +2660,8 @@ class Dynspec:
             dyn, model = svd_model(dyn, nmodes=nmodes)
         else:
             if frequency:
-                self.bandpass = np.mean(dyn, axis=1)
+                self.dyn[self.dyn == 0] = np.nan
+                self.bandpass = np.nanmean(dyn, axis=1)
                 # Make sure there are no zeros
                 self.bandpass[self.bandpass == 0] = np.mean(self.bandpass)
                 if nsmooth is not None:
@@ -2676,13 +2672,15 @@ class Dynspec:
                                                 [len(bandpass), 1]))
 
             if time:
-                timestructure = np.mean(dyn, axis=0)
+                self.dyn[self.dyn == 0] = np.nan
+                timestructure = np.nanmean(dyn, axis=0)
                 # Make sure there are no zeros
                 timestructure[timestructure == 0] = np.mean(timestructure)
                 if nsmooth is not None:
                     timestructure = savgol_filter(timestructure, nsmooth, 1)
                 dyn = np.divide(dyn, np.reshape(timestructure,
                                                 [1, len(timestructure)]))
+            self.dyn[np.isnan(self.dyn)] = 0
 
         if lamsteps:
             self.lamdyn = dyn
@@ -3136,9 +3134,9 @@ class Dynspec:
         self.times = np.linspace(self.dt/2, self.tobs - self.dt/2, self.nsub)
         self.mjd = self.mjd + tmin/86400
 
-    def zap(self, method='median', sigma=7, m=3):
+    def zap(self, sigma=7):
         """
-        Basic zapping (RFI mitigation) of dynamic spectrum
+        Basic median zapping (RFI mitigation) of dynamic spectrum
 
         Parameters
         ----------
@@ -3146,8 +3144,6 @@ class Dynspec:
             DESCRIPTION. The default is 'median'.
         sigma : TYPE, optional
             DESCRIPTION. The default is 7.
-        m : TYPE, optional
-            DESCRIPTION. The default is 3.
 
         Returns
         -------
@@ -3155,13 +3151,10 @@ class Dynspec:
 
         """
 
-        if method == 'median':
-            d = np.abs(self.dyn - np.median(self.dyn[~np.isnan(self.dyn)]))
-            mdev = np.median(d[~np.isnan(d)])
-            s = d/mdev
-            self.dyn[s > sigma] = np.nan
-        elif method == 'medfilt':
-            self.dyn = medfilt(self.dyn, kernel_size=m)
+        d = np.abs(self.dyn - np.median(self.dyn[~np.isnan(self.dyn)]))
+        mdev = np.median(d[~np.isnan(d)])
+        s = d/mdev
+        self.dyn[s > sigma] = np.nan
 
     def scale_dyn(self, scale='lambda', factor=1, window_frac=0.1,
                   window='hanning', spacing='auto'):
