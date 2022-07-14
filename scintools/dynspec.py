@@ -335,7 +335,7 @@ class Dynspec:
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
-                 figsize=(9, 9), dpi=200, title=None, velocity=True):
+                 figsize=(9, 9), dpi=200, title=None, velocity=False):
         """
         Plot the dynamic spectrum
 
