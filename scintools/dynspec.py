@@ -335,7 +335,7 @@ class Dynspec:
 
     def plot_dyn(self, lamsteps=False, input_dyn=None, filename=None,
                  input_x=None, input_y=None, trap=False, display=True,
-                 figsize=(9, 9), dpi=200, title=None):
+                 figsize=(9, 9), dpi=200, title=None, velocity=True):
         """
         Plot the dynamic spectrum
 
@@ -370,9 +370,18 @@ class Dynspec:
 
         if input_dyn is None:
             if lamsteps:
-                if not hasattr(self, 'lamdyn'):
-                    self.scale_dyn()
-                dyn = self.lamdyn
+                if velocity:
+                    if not hasattr(self, 'vlamdyn'):
+                        self.scale_dyn(scale='lambda-velocity')
+                    dyn = self.vlamdyn
+                else:
+                    if not hasattr(self, 'lamdyn'):
+                        self.scale_dyn()
+                    dyn = self.lamdyn
+            elif velocity:
+                if not hasattr(self, 'vdyn'):
+                    self.scale_dyn(scale='velocity')
+                dyn = self.vdyn
             elif trap:
                 if not hasattr(self, 'trapdyn'):
                     self.scale_dyn(scale='trapezoid')
@@ -3208,7 +3217,8 @@ class Dynspec:
 
     def scale_dyn(self, scale='lambda', window_frac=0.1, pars=None,
                   parfile=None, window='hanning', spacing='auto', s=None,
-                  d=None, vism_ra=None, vism_dec=None, Omega=None, inc=None):
+                  d=None, vism_ra=None, vism_dec=None, Omega=None, inc=None,
+                  lamsteps=False, velocity=False, trap=False):
         """
         Rescales the dynamic spectrum to specified shape
 
@@ -3231,7 +3241,7 @@ class Dynspec:
 
         """
 
-        if ('lambda' in scale) or ('wavelength' in scale):
+        if ('lambda' in scale) or ('wavelength' in scale) or lamsteps:
             # function to convert dyn(feq,t) to dyn(lameq,t)
             # fbw = fractional BW = BW / center frequency
             arin = cp(self.dyn)  # input array
@@ -3264,7 +3274,7 @@ class Dynspec:
             self.lam = np.flipud(lam_eq)
             self.nlam = len(self.lam)
 
-        if ('velocity' in scale)  or ('orbit' in scale):
+        if ('velocity' in scale)  or ('orbit' in scale) or velocity:
 
             from scintools.scint_utils import get_ssb_delay, \
                 get_earth_velocity, get_true_anomaly, read_par
@@ -3356,7 +3366,7 @@ class Dynspec:
             if hasattr(self, 'lamdyn'):
                 self.vlamdyn = arout2
 
-        if 'trap' in scale:
+        if 'trap' in scale or trap:
             dyn = cp(self.dyn)
             dyn -= np.mean(dyn)
             nf = np.shape(dyn)[0]
