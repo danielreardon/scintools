@@ -386,6 +386,15 @@ def mjd_to_year(mjd):
     return yrs
 
 
+def find_nearest(arr, val):
+    """
+    Returns the index of an array (arr) that is nearest to value (val)
+    """
+    arr = np.asarray(arr)
+    ind = np.argmin(np.abs(arr - val))
+    return ind
+
+
 def longest_run_of_zeros(arr):
     count = 0
     max_count = 0
@@ -430,10 +439,14 @@ def get_true_anomaly(mjds, pars):
     dictionary
     """
 
-    PB = pars['PB']
-    T0 = pars['T0']
+    PB = pars['PB']  # days
+    T0 = pars['T0']  # MJD
     ECC = pars['ECC']
     PBDOT = 0 if 'PBDOT' not in pars.keys() else pars['PBDOT']
+    if np.abs(PBDOT) > 1e-10:
+        # correct tempo-format
+        PBDOT *= 10**-12
+    print(PBDOT)
 
     nb = 2*np.pi/PB
 
@@ -446,7 +459,9 @@ def get_true_anomaly(mjds, pars):
         print('Assuming circular orbit for true anomaly calculation')
         E = M
     else:
+        M = np.asarray(M, dtype=np.float64)
         E = fsolve(lambda E: E - ECC*np.sin(E) - M, M)
+        E = np.asarray(E, dtype=np.float128)
 
     # true anomaly
     U = 2*np.arctan2(np.sqrt(1 + ECC) * np.sin(E/2),

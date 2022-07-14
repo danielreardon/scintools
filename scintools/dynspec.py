@@ -566,7 +566,7 @@ class Dynspec:
                    plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
                    cutmid=0, startbin=0, display=True, colorbar=True,
                    title=None, figsize=(9, 9), subtract_artefacts=False,
-                   overplot_curvature=None, dpi=200):
+                   overplot_curvature=None, dpi=200, velocity=False):
         """
         Plot the secondary spectrum
 
@@ -623,7 +623,15 @@ class Dynspec:
             if lamsteps:
                 if not hasattr(self, 'lamsspec'):
                     self.calc_sspec(lamsteps=lamsteps, prewhite=prewhite)
-                sspec = cp(self.lamsspec)
+                if velocity:
+                    if not hasattr(self, 'vlamsspec'):
+                        self.calc_sspec(lamsteps=lamsteps, velocity=velocity,
+                                        prewhite=prewhite)
+                    sspec = cp(self.vlamsspec)
+                else:
+                    sspec = cp(self.lamsspec)
+            elif velocity:
+                sspec = cp(self.vsspec)
             elif trap:
                 if not hasattr(self, 'trapsspec'):
                     self.calc_sspec(trap=trap, prewhite=prewhite)
@@ -834,7 +842,8 @@ class Dynspec:
                 ref_freq=1400, constraint=[0, np.inf], nsmooth=5, efac=1,
                 filename=None, noise_error=True, display=True, figN=None,
                 log_parabola=False, logsteps=False, plot_spec=False,
-                fit_spectrum=False, subtract_artefacts=False, dpi=200):
+                fit_spectrum=False, subtract_artefacts=False, dpi=200,
+                velocity=False, weighted=False):
         """
         Find the arc curvature with maximum power along it
             constraint: Only search for peaks between constraint[0] and
@@ -912,16 +921,27 @@ class Dynspec:
         delmax = delmax*(ref_freq/self.freq)**2  # adjust for frequency
 
         if lamsteps:
-            if not hasattr(self, 'lamsspec'):
-                self.calc_sspec(lamsteps=lamsteps)
-            sspec = np.array(cp(self.lamsspec))
+            if velocity:
+                if not hasattr(self, 'vlamsspec'):
+                    self.calc_sspec(lamsteps=lamsteps, velocity=velocity)
+                sspec = np.array(cp(self.vlamsspec))
+
+            else:
+                if not hasattr(self, 'lamsspec'):
+                    self.calc_sspec(lamsteps=lamsteps)
+                sspec = np.array(cp(self.lamsspec))
             yaxis = cp(self.beta)
             ind = np.argmin(abs(self.tdel-delmax))
             ymax = self.beta[ind]  # cut beta at equivalent value to delmax
         else:
-            if not hasattr(self, 'sspec'):
-                self.calc_sspec()
-            sspec = np.array(cp(self.sspec))
+            if velocity:
+                if not hasattr(self, 'vsspec'):
+                    self.calc_sspec(velocity=velocity)
+                sspec = np.array(cp(self.vsspec))
+            else:
+                if not hasattr(self, 'sspec'):
+                    self.calc_sspec()
+                sspec = np.array(cp(self.sspec))
             yaxis = cp(self.tdel)
             ymax = delmax
 
@@ -998,7 +1018,8 @@ class Dynspec:
                             lamsteps=lamsteps, scrunched=True,
                             logsteps=logsteps, plot_fit=False,
                             numsteps=numsteps_new, fit_spectrum=fit_spectrum,
-                            subtract_artefacts=subtract_artefacts)
+                            subtract_artefacts=subtract_artefacts,
+                            velocity=velocity, weighted=weighted)
             norm_sspec = self.normsspecavg.squeeze()
             etafrac_array = self.normsspec_fdop
             ind1 = np.argwhere(etafrac_array >= 0)
@@ -1182,8 +1203,8 @@ class Dynspec:
                     plt.show()
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
-                   maxnormfac=5, minnormfac=0, cutmid=3, lamsteps=True,
-                   scrunched=True, plot_fit=True, ref_freq=1400,
+                   maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
+                   scrunched=True, plot_fit=True, ref_freq=1400, velocity=True,
                    numsteps=None,  filename=None, display=True, weighted=True,
                    unscrunched=True, logsteps=False, powerspec=True,
                    interp_nan=False, fit_spectrum=False, powerspec_cut=False,
@@ -1249,17 +1270,31 @@ class Dynspec:
         """
 
         # Maximum value delay axis (us @ ref_freq)
-        delmax = np.max(self.tdel) if delmax is None else delmax
-        delmax = delmax*(ref_freq/self.freq)**2
+        delmax = np.max(self.tdel) if delmax is None else \
+            delmax*(ref_freq/self.freq)**2
 
+        # Set up data based on whether we're in lamsteps or not
         if lamsteps:
-            if not hasattr(self, 'lamsspec'):
-                self.calc_sspec(lamsteps=lamsteps)
-            sspec = cp(self.lamsspec)
             yaxis = cp(self.beta)
+            if velocity:
+                if not hasattr(self, 'vlamsspec'):
+                    self.calc_sspec(lamsteps=lamsteps, velocity=velocity)
+                sspec = cp(self.vlamsspec)
+            else:
+                if not hasattr(self, 'lamsspec'):
+                    self.calc_sspec(lamsteps=lamsteps)
+                sspec = cp(self.lamsspec)
             if not hasattr(self, 'betaeta') and eta is None:
                 self.fit_arc(lamsteps=lamsteps, delmax=delmax, plot=plot,
-                             startbin=startbin)
+                             startbin=startbin, velocity=velocity)
+        elif velocity:
+            if not hasattr(self, 'vsspec'):
+                self.calc_sspec(velocity=velocity)
+            sspec = cp(self.vsspec)
+            yaxis = cp(self.tdel)
+            if not hasattr(self, 'eta') and eta is None:
+                self.fit_arc(lamsteps=lamsteps, delmax=delmax, plot=plot,
+                             startbin=startbin, velocity=velocity)
         else:
             if not hasattr(self, 'sspec'):
                 self.calc_sspec()
@@ -1280,6 +1315,7 @@ class Dynspec:
                 eta = eta/(self.freq/ref_freq)**2  # correct for frequency
                 eta = eta*beta_to_eta
 
+        # set levels for plotting
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         vmin = medval - 3
@@ -2584,7 +2620,7 @@ class Dynspec:
             DESCRIPTION. The default is 'biharmonic'.
         zeros : TYPE, optional
             DESCRIPTION. The default is True.
-        filter_size : TYPE, optional
+        kernel_size : TYPE, optional
             DESCRIPTION. The default is 3.
         linear : TYPE, optional
             DESCRIPTION. The default is True.
@@ -2874,7 +2910,7 @@ class Dynspec:
     def calc_sspec(self, prewhite=False, halve=True, plot=False,
                    lamsteps=False, input_dyn=None, input_x=None, input_y=None,
                    trap=False, window='blackman', window_frac=0.1,
-                   return_sspec=False):
+                   return_sspec=False, velocity=False):
         """
         Calculate secondary spectrum
 
@@ -2923,7 +2959,16 @@ class Dynspec:
             if lamsteps:
                 if not self.lamsteps:
                     self.scale_dyn()
-                dyn = cp(self.lamdyn)
+                if velocity:
+                    if not hasattr(self, 'vlamdyn'):
+                        self.scale_dyn(scale='velocity')
+                    dyn = cp(self.vlamdyn)
+                else:
+                    dyn = cp(self.lamdyn)
+            elif velocity:
+                if not hasattr(self, 'vdyn'):
+                    self.scale_dyn(scale='velocity')
+                dyn = cp(self.vdyn)
             elif trap:
                 if not hasattr(self, 'trap'):
                     self.scale_dyn(scale='trapezoid')
@@ -3010,7 +3055,12 @@ class Dynspec:
 
         if input_dyn is None and not return_sspec:
             if lamsteps:
-                self.lamsspec = sec
+                if velocity:
+                    self.vlamsspec = sec
+                else:
+                    self.lamsspec = sec
+            elif velocity:
+                self.vsspec = sec
             elif trap:
                 self.trapsspec = sec
             else:
@@ -3156,8 +3206,9 @@ class Dynspec:
         s = d/mdev
         self.dyn[s > sigma] = np.nan
 
-    def scale_dyn(self, scale='lambda', factor=1, window_frac=0.1,
-                  window='hanning', spacing='auto'):
+    def scale_dyn(self, scale='lambda', window_frac=0.1, pars=None,
+                  parfile=None, window='hanning', spacing='auto', s=None,
+                  d=None, vism_ra=None, vism_dec=None, Omega=None, inc=None):
         """
         Rescales the dynamic spectrum to specified shape
 
@@ -3180,7 +3231,7 @@ class Dynspec:
 
         """
 
-        if scale == 'lambda':
+        if ('lambda' in scale) or ('wavelength' in scale):
             # function to convert dyn(feq,t) to dyn(lameq,t)
             # fbw = fractional BW = BW / center frequency
             arin = cp(self.dyn)  # input array
@@ -3212,7 +3263,100 @@ class Dynspec:
             self.lamdyn = np.flipud(arout)
             self.lam = np.flipud(lam_eq)
             self.nlam = len(self.lam)
-        elif scale == 'trapezoid':
+
+        if ('velocity' in scale)  or ('orbit' in scale):
+
+            from scintools.scint_utils import get_ssb_delay, \
+                get_earth_velocity, get_true_anomaly, read_par
+            from scintools.scint_models import effective_velocity_annual
+
+            if pars is None and parfile is None:
+                raise ValueError('Requires dictionary of parameters ' +
+                                 'or .par file for velocity calculation')
+            if parfile is not None:
+                pars = read_par(parfile)
+
+            arin = cp(self.dyn)  # input array
+            if hasattr(self, 'lamdyn'):
+                arin2 = cp(self.lamdyn)  # input array
+            nf, nt = np.shape(arin)
+            arout = np.zeros([nf, nt])
+            if hasattr(self, 'lamdyn'):
+                arin2 = cp(self.lamdyn)  # input array
+                nf2, nt2 = np.shape(arin2)
+                arout2 = np.zeros([nf2, nt2])
+            mjd = np.asarray(self.mjd, dtype=np.float128) + \
+                np.asarray(self.times, dtype=np.float128)/86400
+
+            print('Getting SSB delays')
+            ssb_delays = get_ssb_delay(mjd, pars['RAJ'], pars['DECJ'])
+            mjd += np.divide(ssb_delays, 86400)  # add ssb delay
+            print('Getting Earth velocity')
+            vearth_ra, vearth_dec = get_earth_velocity(mjd, pars['RAJ'],
+                                                       pars['DECJ'])
+            print('Getting true anomaly')
+            true_anomaly = get_true_anomaly(mjd, pars)
+            if 's' not in pars.keys():
+                if s is None:
+                    raise ValueError('Requires screen distance s in ' +
+                                     'parameter dictionary, or as input')
+                pars['s'] = s
+            if 'd' not in pars.keys():
+                if d is None:
+                    raise ValueError('Requires pulsar distance d in ' +
+                                     'parameter dictionary, or as input')
+                pars['d'] = d
+            if 'KIN' not in pars.keys():
+                if inc is None:
+                    raise ValueError('Requires inclination angle (KIN) in ' +
+                                     'parameter dictionary, or as input inc')
+                pars['KIN'] = inc
+            if 'KOM' not in pars.keys():
+                if Omega is None:
+                    raise ValueError('Requires ascending node (KOM) in ' +
+                                     'parameter dictionary, or as input Omega')
+                pars['KOM'] = Omega
+
+            veff_ra, veff_dec, vp_ra, vp_dec = \
+                effective_velocity_annual(pars, true_anomaly, vearth_ra,
+                                          vearth_dec, mjd=mjd)
+
+            if 'vism_ra' in pars.keys():
+                veff_ra -= pars['vism_ra']
+            elif vism_ra is not None:
+                veff_ra -= vism_ra
+            if 'vism_dec' in pars.keys():
+                veff_dec -= pars['vism_dec']
+            elif vism_dec is not None:
+                veff_dec -= vism_dec
+
+            veff = np.sqrt(veff_ra**2 + veff_dec**2)
+            vc_orig = np.cumsum(veff)  # original cumulative sum of velocity
+
+            # even grid in velocity cumulative sum
+            vc_new = np.linspace(np.min(vc_orig), np.max(vc_orig),
+                                 len(vc_orig))
+
+            for ii in range(0, nf):
+                f = interp1d(vc_orig, arin[ii, :], kind='cubic')
+                # Make sure the range is valid after rounding
+                if max(vc_new) > max(vc_orig):
+                    vc_new[np.argmax(vc_new)] = max(vc_orig)
+                if min(vc_new) < min(vc_orig):
+                    vc_new[np.argmin(vc_new)] = min(vc_orig)
+                arout[ii, :] = f(vc_new)
+            if hasattr(self, 'lamdyn'):
+                for ii in range(0, nf2):
+                    f = interp1d(vc_orig, arin2[ii, :], kind='cubic')
+                    # Make sure the range is valid after rounding
+                    arout2[ii, :] = f(vc_new)
+            self.veff_ra = veff_ra
+            self.veff_dec = veff_dec
+            self.vdyn = arout
+            if hasattr(self, 'lamdyn'):
+                self.vlamdyn = arout2
+
+        if 'trap' in scale:
             dyn = cp(self.dyn)
             dyn -= np.mean(dyn)
             nf = np.shape(dyn)[0]
