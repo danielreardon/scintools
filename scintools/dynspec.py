@@ -28,9 +28,11 @@ from scipy.io import loadmat
 from lmfit import Parameters
 try:
     from skimage.restoration import inpaint
+    biharmonic = True
 except Exception as e:
     print(e)
     print("skimage not found: cannot use biharmonic inpainting")
+    biharmonic = False
 try:
     import corner
 except Exception as e:
@@ -2640,6 +2642,11 @@ class Dynspec:
 
         """
 
+        if (not biharmonic) and (method == 'biharmonic'):
+            print('Warning: biharmonic inpainting not available.' +
+                  'Defaulting to linear interpolation.')
+            method = 'linear'
+
         if zeros:
             self.dyn[self.dyn == 0] = np.nan
 
@@ -2668,7 +2675,7 @@ class Dynspec:
         self.dyn[np.isnan(self.dyn)] = meanval
 
     def correct_dyn(self, svd=True, nmodes=1, frequency=True, time=True,
-                    lamsteps=False, nsmooth=None):
+                    lamsteps=False, nsmooth=None, velocity=False):
         """
         Correct for apparent flux variations in time and frequency
 
@@ -2693,16 +2700,30 @@ class Dynspec:
 
         """
 
+        if hasattr(self, 'svd_model'):
+            print('Warning: An svd_model exists. Check before applying twice')
+
         if lamsteps:
-            if not self.lamsteps:
-                self.scale_dyn()
-            dyn = self.lamdyn
+            if velocity:
+                if not hasattr(self, 'vlamdyn'):
+                    raise ValueError('Need to run scale_dyn with a model')
+                dyn = self.vlamdyn
+            else:
+                if not hasattr(self, 'lamdyn'):
+                    self.scale_dyn(lamsteps=lamsteps)
+                dyn = self.lamdyn
+        elif velocity:
+            if not hasattr(self, 'vdyn'):
+                raise ValueError('Need to run scale_dyn with a model')
+            dyn = self.vdyn
         else:
             dyn = self.dyn
+
         dyn[np.isnan(dyn)] = 0
 
         if svd:
             dyn, model = svd_model(dyn, nmodes=nmodes)
+            self.svd_model = model
         else:
             if frequency:
                 self.dyn[self.dyn == 0] = np.nan
@@ -2728,7 +2749,12 @@ class Dynspec:
             self.dyn[np.isnan(self.dyn)] = 0
 
         if lamsteps:
-            self.lamdyn = dyn
+            if velocity:
+                self.vlamdyn = dyn
+            else:
+                self.lamdyn = dyn
+        elif velocity:
+            self.vdyn = dyn
         else:
             self.dyn = dyn
 

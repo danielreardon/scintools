@@ -446,7 +446,6 @@ def get_true_anomaly(mjds, pars):
     if np.abs(PBDOT) > 1e-10:
         # correct tempo-format
         PBDOT *= 10**-12
-    print(PBDOT)
 
     nb = 2*np.pi/PB
 
