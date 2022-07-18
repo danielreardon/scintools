@@ -3442,12 +3442,25 @@ class Dynspec:
                 if 'psi' in pars.keys():
                     psi = pars['psi']
                 psi *= np.pi / 180  # make radians
-                if 'vism_psi' in pars.keys():  # anisotropic case
-                    vism_psi = pars['vism_psi']  # vism in direction of anisotropy
-                elif vism_psi is None:
-                    vism_psi = 0
-                veff2 = (veff_ra*np.sin(psi) +
-                         veff_dec*np.cos(psi) - vism_psi)**2
+                # vism in direction of anisotropy
+                if 'vism_psi' in pars.keys():
+                    vism_psi = pars['vism_psi']
+                    veff2 = (veff_ra*np.sin(psi) +
+                             veff_dec*np.cos(psi) - vism_psi)**2
+                elif vism_psi is not None:
+                    veff2 = (veff_ra*np.sin(psi) +
+                             veff_dec*np.cos(psi) - vism_psi)**2
+                else: # No Vism_psi, maybe have ra and dec velocities?
+                    if 'vism_ra' in pars.keys():
+                        veff_ra -= pars['vism_ra']
+                    elif vism_ra is not None:
+                        veff_ra -= vism_ra
+                    if 'vism_dec' in pars.keys():
+                        veff_dec -= pars['vism_dec']
+                    elif vism_dec is not None:
+                        veff_dec -= vism_dec
+                    veff2 = (veff_ra*np.sin(psi) +
+                             veff_dec*np.cos(psi))**2
 
             # isotropic case
             else:
