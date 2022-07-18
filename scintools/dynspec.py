@@ -3294,7 +3294,8 @@ class Dynspec:
     def scale_dyn(self, scale='lambda', window_frac=0.1, pars=None,
                   parfile=None, window='hanning', spacing='auto', s=None,
                   d=None, vism_ra=None, vism_dec=None, Omega=None, inc=None,
-                  lamsteps=False, velocity=False, trap=False):
+                  vism_psi=None, psi=None, lamsteps=False, velocity=False,
+                  trap=False):
         """
         Rescales the dynamic spectrum to specified shape
 
@@ -3326,6 +3327,10 @@ class Dynspec:
             Ascending node of the orbit. The default is None.
         inc : float, optional
             Inclination of the orbit. The default is None.
+        vism_psi : float, optional
+            ISM veliocity in the direction of anisotropy. The default is None.
+        psi : float, optional
+            Angle of anisotopy on the sky (East of North). The default is None.
         lamsteps : bool, optional
             Use equal steps in wavelength rather than frequency. The default is
             False.
@@ -3432,16 +3437,31 @@ class Dynspec:
                 effective_velocity_annual(pars, true_anomaly, vearth_ra,
                                           vearth_dec, mjd=mjd)
 
-            if 'vism_ra' in pars.keys():
-                veff_ra -= pars['vism_ra']
-            elif vism_ra is not None:
-                veff_ra -= vism_ra
-            if 'vism_dec' in pars.keys():
-                veff_dec -= pars['vism_dec']
-            elif vism_dec is not None:
-                veff_dec -= vism_dec
+            # anisotropic case
+            if ('psi' in pars.keys()) or (psi is not None):
+                if 'psi' in pars.keys():
+                    psi = pars['psi']
+                psi *= np.pi / 180  # make radians
+                if 'vism_psi' in pars.keys():  # anisotropic case
+                    vism_psi = pars['vism_psi']  # vism in direction of anisotropy
+                elif vism_psi is None:
+                    vism_psi = 0
+                veff2 = (veff_ra*np.sin(psi) +
+                         veff_dec*np.cos(psi) - vism_psi)**2
 
-            veff = np.sqrt(veff_ra**2 + veff_dec**2)
+            # isotropic case
+            else:
+                if 'vism_ra' in pars.keys():
+                    veff_ra -= pars['vism_ra']
+                elif vism_ra is not None:
+                    veff_ra -= vism_ra
+                if 'vism_dec' in pars.keys():
+                    veff_dec -= pars['vism_dec']
+                elif vism_dec is not None:
+                    veff_dec -= vism_dec
+                veff2 = veff_ra**2 + veff_dec**2
+
+            veff = np.sqrt(veff2)
             vc_orig = np.cumsum(veff)  # original cumulative sum of velocity
 
             # even grid in velocity cumulative sum
