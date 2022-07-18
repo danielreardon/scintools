@@ -1947,7 +1947,9 @@ class Dynspec:
         flux_var_est = mean**2
         flux_var = np.var(self.dyn[is_valid(self.dyn) * (self.dyn != 0)])
         # Estimate of scint bandwidth
-        self.dnu_est = self.df * flux_var/flux_var_est
+        self.dnu_est = self.df * (flux_var/flux_var_est - 1)
+        if self.dnu_est < 0:
+            self.dnu_est = 0
         self.dnu_esterr = self.dnu_est / np.sqrt(nscint)
         self.tscat_est = 1/(2*np.pi*self.dnu_est)  # scattering timescale
         self.modulation_index = np.sqrt(flux_var)/mean
