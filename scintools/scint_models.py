@@ -398,10 +398,16 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         effective_velocity_annual(params, true_anomaly,
                                   vearth_ra, vearth_dec)
 
+    if 'psi' in params.keys():
+        raise KeyError("parameter psi is no longer supported. Please use zeta")
+    if 'vism_psi' in params.keys():
+        raise KeyError("parameter vism_psi is no longer supported. " +
+                       "Please use vism_zeta")
+
     if 'nmodel' in params.keys():
         nmodel = params['nmodel']
     else:
-        if 'psi' in params.keys():
+        if 'zeta' in params.keys():
             nmodel = 1
         else:
             nmodel = 0
@@ -414,13 +420,14 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         vism_dec = 0
 
     if nmodel > 0.5:  # anisotropic
-        psi = params['psi'] * np.pi / 180  # anisotropy angle
-        if 'vism_psi' in params.keys():  # anisotropic case
-            vism_psi = params['vism_psi']  # vism in direction of anisotropy
-            veff2 = (veff_ra*np.sin(psi) + veff_dec*np.cos(psi) - vism_psi)**2
+        zeta = params['zeta'] * np.pi / 180  # anisotropy angle
+        if 'vism_zeta' in params.keys():  # anisotropic case
+            vism_zeta = params['vism_zeta']  # vism in direction of anisotropy
+            veff2 = (veff_ra*np.sin(zeta) + veff_dec*np.cos(zeta) -
+                     vism_zeta)**2
         else:
-            veff2 = ((veff_ra - vism_ra) * np.sin(psi) +
-                     (veff_dec - vism_dec) * np.cos(psi)) ** 2
+            veff2 = ((veff_ra - vism_ra) * np.sin(zeta) +
+                     (veff_dec - vism_dec) * np.cos(zeta)) ** 2
     else:  # isotropic
         veff2 = (veff_ra - vism_ra)**2 + (veff_dec - vism_dec)**2
 
@@ -485,9 +492,8 @@ def veff_thin_screen(params, ydata, weights, true_anomaly,
         R = params['R']  # axial ratio parameter
         psi = params['psi'] * np.pi / 180  # anisotropy angle
 
-        gamma = psi
-        cosa = np.cos(2 * gamma)
-        sina = np.sin(2 * gamma)
+        cosa = np.cos(2 * psi)
+        sina = np.sin(2 * psi)
 
         # quadratic coefficients
         a = (1 - R * cosa) / np.sqrt(1 - R**2)

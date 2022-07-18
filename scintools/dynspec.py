@@ -3294,7 +3294,7 @@ class Dynspec:
     def scale_dyn(self, scale='lambda', window_frac=0.1, pars=None,
                   parfile=None, window='hanning', spacing='auto', s=None,
                   d=None, vism_ra=None, vism_dec=None, Omega=None, inc=None,
-                  vism_psi=None, psi=None, lamsteps=False, velocity=False,
+                  vism_zeta=None, zeta=None, lamsteps=False, velocity=False,
                   trap=False):
         """
         Rescales the dynamic spectrum to specified shape
@@ -3327,9 +3327,9 @@ class Dynspec:
             Ascending node of the orbit. The default is None.
         inc : float, optional
             Inclination of the orbit. The default is None.
-        vism_psi : float, optional
+        vism_zeta : float, optional
             ISM veliocity in the direction of anisotropy. The default is None.
-        psi : float, optional
+        zeta : float, optional
             Angle of anisotopy on the sky (East of North). The default is None.
         lamsteps : bool, optional
             Use equal steps in wavelength rather than frequency. The default is
@@ -3438,18 +3438,18 @@ class Dynspec:
                                           vearth_dec, mjd=mjd)
 
             # anisotropic case
-            if ('psi' in pars.keys()) or (psi is not None):
-                if 'psi' in pars.keys():
-                    psi = pars['psi']
-                psi *= np.pi / 180  # make radians
+            if ('zeta' in pars.keys()) or (zeta is not None):
+                if 'zeta' in pars.keys():
+                    zeta = pars['zeta']
+                zeta *= np.pi / 180  # make radians
                 # vism in direction of anisotropy
-                if 'vism_psi' in pars.keys():
-                    vism_psi = pars['vism_psi']
-                    veff2 = (veff_ra*np.sin(psi) +
-                             veff_dec*np.cos(psi) - vism_psi)**2
-                elif vism_psi is not None:
-                    veff2 = (veff_ra*np.sin(psi) +
-                             veff_dec*np.cos(psi) - vism_psi)**2
+                if 'vism_zeta' in pars.keys():
+                    vism_zeta = pars['vism_zeta']
+                    veff2 = (veff_ra*np.sin(zeta) +
+                             veff_dec*np.cos(zeta) - vism_zeta)**2
+                elif vism_zeta is not None:
+                    veff2 = (veff_ra*np.sin(zeta) +
+                             veff_dec*np.cos(zeta) - vism_zeta)**2
                 else: # No Vism_psi, maybe have ra and dec velocities?
                     if 'vism_ra' in pars.keys():
                         veff_ra -= pars['vism_ra']
