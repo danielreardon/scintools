@@ -534,7 +534,7 @@ class Dynspec:
             if contour:
                 ax1.contourf(t_delays, f_shifts, arr)
             else:
-                ax1.pcolormesh(t_delays, f_shifts, arr[:, 1:], linewidth=0,
+                ax1.pcolormesh(t_delays, f_shifts, arr, linewidth=0,
                                rasterized=True, shading='auto')
             ax1.set_ylabel(r'Frequency shift, $\Delta\nu$ (MHz)')
             ax1.set_xlabel(r'Time lag, $\tau$ (mins)')
@@ -3517,7 +3517,6 @@ class Dynspec:
     def info(self):
         """
         Print properties of object
-
         """
 
         print("\t OBSERVATION PROPERTIES\n")
