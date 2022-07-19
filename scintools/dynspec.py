@@ -1228,7 +1228,7 @@ class Dynspec:
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
-                   scrunched=True, plot_fit=True, ref_freq=1400, velocity=True,
+                   scrunched=True, plot_fit=True, ref_freq=1400, velocity=False,
                    numsteps=None,  filename=None, display=True, weighted=True,
                    unscrunched=True, logsteps=False, powerspec=True,
                    interp_nan=False, fit_spectrum=False, powerspec_cut=False,
