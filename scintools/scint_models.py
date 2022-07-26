@@ -372,7 +372,7 @@ def fit_log_parabola(x, y):
 
 
 def arc_curvature(params, ydata, weights, true_anomaly,
-                  vearth_ra, vearth_dec):
+                  vearth_ra, vearth_dec, mjd=None):
     """
     arc curvature model
 
@@ -396,7 +396,7 @@ def arc_curvature(params, ydata, weights, true_anomaly,
 
     veff_ra, veff_dec, vp_ra, vp_dec = \
         effective_velocity_annual(params, true_anomaly,
-                                  vearth_ra, vearth_dec)
+                                  vearth_ra, vearth_dec, mjd=mjd)
 
     if 'psi' in params.keys():
         raise KeyError("parameter psi is no longer supported. Please use zeta")
@@ -537,7 +537,12 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
         ECC = params['ECC']  # orbital eccentricity
         OM = params['OM'] * np.pi/180  # longitude of periastron rad
         if 'OMDOT' in params.keys():
-            omega = OM + params['OMDOT']*np.pi/180*(mjd-params['T0'])/365.2425
+            if mjd is None:
+                print('Warning, OMDOT present but no mjd for calculation')
+                omega = OM
+            else:
+                omega = OM + \
+                    params['OMDOT']*np.pi/180*(mjd-params['T0'])/365.2425
         else:
             omega = OM
         # Note: fifth Keplerian param T0 used in true anomaly calculation
@@ -651,6 +656,63 @@ def arc_weak(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3, amp=1, smooth=0):
     sspec[np.isnan(sspec)] = 0
     # Set amplitude to amp
     sspec *= (TDEL/np.mean(tdel))**alpha
+    sspec *= amp / np.nanmax(sspec)
+
+    # smooth the spectrum
+    if smooth > 0:
+        sspec = gaussian_filter(sspec, smooth)
+
+    return sspec
+
+
+def arc_weak_1d(fdop, eta=1, ar=1, psi=0, amp=1, smooth=0):
+    """
+    Parameters
+    ----------
+    fdop : Array 1D
+        The Doppler frequency (x-axis) coordinates of the model secondary
+        spectrum.
+    eta : floar, optional
+        Arc curvature. The default is 1.
+    ar : float, optional
+        Anisotropy axial ratio. The default is 1.
+    psi : float, optional
+        DESCRIPTION. The default is 0.
+    amp : float, optional
+        DESCRIPTION. The default is 1.
+    smooth : float, optional
+        DESCRIPTION. The default is 0.
+
+    Returns
+    -------
+    norm_sspec : Array 1D
+        The model normalised secondary spectrum.
+
+    """
+
+    # Begin model
+    a = np.cos(psi * np.pi/180)**2 / ar + ar * np.sin(psi*np.pi/180)**2
+    b = ar * np.cos(psi * np.pi/180)**2 + (np.sin(psi * np.pi/180)**2)/ar
+    c = 2*np.sin(psi * np.pi/180)*np.cos(psi * np.pi/180)*(1/ar - ar)
+
+    fdx = fdop
+    TDEL = eta * fdop**2
+
+    f_arc = np.sqrt(TDEL/eta)
+
+    fdy = np.sqrt(TDEL/eta - fdx**2)
+
+    p = (a*fdx**2 + b*fdy**2 + c*fdx*fdy)**(-11/6) + \
+        (a*fdx**2 + b*fdy**2 - c*fdx*fdy)**(-11/6)
+
+    arc_frac = np.real(fdx)/np.real(f_arc)
+    arc_frac[np.abs(arc_frac) > 0.995] = 0.995  # restrict the asymptote
+    sspec = p / np.sqrt(1 - arc_frac**2)
+
+    # Make minimum 0
+    sspec -= np.nanmin(sspec)
+    sspec[np.isnan(sspec)] = 0
+    # Set amplitude to amp
     sspec *= amp / np.nanmax(sspec)
 
     # smooth the spectrum
