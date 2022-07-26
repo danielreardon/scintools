@@ -659,10 +659,10 @@ class Dynspec:
         if subtract_artefacts:
             # Subtract off delay response constant in Doppler
             # Estimate using outer 10% of spectrum
-            delay_response = np.nanmean(10**(sspec[:, np.argwhere(
-                    np.abs(self.fdop) > 0.9*np.max(self.fdop))]/10), axis=1)
+            delay_response = np.nanmean(sspec[:, np.argwhere(
+                    np.abs(self.fdop) > 0.9*np.max(self.fdop))], axis=1)
             delay_response -= np.median(delay_response)
-            sspec = 10*np.log10(np.subtract(10**(sspec/10), delay_response))
+            sspec = np.subtract(sspec, delay_response)
 
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         # std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
@@ -1362,10 +1362,10 @@ class Dynspec:
         if subtract_artefacts:
             # Subtract off delay response constant in Doppler
             # Estimate using outer 10% of spectrum
-            delay_response = np.nanmean(10**(sspec[:, np.argwhere(
-                    np.abs(self.fdop) > 0.9*np.max(self.fdop))]/10), axis=1)
+            delay_response = np.nanmean(sspec[:, np.argwhere(
+                    np.abs(self.fdop) > 0.9*np.max(self.fdop))], axis=1)
             delay_response -= np.median(delay_response)
-            sspec = 10*np.log10(np.subtract(10**(sspec/10), delay_response))
+            sspec = np.subtract(sspec, delay_response)
 
         nr, nc = np.shape(sspec)
         # tdel = yaxis[:ind]
