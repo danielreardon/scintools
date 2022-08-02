@@ -372,7 +372,7 @@ def fit_log_parabola(x, y):
 
 
 def arc_curvature(params, ydata, weights, true_anomaly,
-                  vearth_ra, vearth_dec, mjd=None):
+                  vearth_ra, vearth_dec, mjd=None, model_only=False):
     """
     arc curvature model
 
@@ -439,7 +439,10 @@ def arc_curvature(params, ydata, weights, true_anomaly,
     if weights is None:
         weights = np.ones(np.shape(ydata))
 
-    return (ydata - model) * weights
+    if model_only:
+        return model
+    else:
+        return (ydata - model) * weights
 
 
 def veff_thin_screen(params, ydata, weights, true_anomaly,
@@ -604,7 +607,38 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
     return veff_ra, veff_dec, vp_ra, vp_dec
 
 
-def arc_weak(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3, amp=1, smooth=0):
+def arc_weak(ftn, ar=1, psi=0, alpha=11/3):
+    """
+    Parameters
+    ----------
+    ftn : Array 1D
+        The normalised Doppler frequency (x-axis), where ftn=1 is the arc
+
+    ar : float, optional
+        Anisotropy axial ratio. The default is 1.
+    psi : float, optional
+        DESCRIPTION. The default is 0.
+
+    Returns
+    -------
+    p : Array 1D
+        The model poppler profile
+
+    """
+
+    # Begin model
+    a = np.cos(psi * np.pi/180)**2 / ar + ar * np.sin(psi*np.pi/180)**2
+    b = ar * np.cos(psi * np.pi/180)**2 + (np.sin(psi * np.pi/180)**2)/ar
+    c = 2*np.sin(psi * np.pi/180)*np.cos(psi * np.pi/180)*(1/ar - ar)
+
+    p = ((a*ftn**2 + b*(1 - ftn**2) + c*ftn*(1 - ftn**2)**0.5)**(-alpha/2) + \
+         (a*ftn**2 + b*(1 - ftn**2) - c*ftn*(1 - ftn**2)**0.5)**(-alpha/2))
+    p /= np.sqrt(1 - ftn**2)
+
+    return p
+
+
+def arc_weak_2d(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3):
     """
     Parameters
     ----------
@@ -621,10 +655,6 @@ def arc_weak(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3, amp=1, smooth=0):
         DESCRIPTION. The default is 0.
     alpha : float, optional
         DESCRIPTION. The default is 11/3.
-    amp : float, optional
-        DESCRIPTION. The default is 1.
-    smooth : float, optional
-        DESCRIPTION. The default is 0.
 
     Returns
     -------
@@ -648,75 +678,7 @@ def arc_weak(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3, amp=1, smooth=0):
         (a*fdx**2 + b*fdy**2 - c*fdx*fdy)**(-11/6)
 
     arc_frac = np.real(fdx)/np.real(f_arc)
-    arc_frac[np.abs(arc_frac) > 0.995] = 0.995  # restrict the asymptote
     sspec = p / np.sqrt(1 - arc_frac**2)
-
-    # Make minimum 0
-    sspec -= np.nanmin(sspec)
-    sspec[np.isnan(sspec)] = 0
-    # Set amplitude to amp
-    sspec *= (TDEL/np.mean(tdel))**alpha
-    sspec *= amp / np.nanmax(sspec)
-
-    # smooth the spectrum
-    if smooth > 0:
-        sspec = gaussian_filter(sspec, smooth)
 
     return sspec
 
-
-def arc_weak_1d(fdop, eta=1, ar=1, psi=0, amp=1, smooth=0):
-    """
-    Parameters
-    ----------
-    fdop : Array 1D
-        The Doppler frequency (x-axis) coordinates of the model secondary
-        spectrum.
-    eta : floar, optional
-        Arc curvature. The default is 1.
-    ar : float, optional
-        Anisotropy axial ratio. The default is 1.
-    psi : float, optional
-        DESCRIPTION. The default is 0.
-    amp : float, optional
-        DESCRIPTION. The default is 1.
-    smooth : float, optional
-        DESCRIPTION. The default is 0.
-
-    Returns
-    -------
-    norm_sspec : Array 1D
-        The model normalised secondary spectrum.
-
-    """
-
-    # Begin model
-    a = np.cos(psi * np.pi/180)**2 / ar + ar * np.sin(psi*np.pi/180)**2
-    b = ar * np.cos(psi * np.pi/180)**2 + (np.sin(psi * np.pi/180)**2)/ar
-    c = 2*np.sin(psi * np.pi/180)*np.cos(psi * np.pi/180)*(1/ar - ar)
-
-    fdx = fdop
-    TDEL = eta * fdop**2
-
-    f_arc = np.sqrt(TDEL/eta)
-
-    fdy = np.sqrt(TDEL/eta - fdx**2)
-
-    p = (a*fdx**2 + b*fdy**2 + c*fdx*fdy)**(-11/6) + \
-        (a*fdx**2 + b*fdy**2 - c*fdx*fdy)**(-11/6)
-
-    arc_frac = np.real(fdx)/np.real(f_arc)
-    arc_frac[np.abs(arc_frac) > 0.995] = 0.995  # restrict the asymptote
-    sspec = p / np.sqrt(1 - arc_frac**2)
-
-    # Make minimum 0
-    sspec -= np.nanmin(sspec)
-    sspec[np.isnan(sspec)] = 0
-    # Set amplitude to amp
-    sspec *= amp / np.nanmax(sspec)
-
-    # smooth the spectrum
-    if smooth > 0:
-        sspec = gaussian_filter(sspec, smooth)
-
-    return sspec

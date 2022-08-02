@@ -386,6 +386,7 @@ class Dynspec:
                                                 is_valid(dyn)) > 0)])
         vmin = minval + std
         vmax = medval + 4*std
+
         if display or (filename is not None):
             plt.figure(figsize=figsize)
         if input_dyn is None:
@@ -1951,7 +1952,10 @@ class Dynspec:
         if self.dnu_est < 0:
             self.dnu_est = 0
         self.dnu_esterr = self.dnu_est / np.sqrt(nscint)
-        self.tscat_est = 1/(2*np.pi*self.dnu_est)  # scattering timescale
+        if self.dnu_est > 0:
+            self.tscat_est = 1/(2*np.pi*self.dnu_est)  # scattering timescale
+        else:
+            self.tscat_est = 0
         self.modulation_index = np.sqrt(flux_var)/mean
 
         if method == 'nofit':  # Don't want to try fitting, then just exit
@@ -2987,7 +2991,7 @@ class Dynspec:
 
     def calc_sspec(self, prewhite=False, halve=True, plot=False,
                    lamsteps=False, input_dyn=None, input_x=None, input_y=None,
-                   trap=False, window='blackman', window_frac=0.1,
+                   trap=False, window='hanning', window_frac=0.1,
                    return_sspec=False, velocity=False):
         """
         Calculate secondary spectrum
