@@ -167,7 +167,7 @@ def write_results(filename, dyn=None):
         write_string += ",{0},{1}".format(dyn.betaeta_right,
                                           dyn.betaetaerr_right)
 
-    if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
+    if hasattr(dyn, 'norm_delmax'):
         header += ",delmax"
         write_string += ",{0}".format(dyn.norm_delmax)
 
@@ -285,10 +285,10 @@ def get_ssb_delay(mjds, raj, decj):
     return t
 
 
-def get_earth_velocity(mjds, raj, decj):
+def get_earth_velocity(mjds, raj, decj, radial=False):
     """
     Calculates the component of Earth's velocity transverse to the line of
-    sight, in RA and DEC
+    sight, in RA and DEC. Optionally returns the radial velocity
     """
 
     from astropy.time import Time
@@ -302,6 +302,8 @@ def get_earth_velocity(mjds, raj, decj):
 
     vearth_ra = []
     vearth_dec = []
+    if radial:
+        vearth_radial = []
     for mjd in mjds:
         time = Time(mjd, format='mjd')
         pos_xyz, vel_xyz = get_body_barycentric_posvel('earth', time)
@@ -314,12 +316,22 @@ def get_earth_velocity(mjds, raj, decj):
         vearth_dec.append(- vx * np.sin(decrad) * np.cos(rarad) -
                           vy * np.sin(decrad) * np.sin(rarad) +
                           vz * np.cos(decrad))
+        if radial:
+            vearth_radial.append(vx * np.cos(decrad) * np.cos(rarad) +
+                                 vy * np.cos(decrad) * np.sin(rarad) +
+                                 vz * np.sin(decrad))
 
     # Convert from AU/d to km/s
     vearth_ra = vearth_ra * au/1e3/86400
     vearth_dec = vearth_dec * au/1e3/86400
+    if radial:
+        vearth_radial = vearth_radial * au/1e3/86400
 
-    return vearth_ra.value.squeeze(), vearth_dec.value.squeeze()
+    if radial:
+        return vearth_ra.value.squeeze(), vearth_dec.value.squeeze(), \
+            vearth_radial.value.squeeze()
+    else:
+        return vearth_ra.value.squeeze(), vearth_dec.value.squeeze()
 
 
 def read_par(parfile):

@@ -372,7 +372,8 @@ def fit_log_parabola(x, y):
 
 
 def arc_curvature(params, ydata, weights, true_anomaly,
-                  vearth_ra, vearth_dec, mjd=None, model_only=False):
+                  vearth_ra, vearth_dec, mjd=None, model_only=False,
+                  return_veff=False):
     """
     arc curvature model
 
@@ -440,7 +441,10 @@ def arc_curvature(params, ydata, weights, true_anomaly,
         weights = np.ones(np.shape(ydata))
 
     if model_only:
-        return model
+        if return_veff:
+            return model, (veff_ra - vism_ra), (veff_dec - vism_dec)
+        else:
+            return model
     else:
         return (ydata - model) * weights
 
