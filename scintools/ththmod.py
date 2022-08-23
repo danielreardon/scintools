@@ -371,10 +371,11 @@ def single_search(params):
         name -- A string filename used if plotting
         plot -- A bool controlling if the result should be plotted
         neta -- Number of curvatures to test
+        coher -- A bool for whether to use coherent (True) or incoherent (False) theta-theta
     """
     
     ## Reap Parameters
-    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad,neta=params
+    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad,neta,coher=params
 
     ## Verify units
     time2 = unit_checks(time2,'time2',u.s)
@@ -400,15 +401,25 @@ def single_search(params):
     CS = np.fft.fft2(dspec_pad)
     CS = np.fft.fftshift(CS)
     eigs = np.zeros(etas.shape)
-
-    ## Loop over all curvatures
-    for i in range(eigs.shape[0]):
-        try:
-            ## Find largest Eigenvalue for curvature
-            eigs[i] = Eval_calc(CS, tau, fd, etas[i], edges)
-        except:
-            ## Set eigenvalue to NaN in event of failure
-            eigs[i]=np.nan
+    if coher:
+        ## Loop over all curvatures
+        for i in range(eigs.shape[0]):
+            try:
+                ## Find largest Eigenvalue for curvature
+                eigs[i] = Eval_calc(CS, tau, fd, etas[i], edges)
+            except:
+                ## Set eigenvalue to NaN in event of failure
+                eigs[i]=np.nan
+    else:
+        SS = np.abs(CS)**2
+        ## Loop over all curvatures
+        for i in range(eigs.shape[0]):
+            try:
+                ## Find largest Eigenvalue for curvature
+                eigs[i] = Eval_calc(SS, tau, fd, etas[i], edges)
+            except:
+                ## Set eigenvalue to NaN in event of failure
+                eigs[i]=np.nan   
     
     ## Fit eigenvalue peak
     try:
@@ -893,9 +904,9 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
     dfd = np.diff(fd).mean()
 
     # Find bin in CS space that each point maps back to
-    tau_inv = (((eta1 * th1**2 - eta2*th2**2)*u.mHz**2
+    tau_inv = (((eta1 * th1**2 - eta2*th2**2)
                 - tau[1] + dtau/2)//dtau).astype(int)
-    fd_inv = (((th1 - th2)*u.mHz - fd[1] + dfd/2)//dfd).astype(int)
+    fd_inv = (((th1 - th2) - fd[1] + dfd/2)//dfd).astype(int)
 
     # Define thth
     thth = np.zeros(tau_inv.shape, dtype=complex)
@@ -911,12 +922,12 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
     th1_max=np.sqrt(tau.max()/eta1)
     th_cents1 = (edges1[1:] + edges1[:-1]) / 2
     th_cents2 = (edges2[1:] + edges2[:-1]) / 2
-    pnts_1=np.abs(th_cents1)<th1_max.value
-    pnts_2=np.abs(th_cents2)<th2_max.value
-    edges_red1=np.zeros(pnts_1[pnts_1].shape[0]+1)
+    pnts_1=np.abs(th_cents1)<th1_max
+    pnts_2=np.abs(th_cents2)<th2_max
+    edges_red1=np.zeros(pnts_1[pnts_1].shape[0]+1)*edges1.unit
     edges_red1[:-1]=edges1[:-1][pnts_1]
     edges_red1[-1]=edges1[1:][pnts_1].max()
-    edges_red2=np.zeros(pnts_2[pnts_2].shape[0]+1)
+    edges_red2=np.zeros(pnts_2[pnts_2].shape[0]+1)*edges2.unit
     edges_red2[:-1]=edges2[:-1][pnts_2]
     edges_red2[-1]=edges2[1:][pnts_2].max()
     thth_red=thth[pnts_2,:][:,pnts_1]
