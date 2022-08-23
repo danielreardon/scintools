@@ -202,7 +202,7 @@ class Dynspec:
             fluxerrs = np.flip(fluxerrs, 0)
         # Finished reading, now setup dynamic spectrum
         self.dyn = fluxes  # initialise dynamic spectrum
-        self.dyn_err = fluxerrs
+        # self.dyn_err = fluxerrs
         self.dyn_noise = np.nanmedian(fluxerrs)
         self.lamsteps = lamsteps
         if process:
@@ -250,9 +250,9 @@ class Dynspec:
                 for j in range(len(self.freqs)):
                     fi = self.freqs[j]
                     di = self.dyn[j, i]
-                    di_err = self.dyn_err[j, i]
+                    # di_err = self.dyn_err[j, i]
                     fn.write("{0} {1} {2} {3} {4} {5}\n".
-                             format(i, j, ti, fi, di, di_err))
+                             format(i, j, ti, fi, di, 0)) #, # di_err))
         if verbose:
             print("Wrote dynamic spectrum file as {}".format(fname))
 
@@ -2618,57 +2618,57 @@ class Dynspec:
         # Trim bottom
         if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
             self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
-            self.dyn_err[0, :] = np.zeros(np.shape(self.dyn_err[0, :]))
+            # self.dyn_err[0, :] = np.zeros(np.shape(self.dyn_err[0, :]))
         rowsum = sum(abs(self.dyn[0, :]))
         while rowsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=0)
-            self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
+            # self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
             self.freqs = np.delete(self.freqs, (0))
             if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
                 self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
-                self.dyn_err[0, :] = np.zeros(np.shape(self.dyn_err[0, :]))
+                # self.dyn_err[0, :] = np.zeros(np.shape(self.dyn_err[0, :]))
             rowsum = sum(abs(self.dyn[0, :]))
 
         # Trim top
         if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
             self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
-            self.dyn_err[-1, :] = np.zeros(np.shape(self.dyn_err[-1, :]))
+            # self.dyn_err[-1, :] = np.zeros(np.shape(self.dyn_err[-1, :]))
         rowsum = sum(abs(self.dyn[-1, :]))
         while rowsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=0)
-            self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
+            # self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
             self.freqs = np.delete(self.freqs, (-1))
             if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
                 self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
-                self.dyn_err[-1, :] = np.zeros(np.shape(self.dyn_err[-1, :]))
+                # self.dyn_err[-1, :] = np.zeros(np.shape(self.dyn_err[-1, :]))
             rowsum = sum(abs(self.dyn[-1, :]))
 
         # Trim left
         if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
             self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
-            self.dyn_err[:, 0] = np.zeros(np.shape(self.dyn_err[:, 0]))
+            # self.dyn_err[:, 0] = np.zeros(np.shape(self.dyn_err[:, 0]))
         colsum = sum(abs(self.dyn[:, 0]))
         while colsum == 0:
             self.dyn = np.delete(self.dyn, (0), axis=1)
-            self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
+            # self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
             self.times = np.delete(self.times, (0))
             if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
                 self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
-                self.dyn_err[:, 0] = np.zeros(np.shape(self.dyn_err[:, 0]))
+                # self.dyn_err[:, 0] = np.zeros(np.shape(self.dyn_err[:, 0]))
             colsum = sum(abs(self.dyn[:, 0]))
 
         # Trim right
         if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
             self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
-            self.dyn_err[:, -1] = np.zeros(np.shape(self.dyn_err[:, -1]))
+            # self.dyn_err[:, -1] = np.zeros(np.shape(self.dyn_err[:, -1]))
         colsum = sum(abs(self.dyn[:, -1]))
         while colsum == 0:
             self.dyn = np.delete(self.dyn, (-1), axis=1)
-            self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
+            # self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
             self.times = np.delete(self.times, (-1))
             if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
                 self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
-                self.dyn_err[:, -1] = np.zeros(np.shape(self.dyn_err[:, -1]))
+                # self.dyn_err[:, -1] = np.zeros(np.shape(self.dyn_err[:, -1]))
             colsum = sum(abs(self.dyn[:, -1]))
 
         self.nchan = len(self.freqs)
@@ -3259,7 +3259,7 @@ class Dynspec:
         # Crop frequencies
         crop_array = np.array((self.freqs > fmin)*(self.freqs < fmax))
         self.dyn = self.dyn[crop_array, :]
-        self.dyn_err = self.dyn_err[crop_array, :]
+        # self.dyn_err = self.dyn_err[crop_array, :]
         self.freqs = self.freqs[crop_array]
         self.nchan = len(self.freqs)
         self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
@@ -3274,7 +3274,7 @@ class Dynspec:
             self.tobs = self.tobs - tmin
         crop_array = np.array((self.times > tmin)*(self.times < tmax))
         self.dyn = self.dyn[:, crop_array]
-        self.dyn_err = self.dyn_err[:, crop_array]
+        # self.dyn_err = self.dyn_err[:, crop_array]
         self.nsub = len(self.dyn[0, :])
         self.times = np.linspace(self.dt/2, self.tobs - self.dt/2, self.nsub)
         self.mjd = self.mjd + tmin/86400
