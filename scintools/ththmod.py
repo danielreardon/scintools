@@ -375,11 +375,11 @@ def single_search(params):
     """
     
     ## Reap Parameters
-    dspec2,freq2,time2,eta_low,eta_high,edges,name,plot,fw,npad,neta,coher=params
+    dspec2,freq,time,eta_low,eta_high,edges,name,plot,fw,npad,neta,coher=params
 
     ## Verify units
-    time2 = unit_checks(time2,'time2',u.s)
-    freq2 = unit_checks(freq2,'freq2',u.MHz)
+    time = unit_checks(time,'time2',u.s)
+    freq = unit_checks(freq,'freq2',u.MHz)
     eta_low = unit_checks(eta_low,'eta_low',u.s**3)
     eta_high = unit_checks(eta_high,'eta_high',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
@@ -388,8 +388,8 @@ def single_search(params):
     etas = np.linspace(eta_low, eta_high, neta)
 
     ## Calculate fD and tau arrays
-    fd = fft_axis(time2, u.mHz, npad)
-    tau = fft_axis(freq2, u.us, npad)
+    fd = fft_axis(time, u.mHz, npad)
+    tau = fft_axis(freq, u.us, npad)
 
     ## Pad dynamic Spectrum
     dspec_pad = np.pad(dspec2,
@@ -458,15 +458,15 @@ def single_search(params):
     try:
         if plot:
             ## Create diagnostic plots where requested
-            PlotFunc(dspec2,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
+            PlotFunc(dspec2,time,freq,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
             plt.savefig(name)
             plt.close()
     except:
         print('Plotting Error',flush=True)
 
     ## Progress Report
-    print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq2.mean()),flush=True)
-    return(eta_fit,eta_sig,freq2.mean(),time2.mean(),eigs)
+    print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq.mean()),flush=True)
+    return(eta_fit,eta_sig,freq.mean(),time.mean(),eigs)
 
 def PlotFunc(dspec,time,freq,CS,fd,tau,
             edges,eta_fit,eta_sig,etas,measure,etas_fit,fit_res,
