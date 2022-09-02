@@ -503,6 +503,8 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
 
     if not tau_lim==None:
         tau_lim = unit_checks(tau_lim,'tau_lim',u.us)
+    else:
+        tau_lim=tau.max()
 
     ## Determine fd limits 
     fd_lim=min(2*edges.max(),fd.max()).value
@@ -569,7 +571,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
             aspect='auto',
             extent=ext_find(fd,tau))
     plt.xlim((-fd_lim,fd_lim))
-    plt.ylim((0,tau_lim))
+    plt.ylim((0,tau_lim.value))
     plt.xlabel(r'$f_D$ (mHz)')
     plt.ylabel(r'$\tau$ (us)')
     plt.title('Data Secondary Spectrum')
@@ -585,7 +587,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
             aspect='auto',
             extent=ext_find(fd,tau))
     plt.xlim((-fd_lim,fd_lim))
-    plt.ylim((0,tau_lim))
+    plt.ylim((0,tau_lim.value))
     plt.title('Model Secondary Spectrum')
 
     ## Data TH-TH
@@ -674,7 +676,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
             aspect='auto',
             extent=ext_find(fd,tau))
     plt.xlim((-fd_lim,fd_lim))
-    plt.ylim((0,tau_lim))
+    plt.ylim((0,tau_lim.value))
     plt.xlabel(r'$f_D$ (mHz)')
     plt.ylabel(r'$\tau$ (us)')
     plt.title('Recovered Secondary Wavefield')
