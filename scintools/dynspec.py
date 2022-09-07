@@ -3049,7 +3049,7 @@ class Dynspec:
 
         if input_dyn is None:  # use self dynamic spectrum
             if lamsteps:
-                if not self.lamsteps:
+                if not hasattr(self, 'lamdyn'):
                     self.scale_dyn()
                 if velocity:
                     if not hasattr(self, 'vlamdyn'):

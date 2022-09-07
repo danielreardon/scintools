@@ -269,8 +269,10 @@ def get_ssb_delay(mjds, raj, decj):
     """
 
     from astropy.constants import au, c
+    from astropy.coordinates import BarycentricTrueEcliptic, SkyCoord
 
-    coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
+    coord = SkyCoord('{0} {1}'.format(raj, decj), frame=BarycentricTrueEcliptic,
+                     unit=(u.hourangle, u.deg))
     psr_xyz = coord.cartesian.xyz.value
 
     t = []
@@ -280,9 +282,45 @@ def get_ssb_delay(mjds, raj, decj):
         e_dot_p = np.dot(earth_xyz.xyz.value, psr_xyz)
         t.append(e_dot_p*au.value/c.value)
 
-    print('WARNING! Understand sign of SSB correction before applying to MJDs')
+    print('Returned SSB Roemer delays (in seconds) should be ' + \
+          'ADDED to site arrival times')
 
-    return t
+    return np.array(t)
+
+
+def make_lsr(d, raj, decj, pmra, pmdec, vr=0):
+    from astropy.coordinates import BarycentricTrueEcliptic, LSR, SkyCoord
+    from astropy import units as u
+
+    coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
+    ra = coord.ra.value
+    dec = coord.dec.value
+
+    # Initialise the barycentric coordinates with the LSR class and v_bary=0
+    pm = LSR(ra=ra*u.degree, dec=dec*u.deg,
+             pm_ra_cosdec=pmra*u.mas/u.yr,
+             pm_dec=pmdec*u.mas/u.yr, distance=d*u.kpc,
+             radial_velocity=vr*u.km/u.s,
+             v_bary=(0.0*u.km/u.s, 0.0*u.km/u.s, 0.0*u.km/u.s))
+    pm_ecliptic = pm.transform_to(BarycentricTrueEcliptic)
+
+    # Get barycentric ecliptic coordinates
+    elat = coord.barycentrictrueecliptic.lat.value
+    elong = coord.barycentrictrueecliptic.lon.value
+    pm_lat = pm_ecliptic.pm_lat.value
+    pm_lon_coslat = pm_ecliptic.pm_lon_coslat.value
+
+    bte = BarycentricTrueEcliptic(lon=elong*u.degree, lat=elat*u.degree,
+                                  distance=d*u.kpc,
+                                  pm_lon_coslat=pm_lon_coslat*u.mas/u.yr,
+                                  pm_lat=pm_lat*u.mas/u.yr,
+                                  radial_velocity=vr*u.km/u.s)
+
+    # Convert barycentric back to LSR
+    lsr_coord = bte.transform_to(LSR(v_bary=(11.1*u.km/u.s,
+                                             12.24*u.km/u.s, 7.25*u.km/u.s)))
+
+    return lsr_coord.proper_motion.to_value()
 
 
 def get_earth_velocity(mjds, raj, decj, radial=False):
