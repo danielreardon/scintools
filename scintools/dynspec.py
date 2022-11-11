@@ -241,15 +241,14 @@ class Dynspec:
             if note is not None:
                 fn.write("# Note: {0}\n".format(note))
             fn.write("# Original header begins below:\n")
-            fn.write("#\n")
             for line in self.header:
                 fn.write("# {} \n".format(line))
 
             for i in range(len(self.times)):
                 ti = self.times[i]/60
                 for j in range(len(self.freqs)):
-                    fi = self.freqs[j]
-                    di = self.dyn[j, i]
+                    fi = np.flip(self.freqs)[j]
+                    di = np.flipud(self.dyn)[j, i]
                     # di_err = self.dyn_err[j, i]
                     fn.write("{0} {1} {2} {3} {4} {5}\n".
                              format(i, j, ti, fi, di, 0)) #, # di_err))
