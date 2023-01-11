@@ -63,6 +63,26 @@ def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
     return
 
 
+def autocorr(arr):
+    """
+    Do a slow calculation of the 2d autocorrelation of an input masked array
+    """
+    mean = np.ma.mean(arr)
+    std = np.ma.std(arr)
+    nr, nc = np.shape(arr)
+    autocorr = np.zeros((2*nr, 2*nc))
+    for x in range(-nr, nr):
+        for y in range(-nc, nc):
+            segment = (arr[max(0, x):min(x+nr, nr),
+                           max(0, y):min(y+nc, nc)] - mean) \
+                    * (arr[max(0, -x):min(-x+nr, nr),
+                           max(0, -y):min(-y+nc, nc)] - mean)
+            numerator = np.ma.sum(segment)
+            autocorr[x+nr][y+nc] = numerator / (std ** 2)
+    autocorr /= np.nanmax(autocorr)
+    return autocorr
+
+
 def is_valid(array):
     """
     Returns boolean array of values that are finite an not nan
