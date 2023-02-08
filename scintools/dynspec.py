@@ -2027,15 +2027,10 @@ class Dynspec:
 
             T, F = np.meshgrid(tticks, fticks)
             # Create weights array
-            errors_2d = 1/np.sqrt((self.nsub * (max(tticks)/abs(T)))**2 +
-                                  (self.nchan * (max(fticks)/abs(F)))**2)
             errors_2d = 1/np.sqrt(self.nsub * self.nchan * \
                                   (max(tticks)/abs(T)) * (max(fticks)/abs(F)))
             errors_2d[errors_2d == 0] = 1e-3
             errors_2d[~is_valid(errors_2d)] = 1e-3
-
-            plt.pcolormesh(tticks, fticks, errors_2d)
-            plt.show()
 
             weights_2d = np.ones(np.shape(self.acf))
             if weighted:
