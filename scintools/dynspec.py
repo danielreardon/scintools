@@ -955,8 +955,6 @@ class Dynspec:
                     self.calc_sspec(lamsteps=lamsteps)
                 sspec = np.array(cp(self.lamsspec))
             yaxis = cp(self.beta)
-            ind = np.argmin(abs(self.tdel-delmax))
-            ymax = self.beta[ind]  # cut beta at equivalent value to delmax
         else:
             if velocity:
                 if not hasattr(self, 'vsspec'):
@@ -967,7 +965,8 @@ class Dynspec:
                     self.calc_sspec()
                 sspec = np.array(cp(self.sspec))
             yaxis = cp(self.tdel)
-            ymax = delmax
+        ind = np.argmin(abs(self.tdel-delmax))
+        ymax = self.beta[ind]  # cut beta at equivalent value to delmax
 
         nr, nc = np.shape(sspec)
         # Estimate noise in secondary spectrum
@@ -1985,11 +1984,9 @@ class Dynspec:
         params.add('nf', value=nf, vary=False)
 
         # Create weights array
-        t_errors = 2/np.pi * np.arctan(xdata_t / tau) / \
-            np.sqrt(self.nsub)
+        t_errors = 1/np.sqrt(len(xdata_t) * (max(xdata_t)/xdata_t))
         t_errors[t_errors == 0] = 1e-3
-        f_errors = 2/np.pi * np.arctan(xdata_f / dnu) / \
-            np.sqrt(self.nchan)
+        f_errors = 1/np.sqrt(len(xdata_f) * (max(xdata_f)/xdata_f))
         f_errors[f_errors == 0] = 1e-3
         if weighted:
             weights_t = 1/t_errors
@@ -2028,18 +2025,21 @@ class Dynspec:
             tticks = np.linspace(-self.tobs, self.tobs, nt + 1)[:-1]
             fticks = np.linspace(-self.bw, self.bw, nf + 1)[:-1]
 
+            T, F = np.meshgrid(tticks, fticks)
             # Create weights array
-            t_errors_2d = 2/np.pi * np.arctan(np.abs(tticks) / tau) / \
-                np.sqrt(self.nsub)
-            t_errors_2d[t_errors_2d == 0] = 1e-3
-            f_errors_2d = 2/np.pi * np.arctan(np.abs(fticks) / dnu) / \
-                np.sqrt(self.nchan)
-            f_errors_2d[f_errors_2d == 0] = 1e-3
+            errors_2d = 1/np.sqrt((self.nsub * (max(tticks)/abs(T)))**2 +
+                                  (self.nchan * (max(fticks)/abs(F)))**2)
+            errors_2d = 1/np.sqrt(self.nsub * self.nchan * \
+                                  (max(tticks)/abs(T)) * (max(fticks)/abs(F)))
+            errors_2d[errors_2d == 0] = 1e-3
+            errors_2d[~is_valid(errors_2d)] = 1e-3
+
+            plt.pcolormesh(tticks, fticks, errors_2d)
+            plt.show()
 
             weights_2d = np.ones(np.shape(self.acf))
             if weighted:
-                weights_2d = weights_2d / np.transpose([f_errors_2d])
-                weights_2d = weights_2d / [t_errors_2d]
+                weights_2d = weights_2d / errors_2d
 
             wn_loc = np.unravel_index(np.argmax(self.acf, axis=None),
                                       self.acf.shape)
