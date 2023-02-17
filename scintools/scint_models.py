@@ -24,7 +24,6 @@ from __future__ import (absolute_import, division,
 import numpy as np
 from scintools.scint_sim import ACF
 from lmfit import Minimizer, conf_interval
-from scipy.ndimage import gaussian_filter
 
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
@@ -286,24 +285,13 @@ def dnu_sspec_model(params, xdata, ydata):
     return (ydata - model) * model
 
 
-def scint_sspec_model(params, xdata, ydata):
+def scint_sspec_model(params, xdata, ydata, weights):
     """
-    Fit both tau (tau_acf_model) and dnu (dnu_acf_model) simultaneously
+    Fit both tau (tau_sspec_model) and dnu (dnu_sspec_model) simultaneously
     """
 
-    parvals = params.valuesdict()
-
-    nt = parvals['nt']
-
-    # Scintillation timescale model
-    xdata_t = xdata[:nt]
-    ydata_t = ydata[:nt]
-    residuals_t = tau_sspec_model(params, xdata_t, ydata_t)
-
-    # Scintillation bandwidth model
-    xdata_f = xdata[nt:]
-    ydata_f = ydata[nt:]
-    residuals_f = dnu_sspec_model(params, xdata_f, ydata_f)
+    residuals_t = tau_sspec_model(params, xdata[0], ydata[0], weights[0])
+    residuals_f = dnu_sspec_model(params, xdata[1], ydata[1], weights[1])
 
     return np.concatenate((residuals_t, residuals_f))
 

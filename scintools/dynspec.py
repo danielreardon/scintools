@@ -1782,11 +1782,11 @@ class Dynspec:
 
     def get_scint_params(self, method="acf1d", plot=False, alpha=5/3,
                          mcmc=False, full_frame=False, nscale=5,
-                         nwalkers=100, steps=1000, burn=0.2, nitr=1,
+                         nwalkers=50, steps=10000, burn=0.25, nitr=1,
                          lnsigma=True, verbose=False, progress=True,
                          display=True, filename=None, dpi=200,
                          nan_policy='raise', weighted=True, workers=1,
-                         tau_vary_2d=True, tau_input=None):
+                         tau_vary_2d=True, tau_input=None, bartlett=True):
         """
         Measure the scintillation timescale
 
@@ -1892,29 +1892,24 @@ class Dynspec:
         amp = max([ydata_f[0] - wn, ydata_t[0] - wn])
         # Estimate tau for initial guess. Closest index to 1/e power
         if np.argwhere(ydata_t < amp/np.e).squeeze().size == 0:
-            if ydata_t[1] < 0:
-                tau = self.dt
-            else:
-                tau = self.tobs
+            tau = self.dt if ydata_t[1] < 0 else self.tobs
         else:
             tau = xdata_t[np.argwhere(ydata_t < amp/np.e).squeeze()[0]]
         # Estimate dnu for initial guess. Closest index to 1/2 power
         if np.argwhere(ydata_f < amp/2).squeeze().size == 0:
-            if ydata_f[1] < 0:
-                dnu = self.df
-            else:
-                dnu = self.bw
+            dnu = self.df if ydata_f[1] < 0 else self.bw
         else:
             dnu = xdata_f[np.argwhere(ydata_f < amp/2).squeeze()[0]]
 
         # crop arrays to nscale number of scales, or 5 samples
         if not full_frame:
-            if nscale*tau <= 5*self.dt or nscale*dnu <= 5*self.df:
+            t_inds = np.argwhere(xdata_t <= nscale*tau).squeeze()
+            f_inds = np.argwhere(xdata_f <= nscale*dnu).squeeze()
+            if nscale*tau <= 5*self.dt:
                 t_inds = np.argwhere(xdata_t <= 5*self.dt).squeeze()
+            if nscale*dnu <= 5*self.df:
                 f_inds = np.argwhere(xdata_f <= 5*self.df).squeeze()
-            else:
-                t_inds = np.argwhere(xdata_t <= nscale*tau).squeeze()
-                f_inds = np.argwhere(xdata_f <= nscale*dnu).squeeze()
+
             xdata_t = xdata_t[t_inds]
             ydata_t = ydata_t[t_inds]
             xdata_f = xdata_f[f_inds]
@@ -1925,6 +1920,7 @@ class Dynspec:
         self.dnu = dnu
         self.amp = amp
         self.wn = wn
+
         # Estimated number of scintles
         tau_half = xdata_t[np.argmin(abs(ydata_t - amp/2))]  # half power
         if tau_half < self.dt:
@@ -1984,16 +1980,25 @@ class Dynspec:
         params.add('nf', value=nf, vary=False)
 
         # Create weights array
-        t_errors = 1/np.sqrt(len(xdata_t) * (max(xdata_t)/xdata_t))
+        t_errors = 1/np.sqrt((nt/2) * (max(xdata_t)/xdata_t))
         t_errors[t_errors == 0] = 1e-3
-        f_errors = 1/np.sqrt(len(xdata_f) * (max(xdata_f)/xdata_f))
+        f_errors = 1/np.sqrt((nf/2) * (max(xdata_f)/xdata_f))
         f_errors[f_errors == 0] = 1e-3
-        if weighted:
-            weights_t = 1/t_errors
-            weights_f = 1/f_errors
-        else:
-            weights_t = None
-            weights_f = None
+
+        # Use Bartlett's formula from Brockwell and Davis (1991), Eqn 7.2.5
+        # Adapted from formula in statsmodels.tsa.stattools.acf
+        if bartlett:
+            var_t = np.ones(np.shape(ydata_t)) / (nt / 2)
+            var_t[0] = 1e-10
+            var_t[2:] *= 1 + 2 * np.cumsum(ydata_t[1:-1] ** 2)
+            t_errors = np.sqrt(var_t)
+            var_f = np.ones(np.shape(ydata_f)) / (nf / 2)
+            var_f[0] = 1e-10
+            var_f[2:] *= 1 + 2 * np.cumsum(ydata_f[1:-1] ** 2)
+            f_errors = np.sqrt(var_f)
+
+        weights_t = 1/t_errors if weighted else None
+        weights_f = 1/f_errors if weighted else None
 
         if method == 'acf1d' or method == 'acf2d_approx' or method == 'acf2d':
             if verbose:
@@ -2007,7 +2012,8 @@ class Dynspec:
             results = fitter(scint_acf_model, params,
                              ((xdata_t, xdata_f), (ydata_t, ydata_f),
                               (weights_t, weights_f)), max_nfev=max_nfev,
-                             nan_policy=nan_policy)
+                             nan_policy=nan_policy, mcmc=mcmc,
+                             nwalkers=nwalkers, steps=steps, burn=burn)
 
         # overwrite initial value if successful:
         if results.params['dnu'].stderr is not None:
@@ -2025,12 +2031,11 @@ class Dynspec:
             tticks = np.linspace(-self.tobs, self.tobs, nt + 1)[:-1]
             fticks = np.linspace(-self.bw, self.bw, nf + 1)[:-1]
 
-            T, F = np.meshgrid(tticks, fticks)
+            T, F = np.meshgrid(self.tobs - abs(tticks), self.bw - abs(fticks))
             # Create weights array
-            errors_2d = 1/np.sqrt(self.nsub * self.nchan * \
-                                  (max(tticks)/abs(T)) * (max(fticks)/abs(F)))
-            errors_2d[errors_2d == 0] = 1e-3
-            errors_2d[~is_valid(errors_2d)] = 1e-3
+            N2d = self.nsub * self.nchan * (T/max(tticks)) * (F/max(fticks))
+            errors_2d = 1/np.sqrt(N2d)
+            errors_2d[~is_valid(errors_2d)] = np.inf
 
             weights_2d = np.ones(np.shape(self.acf))
             if weighted:
@@ -2090,6 +2095,13 @@ class Dynspec:
                 ydata_2d = ydata_centered
                 tdata = tdata_centered
                 fdata = fdata_centered
+                weights_2d = weights_centered
+
+            weights_2d[ydata_2d - 1/weights_2d < 0] = 0
+
+            weights_2d = np.fft.fftshift(weights_2d)
+            weights_2d[0][0] = 1e10
+            weights_2d = np.fft.fftshift(weights_2d)
 
             params.add('phasegrad', value=0, vary=True,
                        min=-np.inf, max=np.inf)
@@ -2141,7 +2153,7 @@ class Dynspec:
             # max_nfev = 2000 * (nfit + 1)  # lmfit default
             max_nfev = 10000 * (nfit + 1)
             results = fitter(scint_acf_model_2d_approx, params,
-                             (tdata, fdata, ydata_2d, None), mcmc=mcmc,
+                             (tdata, fdata, ydata_2d, weights_2d), mcmc=mcmc,
                              max_nfev=max_nfev, nan_policy=nan_policy,
                              pos=pos, steps=steps, burn=burn,
                              progress=progress, workers=workers,
@@ -2160,6 +2172,8 @@ class Dynspec:
                              vary=False, min=-np.inf, max=np.inf)
                 params2d.add('psi', value=60,
                              vary=True, min=-np.inf, max=np.inf)
+                params2d['phasegrad'].value = 0.0
+
                 chisqr = np.inf
                 for itr in range(nitr):
                     if mcmc:
@@ -2208,7 +2222,7 @@ class Dynspec:
                     # max_nfev = 2000 * (nfit + 1)  # lmfit default
                     max_nfev = 10000 * (nfit + 1)
                     res = fitter(scint_acf_model_2d, params2d,
-                                 (ydata_2d, None), mcmc=mcmc, pos=pos,
+                                 (ydata_2d, weights_2d), mcmc=mcmc, pos=pos,
                                  nwalkers=nwalkers, steps=steps, burn=burn,
                                  progress=progress, workers=workers,
                                  max_nfev=max_nfev, nan_policy=nan_policy,
@@ -2258,7 +2272,7 @@ class Dynspec:
             return
         elif (results.params['tau'].stderr > results.params['tau'].value or
               results.params['dnu'].stderr > results.params['dnu'].value):
-            print("\n Warning: Parameters unconstraiend")
+            print("\n Warning: Parameters unconstrained")
 
         self.scint_param_method = method
 
@@ -2354,17 +2368,19 @@ class Dynspec:
 
         if plot:
             if method == 'acf1d':
-                tmodel = -tau_acf_model(results.params, xdata_t,
-                                        np.zeros(len(xdata_t)), None)
-                fmodel = -dnu_acf_model(results.params, xdata_f,
-                                        np.zeros(len(xdata_f)), None)
+                xmodelt = np.linspace(min(xdata_t), max(xdata_t), 1000)
+                tmodel = -tau_acf_model(results.params, xmodelt,
+                                        np.zeros(len(xmodelt)), None)
+                xmodelf = np.linspace(min(xdata_f), max(xdata_f), 1000)
+                fmodel = -dnu_acf_model(results.params, xmodelf,
+                                        np.zeros(len(xmodelf)), None)
 
                 fig = plt.subplots(2, 1, figsize=(8, 6))
                 fig[1][0].plot(xdata_t, ydata_t, label='data')
                 fig[1][0].fill_between(xdata_t, ydata_t+t_errors,
                                        ydata_t-t_errors, color='C0',
                                        alpha=0.4, label='error')
-                fig[1][0].plot(xdata_t, tmodel, label='model')
+                fig[1][0].plot(xmodelt, tmodel, label='model')
                 # plot 95% white noise level assuming no correlation
                 xl = fig[1][0].get_xlim()
                 fig[1][0].plot([0, xl[1]], [0, 0], 'k--')
@@ -2383,7 +2399,7 @@ class Dynspec:
                 fig[1][1].fill_between(xdata_f, ydata_f+f_errors,
                                        ydata_f-f_errors, color='C0',
                                        alpha=0.4, label='error')
-                fig[1][1].plot(xdata_f, fmodel, label='model')
+                fig[1][1].plot(xmodelf, fmodel, label='model')
                 # plot 95% white noise level assuming no correlation
                 xl = fig[1][1].get_xlim()
                 fig[1][1].plot([0, xl[1]], [0, 0], 'k--')
