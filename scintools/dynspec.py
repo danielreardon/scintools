@@ -571,7 +571,7 @@ class Dynspec:
 
     def plot_sspec(self, lamsteps=False, input_sspec=None, filename=None,
                    input_x=None, input_y=None, trap=False, prewhite=False,
-                   plotarc=False, maxfdop=np.inf, delmax=None, ref_freq=1400,
+                   plotarc=False, maxfdop=np.inf, delmax=None,
                    cutmid=0, startbin=0, display=True, colorbar=True,
                    title=None, figsize=(9, 9), subtract_artefacts=False,
                    overplot_curvature=None, dpi=200, velocity=False):
@@ -603,8 +603,6 @@ class Dynspec:
             Maximum fdop to plot out to. The default is np.inf.
         delmax : float, optional
             Maximum delay to plot out to. The default is None.
-        ref_freq : float, optional
-            Reference frequency. The default is 1400.
         cutmid : int, optional
             Number of columns around fdop=0 to set to nan. The default is 0.
         startbin : int, optional
@@ -678,9 +676,8 @@ class Dynspec:
         sspec[:, int(nc/2-np.floor(cutmid/2)):int(nc/2 +
                                                   np.ceil(cutmid/2))] = np.nan
         sspec[:startbin, :] = np.nan
-        # Maximum value delay axis (us @ ref_freq)
+        # Maximum value delay axis
         delmax = np.max(self.tdel) if delmax is None else delmax
-        delmax = delmax*(ref_freq/self.freq)**2
         ind = np.argmin(abs(self.tdel-delmax))
         if display or (filename is not None):
             plt.figure(figsize=figsize)
@@ -1980,10 +1977,10 @@ class Dynspec:
         params.add('nf', value=nf, vary=False)
 
         # Create weights array
-        t_errors = 1/np.sqrt((nt/2) * (max(xdata_t)/xdata_t))
-        t_errors[t_errors == 0] = 1e-3
-        f_errors = 1/np.sqrt((nf/2) * (max(xdata_f)/xdata_f))
-        f_errors[f_errors == 0] = 1e-3
+        t_errors = np.ones(np.shape(xdata_t))/np.sqrt((nt/2))
+        t_errors[0] = 1e-3
+        f_errors = np.ones(np.shape(xdata_f))/np.sqrt((nf/2))
+        f_errors[0] = 1e-3
 
         # Use Bartlett's formula from Brockwell and Davis (1991), Eqn 7.2.5
         # Adapted from formula in statsmodels.tsa.stattools.acf
