@@ -12,6 +12,7 @@ from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm,SymLogNorm
 from scipy.optimize import curve_fit
+import warnings
 
 def svd_model(arr, nmodes=1):
     """
@@ -952,7 +953,7 @@ def unit_checks(var,name,desired):
     if u.dimensionless_unscaled.is_equivalent(var.unit):
         ## If there are no units assign desired units and tell user
         var*=desired
-        print(f'{name} missing units. Assuming {desired}.')
+        warnings.warn(f'{name} missing units. Assuming {desired}.')
     elif desired.is_equivalent(var.unit):
         ## If var has correct units (or equivalent)
         var=var.to(desired)
