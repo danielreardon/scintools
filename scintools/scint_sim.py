@@ -415,7 +415,7 @@ class Simulation():
 
 class ACF():
 
-    def __init__(self, V=1, psi=0, phasegrad=0, theta=0, ar=1, alpha=5/3,
+    def __init__(self, psi=0, phasegrad=0, theta=0, ar=1, alpha=5/3,
                  taumax=4, dnumax=4, nf=51, nt=51, amp=1, wn=0,
                  spatial_factor=2, resolution_factor=1, core_factor=2,
                  auto_sampling=True, plot=False, display=True):
@@ -423,7 +423,8 @@ class ACF():
         Generate an ACF from the theoretical function in:
             Rickett et al. (2014)
 
-        V - magnitude of velocity
+        Magnitude of velocity defined to be 1
+
         psi - angle of velocity w.r.t the major axis of (brightness) anisotropy
         phasegrad - magnitude of phase gradient
         theta - angle of phase gradient w.r.t velocity vector
@@ -447,7 +448,6 @@ class ACF():
         """
 
         self.alpha = alpha
-        self.V = V
         # anisotropy
         self.ar = ar
         self.psi = psi
@@ -459,7 +459,7 @@ class ACF():
         self.wn = wn
         # sampling parameters
         self.taumax = taumax
-        spmax = taumax*V
+        spmax = taumax
         self.dnumax = dnumax
         if nf % 2 == 0:
             nf += 1  # make odd so the ACF has a centre
@@ -470,9 +470,9 @@ class ACF():
         if auto_sampling:
             # calculate to 6 spatial scales along major axis
             self.sp_fac = 6 * ar/spmax
-            # adjust to 81 pixels (10 pixels per scale), double at ar=3
+            # adjust to 81 pixels, doubles at ar=3
             self.res_fac = (1 + ar/3)*81/nt
-            # doubled
+            # triple near core
             self.core_fac = 3
         else:
             self.sp_fac = spatial_factor
@@ -536,8 +536,7 @@ class ACF():
 
         alph2 = self.alpha/2
 
-        V = self.V
-        spmax = self.taumax * V
+        spmax = self.taumax
         dnumax = self.dnumax
         dsp = self.dsp
         phasegrad = self.phasegrad
@@ -548,8 +547,8 @@ class ACF():
         # distribution major axis (psi=0), which is perpendicular to ACF-efield
         xi = 90 - self.psi  # velocity angle w.r.t ACF-efield
         # calculate velocities parallel (Vx) and perpendicular (Vy) to e-field
-        Vx = V*np.cos(xi*np.pi/180)
-        Vy = V*np.sin(xi*np.pi/180)
+        Vx = np.cos(xi*np.pi/180)
+        Vy = np.sin(xi*np.pi/180)
         # calculate angular offsets parallel (sigxn) and perpendicular (sigyn)
         #    to V
         sigxn = phasegrad * np.cos((xi - theta)*np.pi/180)
@@ -583,7 +582,7 @@ class ACF():
         if phasegrad == 0:
             # calculate only one quadrant tn >= 0
             # equally spaced t array t= tn*S0
-            tn = np.linspace(0, (spmax/V), int(np.ceil(self.nt/2)))
+            tn = np.linspace(0, (spmax), int(np.ceil(self.nt/2)))
             snx = Vx*tn
             sny = Vy*tn
             gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
@@ -623,14 +622,13 @@ class ACF():
 
             t2 = np.concatenate((np.flip(-tn[1:]), tn)).squeeze()
             f2 = np.concatenate((np.flip(-dnun[1:]), dnun)).squeeze()
-            s2 = t2 * V
 
         else:
             # calculate two quadrants -tmax t < tmax
             # equally spaced t array t= tn*S0
-            tn = np.linspace(-(spmax/V), (spmax/V), self.nt)
-            snx = V*np.cos(xi*np.pi/180)*tn
-            sny = V*np.sin(xi*np.pi/180)*tn
+            tn = np.linspace(-(spmax), (spmax), self.nt)
+            snx = np.cos(xi*np.pi/180)*tn
+            sny = np.sin(xi*np.pi/180)*tn
             # compute dnun=0 first
             gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
@@ -665,11 +663,10 @@ class ACF():
 
             f2 = np.concatenate((np.flip(-dnun[1:]), dnun)).squeeze()
             t2 = tn
-            s2 = t2 * V
 
         self.fn = f2
         self.tn = t2
-        self.sn = s2
+        self.sn = t2
         self.snp = snp
         self.acf = amp * gam3
         self.acf_efield = gammes
@@ -728,6 +725,9 @@ class ACF():
             plt.show()
 
     def calc_sspec(self):
+        """
+        Calculate the secondary spectrum
+        """
         arr = np.fft.fftshift(self.acf)
         arr = np.fft.fft2(arr)
         arr = np.fft.fftshift(arr)
@@ -742,8 +742,10 @@ class ACF():
             self.calc_sspec()
 
         plt.pcolormesh(self.tn, self.fn, self.sspec)
+        plt.colorbar()
         plt.xlabel(r'Delay')
         plt.ylabel(r'Doppler')
+        plt.title('Secondary spectrum (dB)')
         if display:
             plt.show()
 
