@@ -23,11 +23,11 @@ from __future__ import (absolute_import, division,
                         print_function, unicode_literals)
 import numpy as np
 from scintools.scint_sim import ACF
-from lmfit import Minimizer, conf_interval
+from lmfit import Minimizer
 
 
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
-           steps=1000, burn=0.2, progress=True, get_ci=False, workers=1,
+           steps=1000, burn=0.2, progress=True, workers=1,
            nan_policy='raise', max_nfev=None, thin=10, is_weighted=True):
 
     # Do fit
@@ -42,14 +42,8 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
         func = Minimizer(model, params, fcn_args=args, nan_policy=nan_policy,
                          max_nfev=max_nfev)
         results = func.minimize()
-    if get_ci:
-        if results.errorbars:
-            ci = conf_interval(func, results)
-        else:
-            ci = ''
-        return results, ci
-    else:
-        return results
+
+    return results
 
 
 def powerspectrum_model(params, xdata, ydata):

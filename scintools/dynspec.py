@@ -312,7 +312,6 @@ class Dynspec:
 
         self.trim_edges()  # remove zeros on band edges
         self.refill()  # refill and zeroed regions with linear interpolation
-        self.correct_dyn()  # correct by svd
         self.calc_acf()  # calculate the ACF
         if lamsteps:
             self.scale_dyn()
@@ -1661,14 +1660,8 @@ class Dynspec:
 
         acf = cp(self.acf)
         nr, nc = np.shape(acf)
-        t_delays = np.linspace(-self.tobs/60, self.tobs/60, np.shape(acf)[1])
-        f_shifts = np.linspace(-self.bw, self.bw, np.shape(acf)[0])
-
-        # just the peak
-        xdata_inds = np.argwhere(abs(t_delays) <= tmax)
-        if len(xdata_inds) < nmin:
-            xdata_inds = np.argwhere(abs(t_delays) <= nmin*self.dt)
-        xdata = np.array(t_delays[xdata_inds]).squeeze()
+        t_delays = np.linspace(-self.tobs/60, self.tobs/60, nc+1)[:-1]
+        f_shifts = np.linspace(-self.bw, self.bw, nr+1)[:-1]
 
         inds = np.argwhere(abs(f_shifts) <= fmax)
         if len(inds) < nmin:
@@ -1679,13 +1672,13 @@ class Dynspec:
 
         # Fit parabolas to find the peak in each frequency-slice
         for ii in inds:
-            f_shift = f_shifts[ii]
-            ind = np.argwhere(f_shifts == f_shift)
-            ydata = np.array(acf[ind, xdata_inds]).squeeze()
+            x_max = np.argmax(acf[ii, :]).squeeze()
+            ydata = np.array(acf[ii, x_max - 3:x_max + 4]).squeeze()
+            xdata = t_delays[x_max - 3:x_max + 4]
             yfit, peak, peakerr = fit_parabola(xdata, ydata)
             peak_array.append(peak)
             peakerr_array.append(peakerr)
-            y_array.append(f_shift)
+            y_array.append(f_shifts[ii])
         peak_array = np.array(peak_array).squeeze()
         y_array = np.array(y_array).squeeze()
         peakerr_array = np.array(peakerr_array).squeeze()
@@ -2265,8 +2258,7 @@ class Dynspec:
 
         if results.params['tau'].stderr is None or \
            results.params['dnu'].stderr is None:
-            print("\n Warning: Fit failed")
-            return
+            print("\n Warning: Could not estimate uncertainties")
         elif (results.params['tau'].stderr > results.params['tau'].value or
               results.params['dnu'].stderr > results.params['dnu'].value):
             print("\n Warning: Parameters unconstrained")
