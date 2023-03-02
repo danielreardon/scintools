@@ -1584,7 +1584,7 @@ class Dynspec:
         return
 
     def get_acf_tilt(self, plot=False, tmax=None, fmax=None, display=True,
-                     filename=None, nscale=0.5, nscaleplot=2, nmin=5, dpi=200,
+                     filename=None, nscale=0.8, nscaleplot=2, nmin=5, dpi=200,
                      method='acf1d', tmaxplot=None, fmaxplot=None):
         """
         Estimates the tilt in the ACF, which is proportional to the phase
