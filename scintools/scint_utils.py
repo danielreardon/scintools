@@ -559,7 +559,7 @@ def get_binphase(mjds, pars):
     if 'TASC' in pars.keys():
         OM = 0
     else:
-        OM = pars['OM']
+        OM = pars['OM'] * np.pi/180
 
     return U + OM
 
