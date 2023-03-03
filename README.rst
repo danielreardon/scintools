@@ -31,4 +31,5 @@ Below is a list of works that use Scintools\:
 * `"Interstellar Scintillation of PSR J2048-1616", Chen et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022ApJ...927...14C>`_ (not explicitly credited)
 * `"Orbital dynamics and extreme scattering event properties from long-term scintillation observations of PSR J1603-7202", Walker et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220411077W>`_
 * `"Pulsar Double-lensing Sheds Light on the Origin of Extreme Scattering Events", Zhu et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220806884Z>`_
+* `"The MSPSRπ catalogue: VLBA astrometry of 18 millisecond pulsars", Ding et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023MNRAS.519.4982D>`_
 * `"Analysis of the ionized interstellar medium and orbital dynamics of PSR J1909-3744 using scintillation arcs", Askew et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv221013703A>`_
