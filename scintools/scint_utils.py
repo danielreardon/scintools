@@ -509,9 +509,14 @@ def get_true_anomaly(mjds, pars):
     dictionary
     """
 
+    if 'TASC' in pars.keys():
+        T0 = pars['TASC']  # MJD
+        ECC = np.sqrt(pars['EPS1']**2 + pars['EPS2']**2)
+    else:
+        T0 = pars['T0']  # MJD
+        ECC = pars['ECC']
+
     PB = pars['PB']  # days
-    T0 = pars['T0']  # MJD
-    ECC = pars['ECC']
     PBDOT = 0 if 'PBDOT' not in pars.keys() else pars['PBDOT']
     if np.abs(PBDOT) > 1e-10:
         # correct tempo-format
@@ -542,6 +547,21 @@ def get_true_anomaly(mjds, pars):
         U += 2*np.pi
 
     return U
+
+
+def get_binphase(mjds, pars):
+    """
+    Calculates binary phase for an array of barycentric MJDs and a parameter
+    dictionary
+    """
+    U = get_true_anomaly(mjds, pars)
+
+    if 'TASC' in pars.keys():
+        OM = 0
+    else:
+        OM = pars['OM']
+
+    return U + OM
 
 
 def differential_velocity(params, sun_velocity=220, screen_velocity=220,
