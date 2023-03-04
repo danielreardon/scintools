@@ -15,6 +15,7 @@ import sys
 import csv
 from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
+from scipy.signal import correlate
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter1d
 import pickle
@@ -562,6 +563,31 @@ def get_binphase(mjds, pars):
         OM = pars['OM'] * np.pi/180
 
     return U + OM
+
+
+def acor(arr):
+    """
+
+    Parameters
+    ----------
+    arr : Array
+         Array of numbers, e.g. a time series
+
+    Returns
+    -------
+    Int
+        Characteristic (50%) autocorrelation length.
+
+    """
+    arr -= np.mean(arr)
+    auto_correlation = correlate(arr, arr, mode='full')
+    auto_correlation = auto_correlation[auto_correlation.size//2:]
+    auto_correlation /= auto_correlation[0]
+    indices = np.where(auto_correlation<0.5)[0]
+    if len(indices)>0:
+        return indices[0]
+    else:
+        return 0
 
 
 def differential_velocity(params, sun_velocity=220, screen_velocity=220,
