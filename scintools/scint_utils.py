@@ -283,7 +283,7 @@ def difference(x):
     return np.array(dx).squeeze()
 
 
-def get_ssb_delay(mjds, raj, decj):
+def get_ssb_delay(mjds, raj, decj, message=True):
     """
     Get Romer delay to Solar System Barycentre (SSB) for correction of site
     arrival times to barycentric.
@@ -303,8 +303,9 @@ def get_ssb_delay(mjds, raj, decj):
         e_dot_p = np.dot(earth_xyz.xyz.value, psr_xyz)
         t.append(e_dot_p*au.value/c.value)
 
-    print('Returned SSB Roemer delays (in seconds) should be ' + \
-          'ADDED to site arrival times')
+    if message:
+        print('Returned SSB Roemer delays (in seconds) should be ' + \
+              'ADDED to site arrival times')
 
     return np.array(t)
 
@@ -409,7 +410,7 @@ def read_par(parfile):
         err = None
         p_type = None
         sline = line.split()
-        if len(sline) == 0 or line[0] == "#" or line[0:1] == "C " \
+        if len(sline) == 0 or line[0] == "#" or line[0:2] == "C " \
            or sline[0] in ignore:
             continue
 
@@ -561,6 +562,9 @@ def get_binphase(mjds, pars):
         OM = 0
     else:
         OM = pars['OM'] * np.pi/180
+        if 'OMDOT' in pars.keys():
+            OM += pars['OMDOT'] * (np.pi/180) / (86400*365.2425) * \
+                (mjds - pars['T0'])
 
     return U + OM
 

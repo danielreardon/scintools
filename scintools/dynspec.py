@@ -573,7 +573,8 @@ class Dynspec:
                    plotarc=False, maxfdop=np.inf, delmax=None,
                    cutmid=0, startbin=0, display=True, colorbar=True,
                    title=None, figsize=(9, 9), subtract_artefacts=False,
-                   overplot_curvature=None, dpi=200, velocity=False):
+                   overplot_curvature=None, dpi=200, velocity=False,
+                   vmin=None, vmax=None):
         """
         Plot the secondary spectrum
 
@@ -664,8 +665,8 @@ class Dynspec:
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         # std = np.std(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
-        vmin = medval - 3
-        vmax = maxval - 3
+        vmin = medval - 3 if vmin is None else vmin
+        vmax = maxval - 3 if vmax is None else vmax
 
         # Get fdop plotting range
         indicies = np.argwhere(np.abs(xplot) < maxfdop)
@@ -696,7 +697,9 @@ class Dynspec:
                                rasterized=True, shading='auto')
                 plt.ylabel(r'$f_\nu$ ($\mu$s)')
             if overplot_curvature is not None:
+                yl = plt.ylim()
                 plt.plot(xplot, overplot_curvature*xplot**2, 'r--')
+                plt.ylim(yl)
             plt.xlabel(r'$f_t$ (mHz)')
             bottom, top = plt.ylim()
             if plotarc:
@@ -1407,6 +1410,7 @@ class Dynspec:
             mask.append((np.abs(fdopnew) > np.max(np.abs(ifdop))))
             normSspec.append(normline)
             isspectot = np.add(isspectot, normline)
+        mask = np.array(mask).squeeze()
         normSspec = np.array(normSspec).squeeze()
         if interp_nan:
             # interpolate NaN values
