@@ -25,7 +25,7 @@ from scintools.scint_utils import is_valid, svd_model, interp_nan_2d,\
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
-from lmfit import Parameters
+from lmfit import Parameters, fit_report
 try:
     from skimage.restoration import inpaint
     biharmonic = True
@@ -1776,7 +1776,8 @@ class Dynspec:
                          lnsigma=True, verbose=False, progress=True,
                          display=True, filename=None, dpi=200,
                          nan_policy='raise', weighted=True, workers=1,
-                         tau_vary_2d=True, tau_input=None, bartlett=True):
+                         tau_vary_2d=True, tau_input=None, bartlett=True,
+                         get_fit_report=True):
         """
         Measure the scintillation timescale
 
@@ -1856,6 +1857,10 @@ class Dynspec:
         tau_input : float, optional
             Value for tau to use in 2D fit. If left unspecified, the value from
             a 1D fit will be used. The default is None.
+        get_fit_report : bool, optional
+            Choose to generate a fit report from lmfit, save as the attribute
+            'self.report'. If verbose=True the report will be printed to
+            console. The default is True.
 
         Returns
         -------
@@ -2264,6 +2269,14 @@ class Dynspec:
             print("\n Warning: Parameters unconstrained")
 
         self.scint_param_method = method
+
+        # This is collecting the lmfit report log
+        if get_fit_report:
+            self.report = fit_report(results)
+            if verbose:
+                print("===== Fit Report Below =====")
+                print(self.report)
+                print(" ")
 
         # Done fitting - now define results
         self.tau = results.params['tau'].value
