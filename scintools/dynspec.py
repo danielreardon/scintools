@@ -1955,17 +1955,11 @@ class Dynspec:
         params.add('tau', value=tau, vary=True, min=0, max=np.inf)
         params.add('dnu', value=dnu, vary=True, min=0, max=np.inf)
         params.add('amp', value=amp, vary=True, min=0, max=np.inf)
-        params.add('wn', value=wn, vary=True, min=0, max=np.inf)
         if verbose:
             print('Initial guesses:',
                   '\ntau:', tau,
                   '\ndnu:', dnu,
-                  '\namp:', amp,
-                  '\nwn:', wn)
-        if 'sim:mb2=' in self.name:
-            # No white noise in simulation. Don't fit or conf. int. will break
-            params['wn'].value = 0
-            params['wn'].vary = False
+                  '\namp:', amp)
         if alpha is None:
             params.add('alpha', value=5/3, vary=True,
                        min=-np.inf, max=np.inf)
@@ -2014,7 +2008,6 @@ class Dynspec:
         if results.params['dnu'].stderr is not None:
             params['tau'].value = results.params['tau'].value
             params['dnu'].value = results.params['dnu'].value
-            params['wn'].value = results.params['wn'].value
             params['amp'].value = results.params['amp'].value
 
         if method == 'acf2d_approx' or method == 'acf2d':
@@ -2128,10 +2121,6 @@ class Dynspec:
                     pos_i.append(np.random.normal(
                                     loc=self.amp,
                                     scale=2*self.amperr))
-                    if 'sim:mb2=' not in self.name:
-                        pos_i.append(np.random.normal(
-                                        loc=self.wn,
-                                        scale=self.wnerr))
                     if alpha is None:
                         pos_i.append(np.random.normal(loc=5/3, scale=0.1))
                     pos_i.append(np.random.uniform(low=0,
@@ -2144,7 +2133,7 @@ class Dynspec:
                 pos = np.array(pos_array).squeeze()
             else:
                 pos = None
-            nfit = 5
+            nfit = 4 if alpha is not None else 5
             # max_nfev = 2000 * (nfit + 1)  # lmfit default
             max_nfev = 10000 * (nfit + 1)
             results = fitter(scint_acf_model_2d_approx, params,
@@ -2185,10 +2174,6 @@ class Dynspec:
                             pos_i.append(np.random.normal(
                                 loc=results.params['amp'].value,
                                 scale=results.params['amp'].value/2))
-                            if 'sim:mb2=' not in self.name:
-                                pos_i.append(np.random.normal(
-                                    loc=results.params['wn'].value,
-                                    scale=results.params['wn'].value/2))
                             if alpha is None:
                                 pos_i.append(np.random.normal(
                                     loc=results.params['alpha'].value,
@@ -2213,7 +2198,7 @@ class Dynspec:
                         else:
                             print("\nPerforming least-squares fit to",
                                   "analytical 2D ACF model")
-                    nfit = 9
+                    nfit = 8 if alpha is not None else 9
                     # max_nfev = 2000 * (nfit + 1)  # lmfit default
                     max_nfev = 10000 * (nfit + 1)
                     res = fitter(scint_acf_model_2d, params2d,
@@ -2309,10 +2294,8 @@ class Dynspec:
 
         self.amp = results.params['amp'].value
         self.amperr = results.params['amp'].stderr
-        if 'sim:mb2=' not in self.name:
-            self.wn = results.params['wn'].value
-            self.wnerr = results.params['wn'].stderr
-        else:
+        self.wn = 1 - self.amp
+        if 'sim:mb2=' in self.name:
             self.wn = 0
         if alpha is None:
             self.talpha = results.params['alpha'].value
