@@ -175,7 +175,6 @@ class Dynspec:
         self.times = np.unique(rawdata[2]*60)  # time since obs start (secs)
         self.freqs = rawdata[3]  # Observing frequency in MHz.
         fluxes = rawdata[4]  # fluxes
-        fluxerrs = rawdata[5]  # flux errors
         self.nchan = int(np.unique(rawdata[1])[-1])  # number of channels
         self.bw = self.freqs[-1] - self.freqs[0]  # obs bw
         self.df = round(self.bw/self.nchan, 5)  # channel bw
@@ -193,17 +192,14 @@ class Dynspec:
         self.freqs = np.unique(self.freqs)
         self.freq = round(np.mean(self.freqs), 2)
         fluxes = fluxes.reshape([self.nsub, self.nchan]).transpose()
-        fluxerrs = fluxerrs.reshape([self.nsub, self.nchan]).transpose()
         if self.df < 0:  # flip things
             self.df = -self.df
             self.bw = -self.bw
             # Flip flux matricies since self.freqs is now in ascending order
             fluxes = np.flip(fluxes, 0)
-            fluxerrs = np.flip(fluxerrs, 0)
         # Finished reading, now setup dynamic spectrum
         self.dyn = fluxes  # initialise dynamic spectrum
-        # self.dyn_err = fluxerrs
-        self.dyn_noise = np.nanmedian(fluxerrs)
+
         self.lamsteps = lamsteps
         if process:
             self.auto_processing(lamsteps=lamsteps)  # do automatic processing
