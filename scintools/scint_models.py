@@ -66,7 +66,6 @@ def tau_acf_model(params, xdata, ydata, weights):
         amp = Amplitude
         tau = timescale at 1/e
         alpha = index of exponential function. 2 is Gaussian, 5/3 is Kolmogorov
-        wn = white noise spike in ACF cut
     """
 
     if weights is None:
@@ -77,10 +76,9 @@ def tau_acf_model(params, xdata, ydata, weights):
     amp = parvals['amp']
     tau = parvals['tau']
     alpha = parvals['alpha']
-    wn = parvals['wn']
 
     model = amp*np.exp(-np.divide(xdata, tau)**(alpha))
-    model[0] = model[0] + wn  # add white noise spike
+    weights[0] = 0  # Not fitting for the white noise spike
     # Multiply by triangle function
     model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
 
@@ -93,7 +91,6 @@ def dnu_acf_model(params, xdata, ydata, weights):
     Default function has is exponential with dnu measured at half power
         amp = Amplitude
         dnu = bandwidth at 1/2 power
-        wn = white noise spike in ACF cut
     """
 
     if weights is None:
@@ -103,10 +100,9 @@ def dnu_acf_model(params, xdata, ydata, weights):
 
     amp = parvals['amp']
     dnu = parvals['dnu']
-    wn = parvals['wn']
 
     model = amp*np.exp(-np.divide(xdata, dnu/np.log(2)))
-    model[0] = model[0] + wn  # add white noise spike
+    weights[0] = 0  # Not fitting for the white noise spike
     # Multiply by triangle function
     model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
 
@@ -138,9 +134,11 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     mu = parvals['phasegrad']*60  # min/MHz to s/MHz
     tobs = parvals['tobs']
     bw = parvals['bw']
-    wn = parvals['wn']
     nt = len(tdata)
     nf = len(fdata)
+
+    if weights is None:
+        weights = np.ones(np.shape(ydata))
 
     tdata = np.reshape(tdata, (nt, 1))
     fdata = np.reshape(fdata, (1, nf))
@@ -155,13 +153,10 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     # multiply by triangle function
     model = np.multiply(model, 1-np.divide(abs(tdata), tobs))
     model = np.multiply(model, 1-np.divide(abs(fdata), bw))
-    model = np.fft.fftshift(model)
-    model[-1, -1] += wn  # add white noise spike
-    model = np.fft.ifftshift(model)
+    weights = np.fft.fftshift(weights)
+    weights[-1, -1] = 0  # Not fitting for the white noise spike
+    weights = np.fft.ifftshift(weights)
     model = np.transpose(model)
-
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
 
     return (ydata - model) * weights
 
@@ -180,7 +175,6 @@ def scint_acf_model_2d(params, ydata, weights):
     psi = parvals['psi']
     phasegrad = parvals['phasegrad']
     theta = parvals['theta']
-    wn = parvals['wn']
     amp = parvals['amp']
 
     tobs = parvals['tobs']
@@ -195,7 +189,7 @@ def scint_acf_model_2d(params, ydata, weights):
 
     acf = ACF(taumax=taumax, dnumax=dnumax, nt=nt_crop, nf=nf_crop, ar=ar,
               alpha=alpha, phasegrad=phasegrad, theta=theta,
-              amp=amp, wn=wn, psi=psi)
+              amp=amp, psi=psi)
     model = acf.acf
 
     triangle_t = 1 - np.divide(np.tile(np.abs(np.linspace(-taumax*tau,
@@ -214,6 +208,10 @@ def scint_acf_model_2d(params, ydata, weights):
         weights = np.ones(np.shape(ydata))
         # weights = 1/model
 
+    weights = np.fft.fftshift(weights)
+    weights[-1, -1] = 0  # Not fitting for the white noise spike
+    weights = np.fft.ifftshift(weights)
+
     return (ydata - model) * weights
 
 
@@ -224,16 +222,14 @@ def tau_sspec_model(params, xdata, ydata):
         amp = Amplitude
         tau = timescale at 1/e
         alpha = index of exponential function. 2 is Gaussian, 5/3 is Kolmogorov
-        wn = white noise spike in ACF cut
     """
 
     amp = params['amp']
     tau = params['tau']
     alpha = params['alpha']
-    wn = params['wn']
 
     model = amp * np.exp(-np.divide(xdata, tau)**alpha)
-    model[0] += wn  # add white noise spike
+    model[0] = 0  # Not fitting for the white noise spike
     # Multiply by triangle function
     model = np.multiply(model, 1 - np.divide(xdata, max(xdata)))
 
@@ -255,15 +251,13 @@ def dnu_sspec_model(params, xdata, ydata):
     Default function has is exponential with dnu measured at half power
         amp = Amplitude
         dnu = bandwidth at 1/2 power
-        wn = white noise spike in ACF cut
     """
 
     amp = params['amp']
     dnu = params['dnu']
-    wn = params['wn']
 
     model = amp * np.exp(-np.divide(xdata, dnu / np.log(2)))
-    model[0] += wn  # add white noise spike
+    model[0] = 0  # Not fitting for the white noise spike
     # Multiply by triangle function
     model = np.multiply(model, 1 - np.divide(xdata, max(xdata)))
 
