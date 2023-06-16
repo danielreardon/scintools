@@ -1466,3 +1466,4 @@ def fullMosHess(p, chunks, dspec, N):
                                 H[idpM, idpN] = dpndpm
                                 H[idpN, idpM] = dpndpm
     return H
+
