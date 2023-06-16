@@ -983,3 +983,486 @@ def min_edges(fd_lim,fd,tau,eta,factor=2):
     ## Ensure even number of edges points
     npoints += np.mod(npoints,2)
     return(np.linspace(-fd_lim,fd_lim,int(npoints)))
+
+def rotMos(chunks, x):
+    """Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation and stacking
+
+    Arguments:
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    x -- Numpy Array of length (n-1) where n is the number of chunks. Contains the phase rotation of each chunk after the first.
+    """
+    ## Determine chunks sizes and number in time and freq
+    nct = chunks.shape[1]
+    ncf = chunks.shape[0]
+    cwf = chunks.shape[2]
+    cwt = chunks.shape[3]
+
+    ## Prepare E_recov array (output wavefield)
+    E_recov = np.zeros(
+        ((ncf - 1) * (cwf // 2) + cwf, (nct - 1) * (cwt // 2) + cwt), dtype=complex
+    )
+
+    ##Loop over all chunks
+    for cf in range(ncf):
+        for ct in range(nct):
+            ## Select new chunk
+            chunk_new = np.copy(chunks[cf, ct, :, :])
+
+            ## Find overlap with current wavefield
+            chunk_old = E_recov[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ]
+            mask = np.ones(chunk_new.shape)
+
+            ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+            if cf > 0:
+                ## All chunks but the first in frequency overlap for the first half in frequency
+                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+            if cf < ncf - 1:
+                ## All chunks but the last in frequency overlap for the second half in frequency
+                mask[cwf // 2 :, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+            if ct > 0:
+                ## All chunks but the first in time overlap for the first half in time
+                mask[:, : cwt // 2] *= mask_func(cwt // 2)
+            if ct < nct - 1:
+                ## All chunks but the last in time overlap for the second half in time
+                mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+            rot = 0
+            if cf > 0 or ct > 0:
+                rot = x[nct * cf + ct - 1]
+            ## Add masked and roated new chunk to wavefield
+            E_recov[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ] += (chunk_new * mask * np.exp(1j * rot))
+    return E_recov
+
+
+def rotFit(x, chunks):
+    """Calculates the sum of the dynamic spectrum for the wavefield produced by rotMos. Should be maximized when all chunks add coherently
+
+    Arguments:
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    x -- Numpy Array of length (n-1) where n is the number of chunks. Contains the phase rotation of each chunk after the first.
+    """
+    E = rotMos(chunks, x)
+    res=-np.sum(np.abs(E) ** 2)
+    return res
+
+
+def rotInit(chunks):
+    """Provides an initial estimate for the phase rotations for rotMos or rotfit
+
+    Arguments:
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    """
+    ## Determine chunks sizes and number in time and freq
+    nct = chunks.shape[1]
+    ncf = chunks.shape[0]
+    cwf = chunks.shape[2]
+    cwt = chunks.shape[3]
+
+    ## Prepare E_recov array (output wavefield)
+    E_recov = np.zeros(
+        ((ncf - 1) * (cwf // 2) + cwf, (nct - 1) * (cwt // 2) + cwt), dtype=complex
+    )
+
+    x = np.zeros((ncf * nct - 1))
+    ##Loop over all chunks
+    for cf in range(ncf):
+        for ct in range(nct):
+            ## Select new chunk
+            chunk_new = np.copy(chunks[cf, ct, :, :])
+
+            ## Find overlap with current wavefield
+            chunk_old = E_recov[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ]
+            mask = np.ones(chunk_new.shape)
+
+            ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+            if cf > 0:
+                ## All chunks but the first in frequency overlap for the first half in frequency
+                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+            if cf < ncf - 1:
+                ## All chunks but the last in frequency overlap for the second half in frequency
+                mask[cwf // 2 :, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+            if ct > 0:
+                ## All chunks but the first in time overlap for the first half in time
+                mask[:, : cwt // 2] *= mask_func(cwt // 2)
+            if ct < nct - 1:
+                ## All chunks but the last in time overlap for the second half in time
+                mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+            ##Average phase difference between new chunk and existing wavefield
+            rot = np.angle((chunk_old * np.conjugate(chunk_new) * mask).mean())
+            ## Add masked and roated new chunk to wavefield
+            E_recov[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ] += (chunk_new * mask * np.exp(1j * rot))
+            if cf > 0 or ct > 0:
+                x[cf * nct + ct - 1] = rot
+    return x
+
+def rotDer(x,chunks):
+    """Analytic calculation of the gradient of rotFit for a given set of phase rotations and chunks
+
+    Arguments:
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    x -- Numpy Array of length (n-1) where n is the number of chunks. Contains the phase rotation of each chunk after the first.
+    """
+    nct = chunks.shape[1]
+    ncf = chunks.shape[0]
+    cwf = chunks.shape[2]
+    cwt = chunks.shape[3]
+    E0=rotMos(chunks, x)
+    derivative=np.zeros(x.shape)
+    for cf in range(ncf):
+        for ct in range(nct):
+            if cf > 0 or ct > 0:
+                ## Select new chunk
+                y = np.copy(chunks[cf, ct, :, :])
+
+                ## Find overlap with current wavefield
+                xx = np.copy(E0[
+                    cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+                ])
+                mask = np.ones(y.shape)
+
+                ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+                if cf > 0:
+                    ## All chunks but the first in frequency overlap for the first half in frequency
+                    mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+                if cf < ncf - 1:
+                    ## All chunks but the last in frequency overlap for the second half in frequency
+                    mask[cwf // 2 :, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+                if ct > 0:
+                    ## All chunks but the first in time overlap for the first half in time
+                    mask[:, : cwt // 2] *= mask_func(cwt // 2)
+                if ct < nct - 1:
+                    ## All chunks but the last in time overlap for the second half in time
+                    mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+                y*=mask
+                rot=x[nct * cf + ct - 1]
+                xx-=(y * np.exp(1j * rot))
+                derivative[nct * cf + ct - 1] = np.sum(2*np.imag(np.conjugate(xx)*y*np.exp(1j*rot)))
+    return(derivative)
+
+def fullMos(chunks, p):
+    """Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation, rescaling, and stacking
+
+    Arguments:
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
+        chunk and the final n elements are the rescaling amplitudes for each chunk.
+    """
+    ## Determine chunks sizes and number in time and freq
+    nct = chunks.shape[1]
+    ncf = chunks.shape[0]
+    cwf = chunks.shape[2]
+    cwt = chunks.shape[3]
+
+    ## Prepare E_recov array (output wavefield)
+    E_recov = np.zeros(
+        ((ncf - 1) * (cwf // 2) + cwf, (nct - 1) * (cwt // 2) + cwt), dtype=complex
+    )
+
+    ##Loop over all chunks
+    for cf in range(ncf):
+        for ct in range(nct):
+            idx = cf * nct + ct
+            ## Select new chunk
+            chunk_new = np.copy(chunks[cf, ct, :, :])
+
+            ## Find overlap with current wavefield
+            chunk_old = E_recov[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ]
+            mask = np.ones(chunk_new.shape)
+
+            ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+            if cf > 0:
+                ## All chunks but the first in frequency overlap for the first half in frequency
+                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+            if cf < ncf - 1:
+                ## All chunks but the last in frequency overlap for the second half in frequency
+                mask[cwf // 2 :, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+            if ct > 0:
+                ## All chunks but the first in time overlap for the first half in time
+                mask[:, : cwt // 2] *= mask_func(cwt // 2)
+            if ct < nct - 1:
+                ## All chunks but the last in time overlap for the second half in time
+                mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+            rot = 0
+            if idx > 0:
+                phi = p[idx - 1]
+            else:
+                phi = 0
+            A = p[idx + ncf * nct - 1]
+            ## Add masked and roated new chunk to wavefield
+            E_recov[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ] += (A * chunk_new * mask * np.exp(1j * phi))
+    return E_recov
+
+
+def fullMosFit(p, chunks, dspec, N):
+    """Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation, rescaling, and stacking
+
+    Arguments:
+    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
+        chunk and the final n elements are the rescaling amplitudes for each chunk.
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    dspec -- Numpy Array of the dynamic spectrum to fit to
+    N -- Numpy Array of the standard deviation of the noise for each point in dspec
+    
+    """
+    W = fullMos(chunks, p)
+    M = np.abs(W) ** 2
+    res = np.sum(np.power((M - dspec[:M.shape[0],:M.shape[1]]) / N[:M.shape[0],:M.shape[1]], 2))
+    return res
+
+
+def fullMosGrad(p, chunks, dspec, N):
+    """Analysic gradient of fullMosFit
+
+    Arguments:
+    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
+        chunk and the final n elements are the rescaling amplitudes for each chunk.
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    dspec -- Numpy Array of the dynamic spectrum to fit to
+    N -- Numpy Array of the standard deviation of the noise for each point in dspec
+    
+    """
+    nct = chunks.shape[1]
+    ncf = chunks.shape[0]
+    cwf = chunks.shape[2]
+    cwt = chunks.shape[3]
+    W = fullMos(chunks, p)
+    M = np.abs(W) ** 2
+    weight = 4 * (M - dspec)
+    grad = np.zeros(p.shape[0])
+    for cf in range(ncf):
+        for ct in range(nct):
+            idx = cf * nct + ct
+            y = np.copy(chunks[cf, ct, :, :])
+
+            ## Find overlap with current wavefield
+            xx = weight[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ]
+            Nse = N[
+                cf * cwf // 2 : cf * cwf // 2 + cwf, ct * cwt // 2 : ct * cwt // 2 + cwt
+            ]
+            mask = np.ones(y.shape)
+
+            ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+            if cf > 0:
+                ## All chunks but the first in frequency overlap for the first half in frequency
+                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+            if cf < ncf - 1:
+                ## All chunks but the last in frequency overlap for the second half in frequency
+                mask[cwf // 2 :, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+            if ct > 0:
+                ## All chunks but the first in time overlap for the first half in time
+                mask[:, : cwt // 2] *= mask_func(cwt // 2)
+            if ct < nct - 1:
+                ## All chunks but the last in time overlap for the second half in time
+                mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+            y *= mask
+            if idx > 0:
+                phi = p[idx - 1]
+            else:
+                phi = 0
+            A = p[idx + ncf * nct - 1]
+
+            temp = np.conjugate(
+                np.sum(
+                    xx
+                    * y
+                    * np.exp(1j * phi)
+                    * np.conjugate(
+                        W[
+                            cf * cwf // 2 : cf * cwf // 2 + cwf,
+                            ct * cwt // 2 : ct * cwt // 2 + cwt,
+                        ]
+                    )
+                    / Nse**2
+                )
+            )
+            if idx > 0:
+                grad[idx - 1] = A * temp.imag
+            grad[idx + ncf * nct - 1] = temp.real
+    return grad
+
+
+def fullMosHess(p, chunks, dspec, N):
+    """Analysic Hessian of fullMosFit
+
+    Arguments:
+    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
+        chunk and the final n elements are the rescaling amplitudes for each chunk.
+    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    dspec -- Numpy Array of the dynamic spectrum to fit to
+    N -- Numpy Array of the standard deviation of the noise for each point in dspec
+    
+    """
+
+    nct = chunks.shape[1]
+    ncf = chunks.shape[0]
+    cwf = chunks.shape[2]
+    cwt = chunks.shape[3]
+    W = fullMos(chunks, p)
+    Ws = np.conjugate(W)
+    M = np.abs(W) ** 2
+    weight =  (M - dspec)
+    H = np.zeros((p.shape[0], p.shape[0]))
+    for cfN in range(ncf):
+        for ctN in range(nct):
+            idxN = cfN * nct + ctN
+            yN = np.copy(chunks[cfN, ctN, :, :])
+
+            ## Find overlap with current wavefield
+            wtN = weight[
+                cfN * cwf // 2 : cfN * cwf // 2 + cwf,
+                ctN * cwt // 2 : ctN * cwt // 2 + cwt,
+            ]
+            NseN = N[
+                cfN * cwf // 2 : cfN * cwf // 2 + cwf,
+                ctN * cwt // 2 : ctN * cwt // 2 + cwt,
+            ]
+            mask = np.ones(yN.shape)
+
+            ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+            if cfN > 0:
+                ## All chunks but the first in frequency overlap for the first half in frequency
+                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+            if cfN < ncf - 1:
+                ## All chunks but the last in frequency overlap for the second half in frequency
+                mask[cwf // 2 :, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+            if ctN > 0:
+                ## All chunks but the first in time overlap for the first half in time
+                mask[:, : cwt // 2] *= mask_func(cwt // 2)
+            if ctN < nct - 1:
+                ## All chunks but the last in time overlap for the second half in time
+                mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+            yN *= mask
+            idpN = idxN - 1
+            if idpN > -1:
+                phiN = p[idpN]
+            else:
+                phiN = 0
+            yN*=np.exp(1j*phiN)
+            idAN = idxN + ncf * nct - 1
+            AN = p[idAN]
+            tempN = (
+                yN
+                * Ws[
+                    cfN * cwf // 2 : cfN * cwf // 2 + cwf,
+                    ctN * cwt // 2 : ctN * cwt // 2 + cwt,
+                ]
+            )
+
+            for dt in np.array([-1,0,1]):
+                if dt == -1:
+                    olNt = np.linspace(0, cwt // 2 - 1, cwt // 2).astype(int)
+                    olMt = np.linspace(cwt // 2, cwt - 1, cwt // 2).astype(int)
+                elif dt == 0:
+                    olNt = np.linspace(0, cwt - 1, cwt).astype(int)
+                    olMt = np.linspace(0, cwt - 1, cwt).astype(int)
+                else:
+                    olMt = np.linspace(0, cwt // 2 - 1, cwt // 2).astype(int)
+                    olNt = np.linspace(cwt // 2, cwt - 1, cwt // 2).astype(int)
+                for df in np.array([-1,0,1]):
+                    if df == -1:
+                        olNf = np.linspace(0, cwf // 2 - 1, cwf // 2).astype(int)
+                        olMf = np.linspace(cwf // 2, cwf - 1, cwf // 2).astype(int)
+                    elif df == 0:
+                        olNf = np.linspace(0, cwf - 1, cwf).astype(int)
+                        olMf = np.linspace(0, cwf - 1, cwf).astype(int)
+                    else:
+                        olMf = np.linspace(0, cwf // 2 - 1, cwf // 2).astype(int)
+                        olNf = np.linspace(cwf // 2, cwf - 1, cwf // 2).astype(int)
+                    cfM = cfN + df
+                    ctM = ctN + dt
+                    if -1 < cfM < ncf and -1 < ctM < nct:
+                        idxM = cfM * nct + ctM
+                        yM = np.copy(chunks[cfM, ctM, :, :])
+                        mask = np.ones(yN.shape)
+
+                        ##Determine Mask for new chunk (chunks will have higher weights towards their centre)
+                        if cfM > 0:
+                            ## All chunks but the first in frequency overlap for the first half in frequency
+                            mask[: cwf // 2, :] *= mask_func(cwf // 2)[
+                                :, np.newaxis
+                            ]
+                        if cfM < ncf - 1:
+                            ## All chunks but the last in frequency overlap for the second half in frequency
+                            mask[cwf // 2 :, :] *= (
+                                1 - mask_func(cwf // 2)[:, np.newaxis]
+                            )
+                        if ctM > 0:
+                            ## All chunks but the first in time overlap for the first half in time
+                            mask[:, : cwt // 2] *= mask_func(cwt // 2)
+                        if ctM < nct - 1:
+                            ## All chunks but the last in time overlap for the second half in time
+                            mask[:, cwt // 2 :] *= 1 - mask_func(cwt // 2)
+                        yM *= mask
+                        idpM = idxM - 1
+                        if idpM > -1:
+                            phiM = p[idpM]
+                        else:
+                            phiM = 0
+                        yM*=np.exp(1j*phiM)
+                        idAM = idxM + ncf * nct - 1
+                        AM = p[idAM]
+                        tempM = (
+                            yM
+                            * Ws[
+                                cfM * cwf // 2 : cfM * cwf // 2 + cwf,
+                                ctM * cwt // 2 : ctM * cwt // 2 + cwt,
+                            ]
+                        )
+
+                        
+                        #print(cfN,ctN,df,dt,tempM.shape,olMf.max(),olMf.min(),olMt.max(),olMt.min())
+                        dAndAm = 8 * np.real(tempM[olMf][:, olMt]) * np.real(
+                            tempN[olNf][:, olNt]
+                        ) + 4 * wtN[olNf][:, olNt] * np.real(
+                            np.conjugate(yM[olMf][:, olMt]) * yN[olNf][:, olNt]
+                        )
+                        dAndAm = np.sum(dAndAm / (NseN[olNf][:, olNt] ** 2))
+                        H[idAN, idAM] = dAndAm
+                        H[idAM, idAN] = dAndAm
+                        if idxM > 0:
+                            dAndpm = -8 * AM * np.imag(tempM[olMf][:, olMt]) * np.real(
+                                tempN[olNf][:, olNt]
+                            ) + 4 * wtN[olNf][:, olNt] * AM * np.imag(
+                                yN[olNf][:, olNt] * np.conjugate(yM[olMf][:, olMt])
+                            )
+                            if idxM == idxN:
+                                dAndpm -= (
+                                    4
+                                    * wtN[olNf][:, olNt]
+                                    * np.imag(tempN[olNf][:, olNt])
+                                )
+                            dAndpm = np.sum(dAndpm / (NseN[olNf][:, olNt] ** 2))
+                            H[idAN, idpM] = dAndpm
+                            H[idpM, idAN] = dAndpm
+                            if idxN > 0:
+                                dpndpm = 8 * AN * AM * np.imag(
+                                    tempM[olMf][:, olMt]
+                                ) * np.imag(tempN[olNf][:, olNt]) + 4 * AN * AM * wtN[
+                                    olNf][:, olNt
+                                ] * np.real(
+                                    np.conjugate(yM[olMf][:, olMt]) * yN[olNf][:, olNt]
+                                )
+                                if idxM == idxN:
+                                    dpndpm -= (
+                                        4
+                                        * AN
+                                        * wtN[olNf][:, olNt]
+                                        * np.real(tempN[olNf][:, olNt])
+                                    )
+                                dpndpm=np.sum(dpndpm/  (NseN[olNf][:, olNt] ** 2))
+                                H[idpM, idpN] = dpndpm
+                                H[idpN, idpM] = dpndpm
+    return H
