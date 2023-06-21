@@ -15,9 +15,13 @@ import sys
 import csv
 from decimal import Decimal, InvalidOperation
 from scipy.optimize import fsolve
+from scipy.signal import correlate
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter1d
 import pickle
+from astropy import units as u
 from astropy.time import Time
+from astropy.coordinates import SkyCoord, get_body_barycentric
 
 
 def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
@@ -60,6 +64,26 @@ def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
     return
 
 
+def autocorr(arr):
+    """
+    Do a slow calculation of the 2d autocorrelation of an input masked array
+    """
+    mean = np.ma.mean(arr)
+    std = np.ma.std(arr)
+    nr, nc = np.shape(arr)
+    autocorr = np.zeros((2*nr, 2*nc))
+    for x in range(-nr, nr):
+        for y in range(-nc, nc):
+            segment = (arr[max(0, x):min(x+nr, nr),
+                           max(0, y):min(y+nc, nc)] - mean) \
+                    * (arr[max(0, -x):min(-x+nr, nr),
+                           max(0, -y):min(-y+nc, nc)] - mean)
+            numerator = np.ma.sum(segment)
+            autocorr[x+nr][y+nc] = numerator / (std ** 2)
+    autocorr /= np.nanmax(autocorr)
+    return autocorr
+
+
 def is_valid(array):
     """
     Returns boolean array of values that are finite an not nan
@@ -94,35 +118,49 @@ def write_results(filename, dyn=None):
         header += ",dnu,dnuerr"
         write_string += ",{0},{1}".format(dyn.dnu, dyn.dnuerr)
 
+    if hasattr(dyn, 'fse_tau'):  # Finite scintle error timescale and bandwidth
+        header += ",fse_tau,fse_dnu"
+        write_string += ",{0},{1}".format(dyn.fse_tau, dyn.fse_dnu)
+
+    if hasattr(dyn, 'scint_param_method'):  # Method of scint measurement
+        header += ",scint_param_method"
+        write_string += ",{0}".format(dyn.scint_param_method)
+
     if hasattr(dyn, 'dnu_est'):  # Estimated scintillation bandwidth
         header += ",dnu_est"
         write_string += ",{0}".format(dyn.dnu_est)
+
+    if hasattr(dyn, 'nscint'):  # Estimated number of scintles
+        header += ",nscint"
+        write_string += ",{0}".format(dyn.nscint)
 
     if hasattr(dyn, 'ar'):  # Axial ratio
         header += ",ar,arerr"
         write_string += ",{0},{1}".format(dyn.ar, dyn.arerr)
 
-    if hasattr(dyn, 'sigma_x'):  # Phase gradient in x,y
-        header += ",sigma_x,sigma_xerr,sigma_y,sigma_yerr"
-        write_string += ",{0},{1},{2},{3}".format(dyn.sigma_x,
-                                                  dyn.sigma_xerr,
-                                                  dyn.sigma_y,
-                                                  dyn.sigma_yerr)
-
-    if hasattr(dyn, 'v_x'):  # Velocity in x,y
-        header += ",v_x,v_xerr,v_y,v_yerr"
-        write_string += ",{0},{1},{2},{3}".format(dyn.v_x,
-                                                  dyn.v_xerr,
-                                                  dyn.v_y,
-                                                  dyn.v_yerr)
-
     if hasattr(dyn, 'acf_tilt'):  # Tilt in the ACF (MHz/min)
         header += ",acf_tilt,acf_tilt_err"
         write_string += ",{0},{1}".format(dyn.acf_tilt, dyn.acf_tilt_err)
 
+    if hasattr(dyn, 'fse_tilt'):  # Finite scintle error, tilt
+        header += ",fse_tilt"
+        write_string += ",{0}".format(dyn.fse_tilt)
+
     if hasattr(dyn, 'phasegrad'):  # Phase gradient (shear to the ACF)
         header += ",phasegrad,phasegraderr"
         write_string += ",{0},{1}".format(dyn.phasegrad, dyn.phasegraderr)
+
+    if hasattr(dyn, 'fse_phasegrad'):  # Finite scintle error, phase gradient
+        header += ",fse_phasegrad"
+        write_string += ",{0}".format(dyn.fse_phasegrad)
+
+    if hasattr(dyn, 'theta'):  # Phase gradient angle relative to V
+        header += ",theta,thetaerr"
+        write_string += ",{0},{1}".format(dyn.theta, dyn.thetaerr)
+
+    if hasattr(dyn, 'psi'):  # Anisotropy angle relative to V
+        header += ",psi,psierr"
+        write_string += ",{0},{1}".format(dyn.psi, dyn.psierr)
 
     if hasattr(dyn, 'eta'):  # Arc curvature
         header += ",eta,etaerr"
@@ -150,7 +188,7 @@ def write_results(filename, dyn=None):
         write_string += ",{0},{1}".format(dyn.betaeta_right,
                                           dyn.betaetaerr_right)
 
-    if hasattr(dyn, 'norm_delmax'):  # Phase gradient (shear to the ACF)
+    if hasattr(dyn, 'norm_delmax'):
         header += ",delmax"
         write_string += ",{0}".format(dyn.norm_delmax)
 
@@ -245,18 +283,17 @@ def difference(x):
     return np.array(dx).squeeze()
 
 
-def get_ssb_delay(mjds, raj, decj):
+def get_ssb_delay(mjds, raj, decj, message=True):
     """
     Get Romer delay to Solar System Barycentre (SSB) for correction of site
     arrival times to barycentric.
     """
 
-    from astropy.time import Time
-    from astropy.coordinates import get_body_barycentric, SkyCoord
-    from astropy import units as u
     from astropy.constants import au, c
+    from astropy.coordinates import BarycentricTrueEcliptic, SkyCoord
 
-    coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
+    coord = SkyCoord('{0} {1}'.format(raj, decj), frame=BarycentricTrueEcliptic,
+                     unit=(u.hourangle, u.deg))
     psr_xyz = coord.cartesian.xyz.value
 
     t = []
@@ -266,15 +303,52 @@ def get_ssb_delay(mjds, raj, decj):
         e_dot_p = np.dot(earth_xyz.xyz.value, psr_xyz)
         t.append(e_dot_p*au.value/c.value)
 
-    print('WARNING! Understand sign of SSB correction before applying to MJDs')
+    if message:
+        print('Returned SSB Roemer delays (in seconds) should be ' + \
+              'ADDED to site arrival times')
 
-    return t
+    return np.array(t)
 
 
-def get_earth_velocity(mjds, raj, decj):
+def make_lsr(d, raj, decj, pmra, pmdec, vr=0):
+    from astropy.coordinates import BarycentricTrueEcliptic, LSR, SkyCoord
+    from astropy import units as u
+
+    coord = SkyCoord('{0} {1}'.format(raj, decj), unit=(u.hourangle, u.deg))
+    ra = coord.ra.value
+    dec = coord.dec.value
+
+    # Initialise the barycentric coordinates with the LSR class and v_bary=0
+    pm = LSR(ra=ra*u.degree, dec=dec*u.deg,
+             pm_ra_cosdec=pmra*u.mas/u.yr,
+             pm_dec=pmdec*u.mas/u.yr, distance=d*u.kpc,
+             radial_velocity=vr*u.km/u.s,
+             v_bary=(0.0*u.km/u.s, 0.0*u.km/u.s, 0.0*u.km/u.s))
+    pm_ecliptic = pm.transform_to(BarycentricTrueEcliptic)
+
+    # Get barycentric ecliptic coordinates
+    elat = coord.barycentrictrueecliptic.lat.value
+    elong = coord.barycentrictrueecliptic.lon.value
+    pm_lat = pm_ecliptic.pm_lat.value
+    pm_lon_coslat = pm_ecliptic.pm_lon_coslat.value
+
+    bte = BarycentricTrueEcliptic(lon=elong*u.degree, lat=elat*u.degree,
+                                  distance=d*u.kpc,
+                                  pm_lon_coslat=pm_lon_coslat*u.mas/u.yr,
+                                  pm_lat=pm_lat*u.mas/u.yr,
+                                  radial_velocity=vr*u.km/u.s)
+
+    # Convert barycentric back to LSR
+    lsr_coord = bte.transform_to(LSR(v_bary=(11.1*u.km/u.s,
+                                             12.24*u.km/u.s, 7.25*u.km/u.s)))
+
+    return lsr_coord.proper_motion.to_value()
+
+
+def get_earth_velocity(mjds, raj, decj, radial=False):
     """
     Calculates the component of Earth's velocity transverse to the line of
-    sight, in RA and DEC
+    sight, in RA and DEC. Optionally returns the radial velocity
     """
 
     from astropy.time import Time
@@ -288,6 +362,8 @@ def get_earth_velocity(mjds, raj, decj):
 
     vearth_ra = []
     vearth_dec = []
+    if radial:
+        vearth_radial = []
     for mjd in mjds:
         time = Time(mjd, format='mjd')
         pos_xyz, vel_xyz = get_body_barycentric_posvel('earth', time)
@@ -300,12 +376,22 @@ def get_earth_velocity(mjds, raj, decj):
         vearth_dec.append(- vx * np.sin(decrad) * np.cos(rarad) -
                           vy * np.sin(decrad) * np.sin(rarad) +
                           vz * np.cos(decrad))
+        if radial:
+            vearth_radial.append(vx * np.cos(decrad) * np.cos(rarad) +
+                                 vy * np.cos(decrad) * np.sin(rarad) +
+                                 vz * np.sin(decrad))
 
     # Convert from AU/d to km/s
     vearth_ra = vearth_ra * au/1e3/86400
     vearth_dec = vearth_dec * au/1e3/86400
+    if radial:
+        vearth_radial = vearth_radial * au/1e3/86400
 
-    return vearth_ra.value.squeeze(), vearth_dec.value.squeeze()
+    if radial:
+        return vearth_ra.value.squeeze(), vearth_dec.value.squeeze(), \
+            vearth_radial.value.squeeze()
+    else:
+        return vearth_ra.value.squeeze(), vearth_dec.value.squeeze()
 
 
 def read_par(parfile):
@@ -324,7 +410,7 @@ def read_par(parfile):
         err = None
         p_type = None
         sline = line.split()
-        if len(sline) == 0 or line[0] == "#" or line[0:1] == "C " \
+        if len(sline) == 0 or line[0] == "#" or line[0:2] == "C " \
            or sline[0] in ignore:
             continue
 
@@ -372,6 +458,24 @@ def mjd_to_year(mjd):
     return yrs
 
 
+def find_nearest(arr, val):
+    """
+    Returns the index of an array (arr) that is nearest to value (val)
+    """
+    arr = np.asarray(arr)
+    ind = np.argmin(np.abs(arr - val))
+    return ind
+
+
+def longest_run_of_zeros(arr):
+    count = 0
+    max_count = 0
+    for num in arr:
+        count = count + 1 if num == 0 else 0
+        max_count = max(max_count, count)
+    return max_count
+
+
 def pars_to_params(pars, params=None):
     """
     Converts a dictionary of par file parameters from read_par() to an
@@ -407,10 +511,18 @@ def get_true_anomaly(mjds, pars):
     dictionary
     """
 
-    PB = pars['PB']
-    T0 = pars['T0']
-    ECC = pars['ECC']
+    if 'TASC' in pars.keys():
+        T0 = pars['TASC']  # MJD
+        ECC = np.sqrt(pars['EPS1']**2 + pars['EPS2']**2)
+    else:
+        T0 = pars['T0']  # MJD
+        ECC = pars['ECC']
+
+    PB = pars['PB']  # days
     PBDOT = 0 if 'PBDOT' not in pars.keys() else pars['PBDOT']
+    if np.abs(PBDOT) > 1e-10:
+        # correct tempo-format
+        PBDOT *= 10**-12
 
     nb = 2*np.pi/PB
 
@@ -423,7 +535,9 @@ def get_true_anomaly(mjds, pars):
         print('Assuming circular orbit for true anomaly calculation')
         E = M
     else:
+        M = np.asarray(M, dtype=np.float64)
         E = fsolve(lambda E: E - ECC*np.sin(E) - M, M)
+        E = np.asarray(E, dtype=np.float128)
 
     # true anomaly
     U = 2*np.arctan2(np.sqrt(1 + ECC) * np.sin(E/2),
@@ -435,6 +549,104 @@ def get_true_anomaly(mjds, pars):
         U += 2*np.pi
 
     return U
+
+
+def get_binphase(mjds, pars):
+    """
+    Calculates binary phase for an array of barycentric MJDs and a parameter
+    dictionary
+    """
+    U = get_true_anomaly(mjds, pars)
+
+    if 'TASC' in pars.keys():
+        OM = 0
+    else:
+        OM = pars['OM'] * np.pi/180
+        if 'OMDOT' in pars.keys():
+            OM += pars['OMDOT'] * (np.pi/180) / (86400*365.2425) * \
+                (mjds - pars['T0'])
+
+    return U + OM
+
+
+def acor(arr):
+    """
+
+    Parameters
+    ----------
+    arr : Array
+         Array of numbers, e.g. a time series
+
+    Returns
+    -------
+    Int
+        Characteristic (50%) autocorrelation length.
+
+    """
+    arr -= np.mean(arr)
+    auto_correlation = correlate(arr, arr, mode='full')
+    auto_correlation = auto_correlation[auto_correlation.size//2:]
+    auto_correlation /= auto_correlation[0]
+    indices = np.where(auto_correlation<0.5)[0]
+    if len(indices)>0:
+        return indices[0]
+    else:
+        return 0
+
+
+def differential_velocity(params, sun_velocity=220, screen_velocity=220,
+                          radius=8):
+    """
+    Approximates the differential velocity between the scattering screen and
+    the Sun assuming zero-inclination circular galactic orbits. Useful for
+    determining the intrinsic ISM velocity.
+
+    Parameters
+    ----------
+    params : dict
+        Parameters list containing the pulsar RAJ and DECJ, pulsar distance d,
+        screen fractional distance s, and anisotropy angle psi.
+    sun_velocity : float, optional
+        Orbital speed of the Sun in km/s. The default is 220.
+    screen_velocity : float, optional
+        Orbital speed of the scattering screen in km/s. The default of 220
+        assumes a flat galactic rotation curve.
+    radius : float, optional
+        Radius of the Sun's orbit about the galactic center in kpc. The default
+        is 8.
+
+    Returns
+    -------
+    v_ra, v_dec : float
+        The RA and dec components of the differential velocity in km/s.
+
+    """
+
+    c_icrs = SkyCoord('{0} {1}'.format(params['RAJ'].value,
+                                       params['DECJ'].value),
+                      unit=(u.radian, u.radian), frame='icrs')
+    c_gal = c_icrs.galactic
+    long = 2 * np.pi - c_gal.l.radian
+
+    dscr = (1 - params['s'].value) * params['d'].value
+    # radial position of screen
+    rscr = np.sqrt(dscr**2 + radius**2 - (2 * dscr * radius * np.cos(long)))
+    costheta = radius / rscr - (dscr * np.cos(long) / rscr)
+    # angle between screen orbital velocity and transverse direction
+    phi = long + np.arccos(costheta)
+
+    vtrans_scr = screen_velocity * np.cos(phi)  # screen transverse velocity
+    vtrans_sun = sun_velocity * np.cos(long)  # sun velocity in same direction
+    diff_vel = vtrans_scr - vtrans_sun
+
+    c_new = SkyCoord(l=c_gal.l.degree+1, b=c_gal.b.degree, unit=(u.deg, u.deg),
+                     frame='galactic')
+    ra_diff = c_new.icrs.ra.radian - c_icrs.ra.radian
+    dec_diff = c_new.icrs.dec.radian - c_icrs.dec.radian
+    # angle of velocity on the sky as measured east from the dec axis
+    angle = np.pi / 2 - np.arctan(dec_diff / ra_diff)
+
+    return diff_vel * np.sin(angle), diff_vel * np.cos(angle)
 
 
 def slow_FT(dynspec, freqs):
@@ -551,7 +763,7 @@ def scint_velocity(params, dnu, tau, freq, dnuerr=None, tauerr=None, a=2.53e4):
         return viss
 
 
-def interp_nan_2d(array):
+def interp_nan_2d(array, method='linear'):
     """
     Fill in NaN values of a 2D array using linear interpolation
     """
@@ -565,8 +777,18 @@ def interp_nan_2d(array):
     x1 = xx[~array.mask]
     y1 = yy[~array.mask]
     newarr = np.ravel(array[~array.mask])
-    array = griddata((x1, y1), newarr, (xx, yy), method='linear')
+    array = griddata((x1, y1), newarr, (xx, yy), method=method)
     return array
+
+
+def centres_to_edges(arr):
+    """
+    Take an array of pixel-centres, and return an array of pixel-edges
+        assumes the pixel-centres are evenly spaced
+    """
+    darr = np.abs(arr[1] - arr[0])
+    arr_edges = arr - darr/2
+    return np.append(arr_edges, arr_edges[-1] + darr)
 
 
 def make_pickle(obj, filepath):
@@ -581,11 +803,13 @@ def make_pickle(obj, filepath):
             f_out.write(bytes_out[idx:idx+max_bytes])
 
 
-def calculate_curvature_peak_probability(power_data, noise_level,
+def calculate_curvature_peak_probability(power_data, noise_level, smooth=True,
                                          curvatures=None, log=False):
     """
     Calculates the probability distribution
     """
+    if smooth:
+        power_data = gaussian_filter1d(power_data, noise_level)
     if np.shape(noise_level) == ():
         max_power = np.max(power_data)
     else:
@@ -644,13 +868,6 @@ def make_dynspec(archive, template=None, phasebin=1):
         $ psrflux -s [template] -e dynspec [archive]
     """
     return
-
-
-def remove_duplicates(dyn_files):
-    """
-    Filters out dynamic spectra from simultaneous observations
-    """
-    return dyn_files
 
 
 def curvature_log_likelihood(power, nfdop, noise, model_nfdop):

@@ -5,3 +5,5 @@ matplotlib
 lmfit
 emcee
 corner
+scikit-image
+bilby

@@ -10,13 +10,15 @@ import numpy as np
 import astropy.units as u
 from scipy.sparse.linalg import eigsh
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm,SymLogNorm
+from matplotlib.colors import LogNorm, SymLogNorm
 from scipy.optimize import curve_fit
 import warnings
 
+
 def svd_model(arr, nmodes=1):
     """
-    Model a matrix using the first nmodes modes of the singular value decomposition
+    Model a matrix using the first nmodes modes of the singular value
+    decomposition
 
     Arguments:
     arr -- 2d numpy array ti be modeled
@@ -36,14 +38,14 @@ def chi_par(x, A, x0, C):
 
     Arguments:
     x -- numpy array of x coordinates of fit
-    A -- 
+    A --
     x0 -- x coordinate of parabola extremum
     C -- y coordinate of extremum
     """
-    return A*(x - x0)**2 + C
+    return A * (x - x0)**2 + C
 
 
-def thth_map(CS, tau, fd, eta, edges,hermetian=True):
+def thth_map(CS, tau, fd, eta, edges, hermetian=True):
     """Map from Secondary Spectrum to theta-theta space
 
     Arguments:
@@ -71,7 +73,7 @@ def thth_map(CS, tau, fd, eta, edges,hermetian=True):
     # Find bin in CS space that each point maps back to
     tau_inv = (((eta * (th1**2 - th2**2))
                 - tau[0] + dtau/2)//dtau).astype(int)
-    fd_inv = (((th1 - th2) - fd[0] + dfd/2)//dfd).astype(int)
+    fd_inv = (((th1 - th2) - fd[0] + dfd / 2) // dfd).astype(int)
 
     # Define thth
     thth = np.zeros(tau_inv.shape, dtype=complex)
@@ -81,7 +83,7 @@ def thth_map(CS, tau, fd, eta, edges,hermetian=True):
     thth[pnts] = CS[tau_inv[pnts], fd_inv[pnts]]
 
     # Preserve flux (int
-    thth *= np.sqrt(np.abs(2*eta*(th2-th1)).value)
+    thth *= np.sqrt(np.abs(2 * eta * (th2 - th1)).value)
     if hermetian:
         # Force Hermetian
         thth -= np.tril(thth)
@@ -93,7 +95,7 @@ def thth_map(CS, tau, fd, eta, edges,hermetian=True):
     return thth
 
 
-def thth_redmap(CS, tau, fd, eta, edges,hermetian=True):
+def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
     """
     Map from Secondary Spectrum to theta-theta space for the largest
     possible filled in sqaure within edges
@@ -106,22 +108,22 @@ def thth_redmap(CS, tau, fd, eta, edges,hermetian=True):
     edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
     """
 
-    tau = unit_checks(tau,'tau',u.us)
-    fd = unit_checks(fd,'fd',u.mHz)
-    eta = unit_checks(eta,'eta',u.s**3)
-    edges = unit_checks(edges,'edges',u.mHz)
+    tau = unit_checks(tau, 'tau', u.us)
+    fd = unit_checks(fd, 'fd', u.mHz)
+    eta = unit_checks(eta, 'eta', u.s**3)
+    edges = unit_checks(edges, 'edges', u.mHz)
 
     # Find full thth
-    thth = thth_map(CS, tau, fd, eta, edges,hermetian)
+    thth = thth_map(CS, tau, fd, eta, edges, hermetian)
 
     # Find region that is fully within CS
-    th_cents = (edges[1:]+edges[:-1])/2
+    th_cents = (edges[1:] + edges[:-1]) / 2
     th_cents -= th_cents[np.abs(th_cents) == np.abs(th_cents).min()]
-    th_pnts = ((th_cents**2)*eta < np.abs(tau.max())) * \
-        (np.abs(th_cents) < np.abs(fd.max())/2)
+    th_pnts = ((th_cents**2) * eta < np.abs(tau.max())) * \
+        (np.abs(th_cents) < np.abs(fd.max()) / 2)
     thth_red = thth[th_pnts, :][:, th_pnts]
     edges_red = th_cents[th_pnts]
-    edges_red = (edges_red[:-1]+edges_red[1:])/2
+    edges_red = (edges_red[:-1]+edges_red[1:]) / 2
     edges_red = np.concatenate((np.array([edges_red[0].value -
                                           np.diff(edges_red.value).mean()]),
                                 edges_red.value, np.array([edges_red[-1].value +
@@ -130,7 +132,7 @@ def thth_redmap(CS, tau, fd, eta, edges,hermetian=True):
     return thth_red, edges_red
 
 
-def rev_map(thth, tau, fd, eta, edges,isdspec=True):
+def rev_map(thth, tau, fd, eta, edges, isdspec=True):
     """
     Map back from theta-theta space to CS space
 
@@ -184,10 +186,10 @@ def rev_map(thth, tau, fd, eta, edges,isdspec=True):
     recov=np.nan_to_num(recov)
     return(recov.T)
 
-def modeler(CS, tau, fd, eta, edges,fd2=None,tau2=None):
+def modeler(CS, tau, fd, eta, edges, fd2=None, tau2=None):
     """
-    Create theta-theta array as well as model theta-theta, Conjugate Spectrum and Dynamic Spectrum
-    from data conjugate spectrum and curvature
+    Create theta-theta array as well as model theta-theta, Conjugate Spectrum
+    and Dynamic Spectrum from data conjugate spectrum and curvature
 
     Arguments:
     CS -- 2d complex numpy array of the Conjugate Spectrum
@@ -254,8 +256,8 @@ def chisq_calc(dspec,CS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
 
 def Eval_calc(CS, tau, fd, eta, edges):
     """
-    Calculates the dominant eigenvalue for the theta-theta matrix from a given conjugate spectrum
-    and curvature.
+    Calculates the dominant eigenvalue for the theta-theta matrix from a given
+    conjugate spectrum and curvature.
 
 
     Arguments:
@@ -306,7 +308,12 @@ def len_arc(x,eta):
     a=2*eta
     return((a*x*np.sqrt((a*x)**2 + 1) +np.arcsinh(a*x))/(2.*a))
 
-def arc_edges(eta,dfd,dtau,fd_max,n):
+def len_arc(x, eta):
+    a = 2 * eta
+    return((a * x * np.sqrt((a * x)**2 + 1) + np.arcsinh(a * x)) / (2. * a))
+
+
+def arc_edges(eta, dfd, dtau, fd_max, n):
     '''
     Calculate evenly spaced in arc length edges array (DEVELOPMENT ONLY)
 
@@ -317,16 +324,17 @@ def arc_edges(eta,dfd,dtau,fd_max,n):
     fd_max largest fD value in edges array
     b -- Integer number of points in array (assumed to be even)
     '''
-    x_max=fd_max/dfd
-    eta_ul=dfd**2*eta/dtau
-    l_max=len_arc(x_max.value,eta_ul.value)
-    dl=l_max/(n//2 - .5)
-    x=np.zeros(int(n//2))
-    x[0]=dl/2
-    for i in range(x.shape[0]-1):
-        x[i+1]=x[i]+dl/(np.sqrt(1+(2*eta_ul*x[i])**2))
-    edges=np.concatenate((-x[::-1],x))*dfd.value
-    return(edges) 
+    x_max = fd_max / dfd
+    eta_ul = dfd**2 * eta / dtau
+    l_max = len_arc(x_max.value, eta_ul.value)
+    dl = l_max / (n // 2 - .5)
+    x = np.zeros(int(n // 2))
+    x[0] = dl / 2
+    for i in range(x.shape[0] - 1):
+        x[i + 1] = x[i] + dl / (np.sqrt(1 + (2 * eta_ul * x[i])**2))
+    edges = np.concatenate((-x[::-1], x)) * dfd.value
+    return(edges)
+
 
 def ext_find(x, y):
     '''
@@ -342,17 +350,21 @@ def ext_find(x, y):
            (y[0] - dy / 2).value, (y[-1] + dy / 2).value]
     return (ext)
 
+
 def fft_axis(x, unit, pad=0):
     '''
     Calculates fourier space coordinates from data space coordinates.
 
     Arguments
-    x -- Astropy 
+    x -- Astropy
     unit -- desired unit for fourier coordinates
-    pad -- integer giving how many additional copies of the data are padded in this direction
+    pad -- integer giving how many additional copies of the data are padded in
+        this direction
     '''
     fx = np.fft.fftshift(
-        np.fft.fftfreq((pad+1) * x.shape[0], x[1] - x[0]).to_value(unit)) * unit
+        np.fft.fftfreq(
+            (pad + 1) * x.shape[0],
+            x[1] - x[0]).to_value(unit)) * unit
     return (fx)
 
 
@@ -360,14 +372,13 @@ def single_search(params):
     """
     Curvature Search for a single chunk of a dynamic spectrum. Designed for use with MPI4py
     
-
     Arguments:
     params -- A tuple containing
         dspec2 -- The chunk of the dynamic spectrum
         freq2 -- The frequency channels of that chunk (with units)
         time -- The time bins of that chunk (with units)
-        eta_low -- The lower limit of curvatures to search (with units)
-        eta_high -- the upper limit of curvatures to search (with units)
+        eta_l -- The lower limit of curvatures to search (with units)
+        eta_h -- the upper limit of curvatures to search (with units)
         edges -- The bin edges for Theta-Theta
         name -- A string filename used if plotting
         plot -- A bool controlling if the result should be plotted
@@ -394,9 +405,10 @@ def single_search(params):
 
     ## Pad dynamic Spectrum
     dspec_pad = np.pad(dspec2,
-                   ((0, npad * dspec2.shape[0]), (0, npad * dspec2.shape[1])),
-                   mode='constant',
-                   constant_values=dspec2.mean())
+                       ((0, npad * dspec2.shape[0]),
+                        (0, npad * dspec2.shape[1])),
+                       mode='constant',
+                       constant_values=dspec2.mean())
 
     ## Calculate Conjugate Spectrum
     CS = np.fft.fft2(dspec_pad)
@@ -486,11 +498,13 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     eta_fit -- Best fit curvature
     eta_sig -- Error on best fir curvature
     etas -- 1D numpy array of curvatures searched over
-    measure -- 1D numpy array with largest eigenvalue (method = 'eigenvalue') or chisq value (method = 'chisq') for etas
+    measure -- 1D numpy array with largest eigenvalue (method = 'eigenvalue')
+        or chisq value (method = 'chisq') for etas
     etas_fit -- Subarray of etas used for fitting
     fit_res -- Fit parameters for parabola at extremum
     tau_lim -- Largest tau value for SS plots
-    method -- Either 'eigenvalue' or 'chisq' depending on how curvature was found
+    method -- Either 'eigenvalue' or 'chisq' depending on how curvature was
+        found
     '''
 
     ## Verify units
@@ -545,10 +559,10 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     ## Data Dynamic Spectrum
     plt.subplot(grid[0,0])
     plt.imshow(dspec,
-            aspect='auto',
-            extent=ext_find(time.to(u.min),freq),
-            origin='lower',
-            vmin=0,vmax=dspec.max())
+               aspect='auto',
+               extent=ext_find(time.to(u.min), freq),
+               origin='lower',
+               vmin=0, vmax=dspec.max())
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Data Dynamic Spectrum')
@@ -576,7 +590,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     plt.xlabel(r'$f_D$ (mHz)')
     plt.ylabel(r'$\tau$ (us)')
     plt.title('Data Secondary Spectrum')
-    plt.plot(fd,eta*(fd**2),'r',alpha=.7)
+    plt.plot(fd, eta * (fd**2), 'r', alpha=.7)
     plt.xlabel(r'$f_D$ (mHz)')
     plt.ylabel(r'$\tau$ (us)')
 
@@ -644,10 +658,12 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
         fmt = "{:.%se}" % (exp_fit - exp_err)
         fit_string = fmt.format(eta_fit.value)[:2 + exp_fit - exp_err]
         err_string = '0%s' % fmt.format(10**(exp_fit) + eta_sig.value)[1:]
-        
-        plt.plot(etas_fit,
-            chi_par(etas_fit.value, *fit_res),
-            label=r'$\eta$ = %s $\pm$ %s $s^3$' % (fit_string, err_string))
+
+        plt.plot(
+            etas_fit, chi_par(
+                etas_fit.value, *fit_res),
+            label=r'$\eta$ = %s $\pm$ %s $s^3$' %
+            (fit_string, err_string))
         plt.legend()
     if method == 'eigenvalue':
         plt.title('Eigenvalue Search')
@@ -660,11 +676,11 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     ## Phase of Wavefield
     plt.subplot(grid[5,0])
     plt.imshow(np.angle(model_E),
-            cmap='twilight',
-            aspect='auto',
-            extent=ext_find(time.to(u.min),freq),
-            origin='lower',
-            vmin=-np.pi,vmax=np.pi)
+               cmap='twilight',
+               aspect='auto',
+               extent=ext_find(time.to(u.min), freq),
+               origin='lower',
+               vmin=-np.pi, vmax=np.pi)
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Recovered Phases')
@@ -684,10 +700,12 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     plt.colorbar()
     plt.tight_layout()
 
+
 def VLBI_chunk_retrieval(params):
     '''
-    Performs phase retrieval on a single time/frequency chunk using multiple dynamic spectra and visibilities.
-    Designed for use in parallel phase retreival code
+    Performs phase retrieval on a single time/frequency chunk using multiple
+    dynamic spectra and visibilities. Designed for use in parallel phase
+    retreival code
 
     Arguments
     params -- tuple of relevant parameters
@@ -794,9 +812,10 @@ def single_chunk_retrieval(params):
 
     ## Pad dynamic spectrum to help with peiodicity problem
     dspec_pad = np.pad(dspec2,
-                   ((0, npad * dspec2.shape[0]), (0, npad * dspec2.shape[1])),
-                   mode='constant',
-                   constant_values=dspec2.mean())
+                       ((0, npad * dspec2.shape[0]),
+                        (0, npad * dspec2.shape[1])),
+                       mode='constant',
+                       constant_values=dspec2.mean())
 
     ## Compute Conjugate Spectrum
     CS = np.fft.fft2(dspec_pad)
@@ -883,7 +902,8 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
     tau -- Time lags in ascending order
     fd -- doppler frequency in ascending order
     eta1-- curvature of the main arc with the units of tau and fd
-    edges1 -- 1d numpy array with the edges of the theta bins along the main arc
+    edges1 -- 1d numpy array with the edges of the theta bins along the main
+        arc
     eta2-- curvature of the arclets with the units of tau and fd
     edges2 -- 1d numpy array with the edges of the theta bins along the arclets
     """
@@ -900,7 +920,8 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
 
     # Calculate theta1 and th2 arrays
     th1 = np.ones((th_cents2.shape[0], th_cents1.shape[0])) * th_cents1
-    th2 = np.ones((th_cents2.shape[0], th_cents1.shape[0])) * th_cents2[:,np.newaxis]
+    th2 = np.ones(
+        (th_cents2.shape[0], th_cents1.shape[0])) * th_cents2[:, np.newaxis]
 
     # tau and fd step sizes
     dtau = np.diff(tau).mean()
@@ -919,10 +940,10 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
     thth[pnts] = CS[tau_inv[pnts], fd_inv[pnts]]
 
     # Preserve flux (int
-    thth *= np.sqrt(np.abs(2*eta1*th1-2*eta2*th2)).value
+    thth *= np.sqrt(np.abs(2 * eta1 * th1 - 2 * eta2 * th2)).value
 
-    th2_max=np.sqrt(tau.max()/eta2)
-    th1_max=np.sqrt(tau.max()/eta1)
+    th2_max = np.sqrt(tau.max() / eta2)
+    th1_max = np.sqrt(tau.max() / eta1)
     th_cents1 = (edges1[1:] + edges1[:-1]) / 2
     th_cents2 = (edges2[1:] + edges2[:-1]) / 2
     pnts_1=np.abs(th_cents1)<th1_max
