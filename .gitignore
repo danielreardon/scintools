@@ -10,3 +10,4 @@ build/*
 *egg*
 dist/
 dist/*
+.vscode/settings.json
