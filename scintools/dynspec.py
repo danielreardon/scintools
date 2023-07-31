@@ -22,6 +22,7 @@ from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          powerspectrum_model
 from scintools.scint_utils import is_valid, svd_model, interp_nan_2d,\
     centres_to_edges
+import scintools.ththmod as thth
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
 from scipy.io import loadmat
@@ -1219,6 +1220,23 @@ class Dynspec:
                     plt.close()
                 elif display:
                     plt.show()
+    
+    def prep_thetatheta(self,cwf=None,cwt=None,edgelim=None,nedge=None):
+        self.cwf = cwf
+        self.cwt = cwt
+        self.ncf_fit = self.dyn.shape[0]//self.cwf
+        self.nct_fit = self.dyn.shape[1]//self.cwt
+        self.ncf_ret = (2*self.ncf_fit)
+
+    def fit_thetatheta(self,plot=False, delmax=None, numsteps=1e4,
+                startbin=3, cutmid=3, lamsteps=False, etamax=None, etamin=None,
+                low_power_diff=-1, high_power_diff=-0.5, ref_freq=1400,
+                constraint=[0, np.inf], nsmooth=5, efac=1, filename=None,
+                noise_error=True, display=True, figN=None, log_parabola=False,
+                logsteps=False, plot_spec=False, fit_spectrum=False,
+                subtract_artefacts=False, figsize=(9, 9), dpi=200,
+                velocity=False, weighted=False):
+        return(0)
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
