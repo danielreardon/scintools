@@ -39,7 +39,7 @@ try:
 except Exception as e:
     print(e)
     print("Corner.py not found: cannot plot mcmc results")
-
+import astropy.units as u
 
 class Dynspec:
 
@@ -1221,12 +1221,73 @@ class Dynspec:
                 elif display:
                     plt.show()
     
-    def prep_thetatheta(self,cwf=None,cwt=None,edgelim=None,nedge=None):
-        self.cwf = cwf
-        self.cwt = cwt
-        self.ncf_fit = self.dyn.shape[0]//self.cwf
-        self.nct_fit = self.dyn.shape[1]//self.cwt
-        self.ncf_ret = (2*self.ncf_fit)
+    def prep_thetatheta(self,cwf=None,cwt=None, fref=None, eta_max=None, eta_min = None, nedge = None, edges_lim = None, verbose = False):
+        """
+        Prepare 
+
+        Parameters
+        ----------
+        cwf : int, optional
+            The number of frequency channels per chunk for theta-theta. Defaults to all channels in dyn
+        cwt : int, optional
+            The number of integrations per chunk for theta-theta. Defaults to all time bins in dyn
+        fref : as
+        """
+        if cwf:
+            self.cwf = 2*(cwf//2)
+            self.ncf_fit = self.dyn.shape[0]//self.cwf
+            hwf = self.cwf//2
+            self.ncf_ret = (self.dyn.shape[0]//hwf)-1
+        else:
+            self.cwf = self.dyn.shape[0]
+            self.ncf_fit = 1
+            self.ncf_ret = 1
+        if cwt:
+            self.cwt = 2*(cwt//2)
+            self.nct_fit = self.dyn.shape[1]//self.cwt
+            hwt = self.cwt//2
+            self.nct_ret = (self.dyn.shape[1]//hwt)-1
+        else:
+            self.cwt = self.dyn.shape[1]
+            self.nct_fit = 1
+            self.nct_ret = 1   
+
+        if fref:
+            self.fref = thth.unit_checks(fref,'reference frequency',u.MHz)
+        else:
+            self.fref = self.freqs.mean()*u.MHz
+        
+        fd = thth.fft_axis(self.times[:self.cwt]*u.s,u.mHz)
+        tau = thth.fft_axis(self.freqs[:self.cwf]*u.MHz,u.us)
+        
+        self.eta_min = (4*(tau[1]-tau[0])/fd.max()**2).to(u.s**3)
+        self.eta_min*= self.freqs.max()/self.fref
+        if eta_min:
+            self.eta_min = max(thth.unit_checks(eta_min,'eta',u.s**3),self.eta_min)
+        
+        self.eta_max = (tau.max()/(fd[1]-fd[0])**2).to(u.s**3)
+        self.eta_max*= self.freqs.min()/self.fref
+        if eta_max:
+            self.eta_max = min(thth.unit_checks(eta_max,'eta',u.s**3),self.eta_max)
+        
+        fd_cut = fd.max()/2
+        tau_cut = np.sqrt(tau.max()/(self.eta_max*(self.fref/self.freqs.min())**2)).to(u.mHz)
+        data_lim = min(fd_cut,tau_cut)
+        if edges_lim:
+            edges_lim = min(thth.unit_checks(edges_lim,'edges limit',u.mHz),data_lim)
+        else:
+            edges_lim=data_lim
+
+        if nedge:
+            self.edges = thth.unit_checks(np.linspace(-edges_lim,edges_lim,2*(nedge//2)),'edges'.u.mHz)
+        else:
+            self.edges = thth.arc_edges(self.eta_max*(self.fref/(self.freqs.min()*u.MHz)),
+                                        fd[1]-fd[0], tau[1]-tau[0],
+                                        edges_lim, 2
+                                        )*(self.freqs.min()*u.MHz/self.fref)
+        
+
+ 
 
     def fit_thetatheta(self,plot=False, delmax=None, numsteps=1e4,
                 startbin=3, cutmid=3, lamsteps=False, etamax=None, etamin=None,
