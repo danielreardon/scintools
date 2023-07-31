@@ -731,18 +731,26 @@ def VLBI_chunk_retrieval(params):
     dspec_args=(n_dish*(n_dish+1))/2-np.cumsum(np.linspace(1,n_dish,n_dish))
     thth_red=list()
     for i in range(len(dspec2_list)):
-        ## Pad dynamic spectrum to help with peiodicity problem
-        dspec_pad = np.pad(dspec2_list[i],
-                    ((0, npad * dspec2_list[i].shape[0]), (0, npad * dspec2_list[i].shape[1])),
-                    mode='constant',
-                    constant_values=dspec2_list[i].mean())
-
-        ## Calculate Conjugate Spectrum (or Conjugate Visibility)
-        CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
         if np.isin(i,dspec_args):
+            ## Pad dynamic spectrum to help with peiodicity problem
+            dspec_pad = np.pad(dspec2_list[i],
+                        ((0, npad * dspec2_list[i].shape[0]), (0, npad * dspec2_list[i].shape[1])),
+                        mode='constant',
+                        constant_values=dspec2_list[i].mean())
+
+            ## Calculate Conjugate Spectrum (or Conjugate Visibility)
+            CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
             ## Calculate TH-TH for dynamic spectra
             thth_single,edges_red=thth_redmap(CS,tau,fd,eta,edges)
         else:
+            ## Pad dynamic spectrum to help with peiodicity problem
+            dspec_pad = np.pad(dspec2_list[i],
+                        ((0, npad * dspec2_list[i].shape[0]), (0, npad * dspec2_list[i].shape[1])),
+                        mode='constant',
+                        constant_values=0)
+
+            ## Calculate Conjugate Spectrum (or Conjugate Visibility)
+            CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
             ## Calculate THTH for Visiblities
             thth_single,edges_red=thth_redmap(CS,tau,fd,eta,edges,hermetian=False)
         ## Append TH-THT of spectrum to list
@@ -1238,7 +1246,7 @@ def fullMosFit(p, chunks, dspec, N):
     """
     W = fullMos(chunks, p)
     M = np.abs(W) ** 2
-    res = np.sum(np.power((M - dspec[:M.shape[0],:M.shape[1]]) / N[:M.shape[0],:M.shape[1]], 2))
+    res = np.nansum(np.power((M - dspec[:M.shape[0],:M.shape[1]]) / N[:M.shape[0],:M.shape[1]], 2))
     return res
 
 
@@ -1296,7 +1304,7 @@ def fullMosGrad(p, chunks, dspec, N):
             A = p[idx + ncf * nct - 1]
 
             temp = np.conjugate(
-                np.sum(
+                np.nansum(
                     xx
                     * y
                     * np.exp(1j * phi)
