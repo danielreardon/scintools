@@ -40,6 +40,7 @@ except Exception as e:
     print(e)
     print("Corner.py not found: cannot plot mcmc results")
 import astropy.units as u
+import astropy.constants as const
 
 class Dynspec:
 
@@ -1221,7 +1222,9 @@ class Dynspec:
                 elif display:
                     plt.show()
     
-    def prep_thetatheta(self,cwf=None,cwt=None, fref=None, eta_max=None, eta_min = None, nedge = None, edges_lim = None, verbose = False):
+    def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
+                        eta_max=None, eta_min = None, nedge = None,
+                        edges_lim = None, fw = .1, npad=3, verbose = False):
         """
         Prepare 
 
@@ -1233,6 +1236,9 @@ class Dynspec:
             The number of integrations per chunk for theta-theta. Defaults to all time bins in dyn
         fref : as
         """
+
+        self.npad = npad
+        self.fw = fw
         if cwf:
             self.cwf = 2*(cwf//2)
             self.ncf_fit = self.dyn.shape[0]//self.cwf
@@ -1261,43 +1267,128 @@ class Dynspec:
         tau = thth.fft_axis(self.freqs[:self.cwf]*u.MHz,u.us)
         
         self.eta_min = (4*(tau[1]-tau[0])/fd.max()**2).to(u.s**3)
-        self.eta_min*= self.freqs.max()/self.fref
-        if eta_min:
-            self.eta_min = max(thth.unit_checks(eta_min,'eta',u.s**3),self.eta_min)
-        
         self.eta_max = (tau.max()/(fd[1]-fd[0])**2).to(u.s**3)
-        self.eta_max*= self.freqs.min()/self.fref
-        if eta_max:
-            self.eta_max = min(thth.unit_checks(eta_max,'eta',u.s**3),self.eta_max)
+        self.eta_min*= (self.freqs.max()/self.fref.value)**2
+        self.eta_max*= (self.freqs.min()/self.fref.value)**2
         
-        fd_cut = fd.max()/2
-        tau_cut = np.sqrt(tau.max()/(self.eta_max*(self.fref/self.freqs.min())**2)).to(u.mHz)
-        data_lim = min(fd_cut,tau_cut)
+        if not (eta_min and eta_min):
+            if not hasattr(self,"betaeta"):
+                self.fit_arc(lamsteps=True,numsteps=1e4,
+                            etamin=((self.eta_min*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)))
+            eta_hough = ((const.c*self.betaeta/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
+            err_hough = ((const.c*2*max((self.betaetaerr,self.betaetaerr2))/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
+        if not eta_min:
+            self.eta_min=max((self.eta_min,eta_hough-err_hough))
+        if not eta_max:
+            self.eta_max=min((self.eta_max,eta_hough+err_hough))
+
+        l0=np.log10(self.eta_min.value)
+        l1=np.log10(self.eta_max.value)
+
+        self.neta = int(1+ (l1-l0)/np.log10(1+self.fw/10))
+        
+        fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
         if edges_lim:
-            edges_lim = min(thth.unit_checks(edges_lim,'edges limit',u.mHz),data_lim)
+            edges_lim = min(thth.unit_checks(edges_lim,'edges limit',u.mHz),fd_cut)
         else:
-            edges_lim=data_lim
+            edges_lim=fd_cut
 
         if nedge:
-            self.edges = thth.unit_checks(np.linspace(-edges_lim,edges_lim,2*(nedge//2)),'edges'.u.mHz)
+            self.edges = thth.unit_checks(np.linspace(-edges_lim,edges_lim,2*(nedge//2)),'edges',u.mHz)
         else:
-            self.edges = thth.arc_edges(self.eta_max*(self.fref/(self.freqs.min()*u.MHz)),
-                                        fd[1]-fd[0], tau[1]-tau[0],
-                                        edges_lim, 2
-                                        )*(self.freqs.min()*u.MHz/self.fref)
+            self.edges = thth.min_edges(edges_lim,fd,tau,self.eta_max*(self.fref.value/self.freqs.min()), 2
+                                        )*(self.freqs.min()/self.fref.value)
+        if verbose:
+            print("\t THETA-THETA PROPERTIES\n")
+            print(f'Channels per chunk: {self.cwf}')
+            print(f'Time bins per chunk: {self.cwt}')
+            print(f'Number of fitting chunks: {self.ncf_fit}x{self.nct_fit}')
+            print(f'Number of mosaic chunks: {self.ncf_ret}x{self.nct_ret}')
+            print(f'Reference Frequency: {self.fref}')
+            print(f'Eta range: {self.eta_min} to {self.eta_max} with {self.neta} points')
+            print(f'Edges has {self.edges.shape[0]} point out to {self.edges[-1]}')
+            print(f'Fractional fitting width: {self.fw}')
+            print(f'Zero paddings: {self.npad}')
+
+
+    def thetatheta_single(self, cf=0, ct=0,fname=None,verbose=False):
+        if not hasattr(self,'cwf'):
+            self.prep_thetatheta(verbose=verbose)
+
+        if cf>=self.ncf_fit:
+            cf=self.ncf_fit-1
+        if ct>=self.nct_fit:
+            ct=self.nct_fit-1
+        
+        fs = slice(cf*self.cwf,(cf+1)*self.cwf)
+        ts = slice(ct*self.cwt, (ct+1)*self.cwt)
+
+        time2 = self.times[ts]*u.s
+        freq2= self.freqs[fs]*u.MHz
+
+        dspec2=np.copy(self.dyn[fs,ts])
+        dspec2-=np.nanmean(dspec2)
+        dspec_pad=np.pad(np.nan_to_num(dspec2),((0,self.npad*self.cwf),(0,self.npad*self.cwt)),mode='constant',constant_values=0)
+        CS=np.fft.fftshift(np.fft.fft2(dspec_pad))
+        tau=thth.fft_axis(freq2,u.us,self.npad)
+        fd=thth.fft_axis(time2,u.mHz,self.npad)
+
+        etas=np.logspace(np.log10(self.eta_min.value),np.log10(self.eta_max.value),self.neta)*u.s**3*(self.fref/freq2.mean())**2
+        eigs=np.zeros(self.neta)
+        edges = self.edges*(freq2.mean()/self.fref)
+        for i in range(etas.shape[0]):
+            eigs[i]=thth.Eval_calc(CS,tau,fd,etas[i],edges)
+
+        try:
+            ## Remove failed curvatures
+            etas=etas[np.isfinite(eigs)]
+            eigs=eigs[np.isfinite(eigs)]
+
+            ## Reduced range around peak to be withing fw times curvature of maximum eigenvalue
+            etas_fit = etas[np.abs(etas - etas[eigs == eigs.max()]) < self.fw * etas[eigs == eigs.max()]]
+            eigs_fit = eigs[np.abs(etas - etas[eigs == eigs.max()]) < self.fw * etas[eigs == eigs.max()]]
+
+            ## Initial Guesses
+            C = eigs_fit.max()
+            x0 = etas_fit[eigs_fit == C][0].value
+            if x0 == etas_fit[0].value:
+                A = (eigs_fit[-1] - C) / ((etas_fit[-1].value - x0)**2)
+            else:
+                A = (eigs_fit[0] - C) / ((etas_fit[0].value - x0)**2)
+
+            ## Fit parabola around peak
+            popt, pcov = thth.curve_fit(thth.chi_par,
+                                    etas_fit.value,
+                                    eigs_fit,
+                                    p0=np.array([A, x0, C]))
+
+            ## Record curvauture fit and error
+            eta_fit = popt[1]*u.us/u.mHz**2
+            eta_sig = np.sqrt((eigs_fit - thth.chi_par(etas_fit.value, *popt)).std() / np.abs(popt[0]))*u.us/u.mHz**2
+        except:
+            ## Return NaN for curvautre and error if fitting fails
+            popt=None
+            eta_fit=np.nan
+            eta_sig=np.nan
+
+        ## Plotting
+        try:
+            # Create diagnostic plots where requested
+            thth.PlotFunc(dspec2,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
+            if fname:
+                np.savez(fname)
+        except:
+            print('Plotting Error',flush=True)
+            plt.figure()
+            plt.plot(etas,eigs)
+            plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
+            plt.ylabel(r'Eigenvalue')
         
 
- 
-
-    def fit_thetatheta(self,plot=False, delmax=None, numsteps=1e4,
-                startbin=3, cutmid=3, lamsteps=False, etamax=None, etamin=None,
-                low_power_diff=-1, high_power_diff=-0.5, ref_freq=1400,
-                constraint=[0, np.inf], nsmooth=5, efac=1, filename=None,
-                noise_error=True, display=True, figN=None, log_parabola=False,
-                logsteps=False, plot_spec=False, fit_spectrum=False,
-                subtract_artefacts=False, figsize=(9, 9), dpi=200,
-                velocity=False, weighted=False):
-        return(0)
+    def fit_thetatheta(self,verbose=False):
+        if not hasattr(self,'cwf'):
+            self.prep_thetatheta(verbose=verbose)
+        self.eta_evo = np.zeros((self.ncf_))
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
