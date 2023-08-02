@@ -1224,7 +1224,7 @@ class Dynspec:
     
     def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
                         eta_max=None, eta_min = None, nedge = None,
-                        edges_lim = None, fw = .1, npad=3, verbose = False):
+                        edges_lim = None, tau_lim=None, fw = .1, npad=3, verbose = False):
         """
         Prepare 
 
@@ -1257,7 +1257,11 @@ class Dynspec:
             self.cwt = self.dyn.shape[1]
             self.nct_fit = 1
             self.nct_ret = 1   
-
+        if tau_lim:
+            tau_lim = thth.unit_checks(tau_lim,'Tau Limit', u.us)
+            delmax = tau_lim
+        else:
+            delmax=None
         if fref:
             self.fref = thth.unit_checks(fref,'reference frequency',u.MHz)
         else:
@@ -1270,17 +1274,25 @@ class Dynspec:
         self.eta_max = (tau.max()/(fd[1]-fd[0])**2).to(u.s**3)
         self.eta_min*= (self.freqs.max()/self.fref.value)**2
         self.eta_max*= (self.freqs.min()/self.fref.value)**2
+        if type(eta_min)!=type(None):
+            self.eta_min=max((eta_min,self.eta_min))
+        if type(eta_max)!=type(None):
+            self.eta_max=min((eta_max,self.eta_max))
         
-        if not (eta_min and eta_min):
+        if  (type(eta_min)==type(None)) or (type(eta_max)==type(None)):
             if not hasattr(self,"betaeta"):
                 self.fit_arc(lamsteps=True,numsteps=1e4,
-                            etamin=((self.eta_min*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)))
+                            etamin=((self.eta_min*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)),delmax=delmax)
             eta_hough = ((const.c*self.betaeta/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
             err_hough = ((const.c*2*max((self.betaetaerr,self.betaetaerr2))/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
-        if not eta_min:
+        if type(eta_min)==type(None):
             self.eta_min=max((self.eta_min,eta_hough-err_hough))
-        if not eta_max:
+        else:
+            self.eta_min = eta_min
+        if type(eta_max)==type(None):
             self.eta_max=min((self.eta_max,eta_hough+err_hough))
+        else:
+            self.eta_max= eta_max
 
         l0=np.log10(self.eta_min.value)
         l1=np.log10(self.eta_max.value)
@@ -1289,9 +1301,11 @@ class Dynspec:
         
         fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
         if edges_lim:
-            edges_lim = min(thth.unit_checks(edges_lim,'edges limit',u.mHz),fd_cut)
+            edges_lim = min((thth.unit_checks(edges_lim,'edges limit',u.mHz),fd_cut))
         else:
             edges_lim=fd_cut
+        if tau_lim:
+            edges_lim=min((edges_lim,np.sqrt(tau_lim/self.eta_max).to(u.mHz)))
 
         if nedge:
             self.edges = thth.unit_checks(np.linspace(-edges_lim,edges_lim,2*(nedge//2)),'edges',u.mHz)
@@ -1299,7 +1313,7 @@ class Dynspec:
             self.edges = thth.min_edges(edges_lim,fd,tau,self.eta_max*(self.fref.value/self.freqs.min()), 2
                                         )*(self.freqs.min()/self.fref.value)
         if verbose:
-            print("\t THETA-THETA PROPERTIES\n")
+            print("\n\t THETA-THETA PROPERTIES\n")
             print(f'Channels per chunk: {self.cwf}')
             print(f'Time bins per chunk: {self.cwt}')
             print(f'Number of fitting chunks: {self.ncf_fit}x{self.nct_fit}')
@@ -1385,10 +1399,64 @@ class Dynspec:
             plt.ylabel(r'Eigenvalue')
         
 
-    def fit_thetatheta(self,verbose=False):
+    def fit_thetatheta(self,verbose=False,plot=False):
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
-        self.eta_evo = np.zeros((self.ncf_))
+        self.eta_evo = np.zeros((self.ncf_fit,self.nct_fit))*u.s**3
+        self.eta_evo_err = np.zeros((self.ncf_fit,self.nct_fit))*u.s**3
+        self.f0s = np.zeros(self.ncf_fit)*u.MHz
+        self.t0s = np.zeros((self.nct_fit))*u.s
+        for cf in range(self.ncf_fit):
+            fs = slice(cf*self.cwf,(cf+1)*self.cwf)
+            freq2=np.copy(self.freqs[fs])*u.MHz
+            self.f0s[cf]=freq2.mean()
+            etas=np.logspace(np.log10(self.eta_min.value),np.log10(self.eta_max.value),self.neta)*u.s**3*(self.fref/freq2.mean())**2
+            for ct in range(self.nct_fit):
+                ts = slice(ct*self.cwt, (ct+1)*self.cwt)
+                time2 = np.copy(self.times[ts])*u.s
+                dspec2=np.copy(self.dyn[fs,ts])
+                dspec2-=np.nanmean(dspec2)
+
+                params=(dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True)
+                res = thth.single_search(params)
+                self.eta_evo[cf,ct]=res[0]
+                self.eta_evo_err[cf,ct]=res[1]
+        tofit =  np.isfinite(self.eta_evo)*np.isfinite(self.eta_evo_err)
+        A = (np.sum(self.eta_evo[tofit] / (self.f0s[:,np.newaxis] * self.eta_evo_err)[tofit] ** 2)/ np.sum(1 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+        A_err = np.sqrt(1 / np.sum(2 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+        self.ththeta = A/self.fref**2
+        self.ththetaerr = A_err/self.fref**2
+
+        if plot:
+            fit_string,err_string = thth.errString(self.ththeta*(self.fref/np.floor(self.fref))**2,self.ththetaerr*(self.fref/np.floor(self.fref))**2)
+            plt.figure()
+            plt.errorbar(np.ravel(self.f0s.value[:,np.newaxis]*np.ones(self.eta_evo.shape)),
+                         np.ravel(self.eta_evo.value),
+                         yerr=np.ravel(self.eta_evo_err.value),fmt='.')
+            plt.plot(self.f0s,A/self.f0s**2,label = r'$\eta_{%s}$ = %s $\pm$ %s $s^3$' %
+            (np.floor(self.fref),fit_string, err_string))
+            plt.xlabel(r'$\rm{Freq}~\left(\rm{MHz}\right)$')
+            plt.ylabel(r'$\eta~\left(\rm{s}^3\right)$')
+            plt.legend()
+
+    def thetatheta_chunks(self,verbose=False):
+        if not hasattr(self,"ththeta"):
+            self.fit_thetatheta(verbose=verbose)
+        self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
+        for cf in range(self.ncf_ret):
+            fs = slice(cf*(self.cwf//2),cf*(self.cwf//2)+self.cwf)
+            freq2 = np.copy(self.freqs[fs])*u.MHz
+            freq=freq2.mean()
+            eta = self.ththeta*(self.fref/freq)**2
+            for ct in range(self.nct_ret):
+                ts=slice(ct*(self.cwt//2),ct*(self.cwt//2)+self.cwt)
+                time2=np.copy(self.times[ts])*u.s
+                dspec2=np.copy(self.dyn[fs,ts])
+                dspec2-=np.nanmean(dspec2)
+                params = (dspec2,self.edges*(freq/self.fref),time2,freq2,eta,ct,cf,self.npad)
+                res = thth.single_chunk_retrieval(params)
+                self.chunks[cf,ct,:,:]=res[0]
+        self.wavefield = thth.mosaic(self.chunks)
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,

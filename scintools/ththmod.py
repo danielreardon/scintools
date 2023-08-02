@@ -387,17 +387,13 @@ def single_search(params):
     """
     
     ## Reap Parameters
-    dspec2,freq,time,eta_low,eta_high,edges,name,plot,fw,npad,neta,coher=params
+    dspec2,freq,time,etas,edges,name,plot,fw,npad,coher=params
 
     ## Verify units
     time = unit_checks(time,'time2',u.s)
     freq = unit_checks(freq,'freq2',u.MHz)
-    eta_low = unit_checks(eta_low,'eta_low',u.s**3)
-    eta_high = unit_checks(eta_high,'eta_high',u.s**3)
+    etas = unit_checks(etas,'etas',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
-
-    ## Curvature Range to Search Over
-    etas = np.linspace(eta_low, eta_high, neta)
 
     ## Calculate fD and tau arrays
     fd = fft_axis(time, u.mHz, npad)
@@ -653,12 +649,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     plt.subplot(grid[4,:])
     plt.plot(etas,measure)
     if not np.isnan(eta_fit):
-        exp_fit = int(('%.0e' % eta_fit.value)[2:])
-        exp_err = int(('%.0e' % eta_sig.value)[2:])
-        fmt = "{:.%se}" % (exp_fit - exp_err)
-        fit_string = fmt.format(eta_fit.value)[:2 + exp_fit - exp_err]
-        err_string = '0%s' % fmt.format(10**(exp_fit) + eta_sig.value)[1:]
-
+        fit_string,err_string = errString(eta_fit,eta_sig)
         plt.plot(
             etas_fit, chi_par(
                 etas_fit.value, *fit_res),
@@ -1496,3 +1487,42 @@ def fullMosHess(p, chunks, dspec, N):
                                 H[idpN, idpM] = dpndpm
     return H
 
+def errString(fit,sig):
+        exp_fit = int(('%.0e' % fit.value)[2:])
+        exp_err = int(('%.0e' % sig.value)[2:])
+
+        if exp_err==exp_fit:
+            fmt = "{:.%se}" % (exp_fit - exp_err)
+            fit_string = fmt.format(fit.value)
+            fit_string = fit_string[:fit_string.index('e')]
+            err_string = fmt.format(sig.value)
+            if err_string[0]=='1':
+                exp_err-=1
+                fmt = "{:.%se}" % (exp_fit - exp_err)
+                fit_string = fmt.format(fit.value)
+                fit_string = fit_string[:fit_string.index('e')]
+                err_string = fmt.format(sig.value)
+        elif exp_fit>exp_err:
+            fmt = "{:.%se}" % (exp_fit - exp_err)
+            fit_string = fmt.format(fit.value)
+            fit_string = fit_string[:fit_string.index('e')]
+            err_string = '0%s' % fmt.format(10**exp_fit + sig.value)
+            err_string =err_string[err_string.index('.'):]
+            if err_string[1]=='1':
+                exp_err-=1
+                fmt = "{:.%se}" % (exp_fit - exp_err)
+                fit_string = fmt.format(fit.value)
+                fit_string = fit_string[:fit_string.index('e')]
+                err_string = '0%s' % fmt.format(10**exp_fit + sig.value)
+                err_string =err_string[err_string.index('.'):]
+            err_string='0'+err_string
+        else:
+            fmt = "{:.%se}" % (exp_err - exp_fit)
+            err_string = fmt.format(sig.value)
+            err_string = err_string
+            fit_string = '0%s' % fmt.format(10**exp_err + fit.value)
+            fit_string ='0'+fit_string[fit_string.index('.'):fit_string.index('e')]
+        if err_string[err_string.index('e'):]== 'e+00' :
+                err_string=err_string[:err_string.index('e')]
+            
+        return(fit_string,err_string)
