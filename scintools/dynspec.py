@@ -1417,7 +1417,7 @@ class Dynspec:
                 dspec2=np.copy(self.dyn[fs,ts])
                 dspec2-=np.nanmean(dspec2)
 
-                params=(dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True)
+                params=(dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True,verbose)
                 res = thth.single_search(params)
                 self.eta_evo[cf,ct]=res[0]
                 self.eta_evo_err[cf,ct]=res[1]
@@ -1453,7 +1453,7 @@ class Dynspec:
                 time2=np.copy(self.times[ts])*u.s
                 dspec2=np.copy(self.dyn[fs,ts])
                 dspec2-=np.nanmean(dspec2)
-                params = (dspec2,self.edges*(freq/self.fref),time2,freq2,eta,ct,cf,self.npad)
+                params = (dspec2,self.edges*(freq/self.fref),time2,freq2,eta,ct,cf,self.npad,verbose)
                 res = thth.single_chunk_retrieval(params)
                 self.chunks[cf,ct,:,:]=res[0]
         self.wavefield = thth.mosaic(self.chunks)

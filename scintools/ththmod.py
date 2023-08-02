@@ -20,9 +20,12 @@ def svd_model(arr, nmodes=1):
     Model a matrix using the first nmodes modes of the singular value
     decomposition
 
-    Arguments:
-    arr -- 2d numpy array ti be modeled
-    nmodes -- Number os SVD modes to use in reconstruction
+    Parameters
+    ----------
+    arr : 2D Array
+        The array to be modeled with the SVD
+    nmodes: int, optional
+        Number of modes used in the SVD model. Defaults to 1
     """
     u, s, w = np.linalg.svd(arr)
     s[nmodes:] = 0
@@ -36,25 +39,40 @@ def chi_par(x, A, x0, C):
     """
     Parabola for fitting to chisq curve.
 
-    Arguments:
-    x -- numpy array of x coordinates of fit
-    A --
-    x0 -- x coordinate of parabola extremum
-    C -- y coordinate of extremum
+    Parameters
+    ----------
+    x : 1D Array
+        X coordinates of the
+    A : float
+        Coefficient for the quadratic term
+    x0 : float
+        X coordinate of apex
+    X : float
+        Y Coordinate of apex
     """
     return A * (x - x0)**2 + C
 
 
 def thth_map(CS, tau, fd, eta, edges, hermetian=True):
-    """Map from Secondary Spectrum to theta-theta space
-
-    Arguments:
-    CS -- Conjugate Spectrum in [tau,fd] order with (0,0) in center
-    tau -- Time lags in ascending order
-    fd -- doppler frequency in ascending order
-    eta -- curvature with the units of tau and fd
-    edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
     """
+    Maping from Conjugate Spectrum space to theta-theta space
+
+    Parameters
+    ----------
+    CS : 2D Array
+        Conjugate Spectrum
+    tau : 1D Array
+        Time delay coordinates for the CS (us).
+    fd : 1D Array
+        Doppler shift coordinates for the CS (mHz)
+    eta : float
+        Arc curvature (s**3)
+    edges: 1D Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+    hermetian: bool, optional
+        Force theta-theta to be hermetian symmetric (as expected from dynamic spectra). Defaults to True
+    """
+    
     tau = unit_checks(tau,'tau',u.us)
     fd = unit_checks(fd,'fd',u.mHz)
     eta = unit_checks(eta,'eta',u.s**3)
@@ -97,15 +115,23 @@ def thth_map(CS, tau, fd, eta, edges, hermetian=True):
 
 def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
     """
-    Map from Secondary Spectrum to theta-theta space for the largest
+    Map from Conjugate Spectrum to theta-theta space for the largest
     possible filled in sqaure within edges
 
-    Arguments:
-    CS -- Secondary Spectrum in [tau,fd] order with (0,0) in center
-    tau -- Time lags in ascending order
-    fd -- doppler frequency in ascending order
-    eta -- curvature with the units of tau and fd
-    edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
+    Parameters
+    ----------
+    CS : 2D Array
+        Conjugate Spectrum
+    tau : 1D Array
+        Time delay coordinates for the CS (us).
+    fd : 1D Array
+        Doppler shift coordinates for the CS (mHz)
+    eta : float
+        Arc curvature (s**3)
+    edges: 1D Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+    hermetian: bool, optional
+        Force theta-theta to be hermetian symmetric (as expected from dynamic spectra). Defaults to True
     """
 
     tau = unit_checks(tau, 'tau', u.us)
@@ -132,16 +158,24 @@ def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
     return thth_red, edges_red
 
 
-def rev_map(thth, tau, fd, eta, edges, isdspec=True):
+def rev_map(thth, tau, fd, eta, edges, hermetian=True):
     """
-    Map back from theta-theta space to CS space
+    Inverse map from theta-theta to Conjugate Spectrum space.
 
-    Arguments:
-    thth -- 2d theta-theta spectrum
-    tau -- Time lags in ascending order
-    fd -- doppler frequency in ascending order
-    eta -- curvature with the units of tau and fd
-    edges -- 1d numpy array with the edges of the theta bins(symmetric about 0)
+    Parameters
+    ----------
+    thth : 2D Array
+        Theta-theta matrix to be mapped
+    tau : 1D Array
+        Time delay coordinates for the CS (us).
+    fd : 1D Array
+        Doppler shift coordinates for the CS (mHz)
+    eta : float
+        Arc curvature (s**3)
+    edges: 1D Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+    hermetian: bool, optional
+        Force CS to be hermetian symmetric (as expected from dynamic spectra). Defaults to True
     """
 
     tau = unit_checks(tau,'tau',u.us)
@@ -170,7 +204,7 @@ def rev_map(thth, tau, fd, eta, edges, isdspec=True):
     norm=np.histogram2d(np.ravel(fd_map.value),
                          np.ravel(tau_map.value),
                          bins=(fd_edges,tau_edges))[0]
-    if isdspec:
+    if hermetian:
         recov += np.histogram2d(np.ravel(-fd_map.value),
                             np.ravel(-tau_map.value),
                             bins=(fd_edges,tau_edges),
@@ -186,65 +220,84 @@ def rev_map(thth, tau, fd, eta, edges, isdspec=True):
     recov=np.nan_to_num(recov)
     return(recov.T)
 
-def modeler(CS, tau, fd, eta, edges, fd2=None, tau2=None):
+def modeler(CS, tau, fd, eta, edges, hermetian=True):
     """
     Create theta-theta array as well as model theta-theta, Conjugate Spectrum
     and Dynamic Spectrum from data conjugate spectrum and curvature
 
-    Arguments:
-    CS -- 2d complex numpy array of the Conjugate Spectrum
-    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
-    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
-    eta -- curvature of main arc in units of (tau/fd^2)
-    edges -- 1d array of coordinate of bin edges in theta-theta array
-    fd2 --  fd values for reverse theta-theta map (defaults to fd)
-    tau2 -- tau values for reverse theta-theta map (defaults to tau)
+    Parameters
+    ----------
+    CS : 2D Array
+        Theta-theta matrix to be mapped
+    tau : 1D Array
+        Time delay coordinates for the CS (us).
+    fd : 1D Array
+        Doppler shift coordinates for the CS (mHz)
+    eta : float
+        Arc curvature (s**3)
+    edges: 1D Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+    hermetian: bool, optional
+        Force CS to be hermetian symmetric (as expected from dynamic spectra). Defaults to True
     """
+
     tau = unit_checks(tau,'tau',u.us)
     fd = unit_checks(fd,'fd',u.mHz)
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
-    if fd2==None:
-        fd2=fd
+
+    thth_red,edges_red=thth_redmap(CS, tau, fd, eta, edges,hermetian=hermetian)
+    if hermetian
+        ## Use eigenvalue decomposition if hermetian
+        ##Find first eigenvector and value
+        w,V=eigsh(thth_red,1,which='LA')
+        w=w[0]
+        V=V[:,0]
+        ##Use larges eigenvector/value as model
+        thth2_red=np.outer(V,np.conjugate(V))
+        thth2_red*=np.abs(w)
     else:
-        fd2 = unit_checks(fd2,'fd2',u.mHz)
-    if tau2==None:
-        tau2=tau
+        ## Use Singular value decomposition if not hermetian
+        U,S,W=np.linalg.svd(thth_red)
+        U=U[:,0]
+        W=W[0,:]
+        S=S[0]
+        thth2_red=(np.outer(U[:,0],W[0,:])*S[0])
+    recov=rev_map(thth2_red,tau,fd,eta,edges_red,hermetian=hermetian)
+    model=np.fft.ifft2(np.fft.ifftshift(recov))
+    if hermetian:
+        model=model.real
+        return(thth_red,thth2_red,recov,model,edges_red,w,V)
     else:
-        tau2 = unit_checks(tau2,'tau2',u.us)
-    thth_red,edges_red=thth_redmap(CS, tau, fd, eta, edges)
-    ##Find first eigenvector and value
-    w,V=eigsh(thth_red,1,which='LA')
-    w=w[0]
-    V=V[:,0]
-    ##Use larges eigenvector/value as model
-    thth2_red=np.outer(V,np.conjugate(V))
-    thth2_red*=np.abs(w)
-    ##Map back to CS for high
-#    thth2_red[thth_red==0]=0
-    recov=rev_map(thth2_red,tau2,fd2,eta,edges_red)
-    model=np.fft.ifft2(np.fft.ifftshift(recov)).real
-    return(thth_red,thth2_red,recov,model,edges_red,w,V)
+        return(thth_red,thth2_red,recov,model,edges_red,U,S,W)
 
-def chisq_calc(dspec,CS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
+def chisq_calc(dspec,CS, tau, fd, eta, edges,N,mask=None):
     """
-    Calculate chisq value for modeled dynamic spectrum for a given curvature
+    Calculates the chisquared value for the model dynamic spectrum generated with the theta-theta model
 
-    Arguments:
-    dspec -- 2d array of observed dynamic spectrum
-    CS -- 2d array of conjugate spectrum
-    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
-    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
-    eta -- curvature of main arc in units of (tau/fd^2)
-    edges -- 1d array of coordinate of bin edges in theta-theta array
-    mask -- 2d boolean array of points in dynamic spectrum for fitting
-    N -- Variance of dynamic spectrum noise
-    fd2 --  fd values for reverse theta-theta map (defaults to fd)
-    tau2 -- tau values for reverse theta-theta map (defaults to tau)
-
+    Parameters
+    ----------
+    dspec : 2D Array
+        Dynamic spectrum to be fit to
+    CS : 2D Array
+        Theta-theta matrix to be mapped
+    tau : 1D Array
+        Time delay coordinates for the CS (us).
+    fd : 1D Array
+        Doppler shift coordinates for the CS (mHz)
+    eta : float
+        Arc curvature (s**3)
+    edges: 1D Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+    N : 2D Array
+        Standard deviation of the noise at each point in dspec
+    mask 2D Array bool, optional
+        Sets which points in dspec to calculate chisquared for. Defaults to all finite points
     """
 
+    if type(mask) == type(None):
+        mask=np.isfinite(dspec)
     tau = unit_checks(tau,'tau',u.us)
     fd = unit_checks(fd,'fd',u.mHz)
     eta = unit_checks(eta,'eta',u.s**3)
@@ -256,16 +309,20 @@ def chisq_calc(dspec,CS, tau, fd, eta, edges,mask,N,fd2=None,tau2=None):
 
 def Eval_calc(CS, tau, fd, eta, edges):
     """
-    Calculates the dominant eigenvalue for the theta-theta matrix from a given
-    conjugate spectrum and curvature.
+    Calculates to dominate eigenvalue for the theta-matrix generated from CS with curvature eta and bin edges edges
 
-
-    Arguments:
-    CS -- 2d complex numpy array of the Conjugate Spectrum
-    tau -- 1d array of tau values for conjugate spectrum in ascending order with units
-    fd -- 1d array of fd values for conjugate spectrum in ascending order with units
-    eta -- curvature of main arc in units of (tau/fd^2)
-    edges -- 1d array of coordinate of bin edges in theta-theta array
+    Parameters
+    ----------
+    CS : 2D Array
+        Theta-theta matrix to be mapped
+    tau : 1D Array
+        Time delay coordinates for the CS (us).
+    fd : 1D Array
+        Doppler shift coordinates for the CS (mHz)
+    eta : float
+        Arc curvature (s**3)
+    edges: 1D Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
     """
 
     tau = unit_checks(tau,'tau',u.us)
@@ -280,37 +337,19 @@ def Eval_calc(CS, tau, fd, eta, edges):
     w,V=eigsh(thth_red,1,v0=v0,which='LA')
     return(np.abs(w[0]))
 
-def G_revmap(w,V,eta,edges,tau,fd):
-
-    tau = unit_checks(tau,'tau',u.us)
-    fd = unit_checks(fd,'fd',u.mHz)
-    eta = unit_checks(eta,'eta',u.s**3)
-    edges = unit_checks(edges,'edges',u.mHz)
-
-    th_cents=(edges[1:]+edges[:-1])/2
-    th_cents-=th_cents[np.abs(th_cents)==np.abs(th_cents).min()]
-    screen=np.conjugate(V[:,np.abs(w)==np.abs(w).max()][:,0]*np.sqrt(w[np.abs(w)==np.abs(w).max()]))
-#     screen/=np.abs(2*eta*th_cents).value
-    dtau=np.diff(tau).mean()
-    dfd=np.diff(fd).mean()
-    fd_map=(((th_cents*fd.unit)-fd[0] +dfd/2)//dfd).astype(int)
-    tau_map=(((eta*(th_cents*fd.unit)**2)-tau[0]+dtau/2)//dtau).astype(int)
-    pnts=(fd_map>0)*(tau_map>0)*(fd_map<fd.shape[0])*(tau_map<tau.shape[0])
-    CS_G=np.zeros((tau.shape[0],fd.shape[0]),dtype=complex)
-    CS_G[tau_map[pnts],fd_map[pnts]]=screen[pnts]
-    G=np.fft.ifft2(np.fft.ifftshift(CS_G))
-    return(G)
-
 def len_arc(x,eta):
     """
     Calculate distance along arc with curvature eta to points (x,eta x**2) (DEVELOPMENT ONLY)
+
+    Parameters
+    ----------
+    x : float
+        X offset from apex of parabola
+    eta : float
+        Arc curvature of parabola
     """
     a=2*eta
     return((a*x*np.sqrt((a*x)**2 + 1) +np.arcsinh(a*x))/(2.*a))
-
-def len_arc(x, eta):
-    a = 2 * eta
-    return((a * x * np.sqrt((a * x)**2 + 1) + np.arcsinh(a * x)) / (2. * a))
 
 
 def arc_edges(eta, dfd, dtau, fd_max, n):
@@ -387,7 +426,7 @@ def single_search(params):
     """
     
     ## Reap Parameters
-    dspec2,freq,time,etas,edges,name,plot,fw,npad,coher=params
+    dspec2,freq,time,etas,edges,name,plot,fw,npad,coher,verbose=params
 
     ## Verify units
     time = unit_checks(time,'time2',u.s)
@@ -473,8 +512,9 @@ def single_search(params):
     except:
         print('Plotting Error',flush=True)
 
-    ## Progress Report
-    print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq.mean()),flush=True)
+    if verbose:
+        ## Progress Report
+        print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq.mean()),flush=True)
     return(eta_fit,eta_sig,freq.mean(),time.mean(),eigs)
 
 def PlotFunc(dspec,time,freq,CS,fd,tau,
@@ -703,7 +743,7 @@ def VLBI_chunk_retrieval(params):
     '''
 
     ## Read parameters
-    dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,npad,n_dish = params
+    dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,npad,n_dish,verbose = params
 
     ## Verify unit compatability
     time2 = unit_checks(time2,'time2',u.s)
@@ -711,8 +751,9 @@ def VLBI_chunk_retrieval(params):
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
-    ## Progress reporting
-    print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
+    if verbose:
+        ## Progress reporting
+        print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
 
     ## Determine fd and tau coordinates of Conjugate Spectrum
     fd = fft_axis(time2, u.mHz, npad)
@@ -780,8 +821,9 @@ def VLBI_chunk_retrieval(params):
         model_E_temp=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2_list[0].shape[0],:dspec2_list[0].shape[1]]
         model_E_temp*=(dspec2_list[0].shape[0]*dspec2_list[0].shape[1]/4)
         model_E.append(model_E_temp)
-    ##Progress Report
-    print("Chunk %s-%s success" %(idx_f,idx_t),flush=True)
+    if verbose:
+        ##Progress Report
+        print("Chunk %s-%s success" %(idx_f,idx_t),flush=True)
     return(model_E,idx_f,idx_t)
 
 def single_chunk_retrieval(params):
@@ -794,7 +836,7 @@ def single_chunk_retrieval(params):
     '''
     
     ## Read parameters
-    dspec2,edges,time2,freq2,eta,idx_t,idx_f,npad = params
+    dspec2,edges,time2,freq2,eta,idx_t,idx_f,npad,verbose = params
 
     ## Verify unit compatability
     time2 = unit_checks(time2,'time2',u.s)
@@ -802,8 +844,9 @@ def single_chunk_retrieval(params):
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
-    ## Progress Reporting
-    print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
+    if verbose:
+        ## Progress Reporting
+        print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
 
     ## Determine fd and tau coordinates of Conjugate Spectrum
     fd = fft_axis(time2, u.mHz, npad)
@@ -832,8 +875,9 @@ def single_chunk_retrieval(params):
         recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,isdspec = False)
         model_E=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2.shape[0],:dspec2.shape[1]]
         model_E*=(dspec2.shape[0]*dspec2.shape[1]/4)
-        ## Progress Reporting
-        print("Chunk %s-%s success" %(idx_f,idx_t),flush=True)
+        if verbose:
+            ## Progress Reporting
+            print("Chunk %s-%s success" %(idx_f,idx_t),flush=True)
     except Exception as e:
         ## If chunk cannot be recovered print Error and return zero array (Prevents failure of a single chunk from ending phase retrieval)
         print(e,flush=True)
@@ -1443,7 +1487,6 @@ def fullMosHess(p, chunks, dspec, N):
                         )
 
                         
-                        #print(cfN,ctN,df,dt,tempM.shape,olMf.max(),olMf.min(),olMt.max(),olMt.min())
                         dAndAm = 8 * np.real(tempM[olMf][:, olMt]) * np.real(
                             tempN[olNf][:, olNt]
                         ) + 4 * wtN[olNf][:, olNt] * np.real(
