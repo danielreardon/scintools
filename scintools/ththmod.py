@@ -248,7 +248,7 @@ def modeler(CS, tau, fd, eta, edges, hermetian=True):
 
 
     thth_red,edges_red=thth_redmap(CS, tau, fd, eta, edges,hermetian=hermetian)
-    if hermetian
+    if hermetian:
         ## Use eigenvalue decomposition if hermetian
         ##Find first eigenvector and value
         w,V=eigsh(thth_red,1,which='LA')
@@ -303,7 +303,7 @@ def chisq_calc(dspec,CS, tau, fd, eta, edges,N,mask=None):
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
-    model=modeler(CS, tau, fd, eta, edges,fd2,tau2)[3][:dspec.shape[0],:dspec.shape[1]]
+    model=modeler(CS, tau, fd, eta, edges,fd,tau)[3][:dspec.shape[0],:dspec.shape[1]]
     chisq=np.sum((model-dspec)[mask]**2)/N
     return(chisq)
 
@@ -321,8 +321,8 @@ def Eval_calc(CS, tau, fd, eta, edges):
         Doppler shift coordinates for the CS (mHz)
     eta : float
         Arc curvature (s**3)
-    edges: 1D Array
-        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+    edges: 1D Astropy Quantity Array
+        Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0 (mHz)
     """
 
     tau = unit_checks(tau,'tau',u.us)
@@ -356,13 +356,20 @@ def arc_edges(eta, dfd, dtau, fd_max, n):
     '''
     Calculate evenly spaced in arc length edges array (DEVELOPMENT ONLY)
 
-    Arguments:
-    eta -- Curvature 
-    dfd -- fD resolution of conjugate spectrum
-    dtau -- tau resolution of conjugate spectrum
-    fd_max largest fD value in edges array
-    b -- Integer number of points in array (assumed to be even)
+    Parameters:
+    ----------
+    eta : float
+        The curvature of the parabola 
+    dfd : float
+        Doppler shift resolution of conjugate spectrum (mHz)
+    dtau : float
+        Time delay resolution of conjugate spectrum (us)
+    fd_max : float
+        Extent of arc in Doppler shift
+    n  : int
+        Integer number of points in array (must be even)
     '''
+
     x_max = fd_max / dfd
     eta_ul = dfd**2 * eta / dtau
     l_max = len_arc(x_max.value, eta_ul.value)
@@ -379,8 +386,12 @@ def ext_find(x, y):
     '''
     Determine extent for imshow to center bins at given coordinates
 
-    x -- x coordinates of data
-    y -- y coordiantes of data
+    Parameters
+    ----------
+    x : 1D Array Quantity
+        X coordinates of data
+    y : 1D Array Quantity
+        Y coordiantes of data
 
     '''
     dx = np.diff(x).mean()
@@ -394,10 +405,14 @@ def fft_axis(x, unit, pad=0):
     '''
     Calculates fourier space coordinates from data space coordinates.
 
-    Arguments
-    x -- Astropy
-    unit -- desired unit for fourier coordinates
-    pad -- integer giving how many additional copies of the data are padded in
+    Parameters
+    ----------
+    x : 1D Array Quantity
+        Coordinate array to find Fourier conjugate of
+    unit : Atropy Unit
+        Desired unit for fourier coordinates
+    pad : int, optional
+        Integer giving how many additional copies of the data are padded in
         this direction
     '''
     fx = np.fft.fftshift(
@@ -411,10 +426,12 @@ def single_search(params):
     """
     Curvature Search for a single chunk of a dynamic spectrum. Designed for use with MPI4py
     
-    Arguments:
-    params -- A tuple containing
+    Parameters
+    ----------
+    params : List
+        Contains the following
         dspec2 -- The chunk of the dynamic spectrum
-        freq2 -- The frequency channels of that chunk (with units)
+        freq -- The frequency channels of that chunk (with units)
         time -- The time bins of that chunk (with units)
         eta_l -- The lower limit of curvatures to search (with units)
         eta_h -- the upper limit of curvatures to search (with units)
@@ -423,14 +440,15 @@ def single_search(params):
         plot -- A bool controlling if the result should be plotted
         neta -- Number of curvatures to test
         coher -- A bool for whether to use coherent (True) or incoherent (False) theta-theta
+        verbose -- A bool for how many updates the search prints
     """
     
-    ## Reap Parameters
+    ## Read Parameters
     dspec2,freq,time,etas,edges,name,plot,fw,npad,coher,verbose=params
 
     ## Verify units
-    time = unit_checks(time,'time2',u.s)
-    freq = unit_checks(freq,'freq2',u.MHz)
+    time = unit_checks(time,'time',u.s)
+    freq = unit_checks(freq,'freq',u.MHz)
     etas = unit_checks(etas,'etas',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
@@ -523,24 +541,38 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     '''
     Plotting script to look at invidivual chunks
 
-    Arguments
-    dspec -- 2D numpy array containing the dynamic spectrum
-    time -- 1D numpy array of the dynamic spectrum time bins (with units)
-    freq -- 1D numpy array of the dynamic spectrum frequency channels (with units)
-    CS -- 2D numpy array of the conjugate spectrum
-    fd -- 1D numpy array of the SS fd bins (with units)
-    tau -- 1D numpy array of the SS tau bins (with units)
-    edges -- 1D numpy array with the bin edges for theta-theta
-    eta_fit -- Best fit curvature
-    eta_sig -- Error on best fir curvature
-    etas -- 1D numpy array of curvatures searched over
-    measure -- 1D numpy array with largest eigenvalue (method = 'eigenvalue')
-        or chisq value (method = 'chisq') for etas
-    etas_fit -- Subarray of etas used for fitting
-    fit_res -- Fit parameters for parabola at extremum
-    tau_lim -- Largest tau value for SS plots
-    method -- Either 'eigenvalue' or 'chisq' depending on how curvature was
-        found
+    Parameters
+    ----------
+    dspec : 2D Array
+        The Dynamic Spectrum
+    time : 1D Astropy Quantity Array
+        Time bins of the Dynamic Spectrum (s)
+    freq : 1D Astropy Quantity Array 
+        Frequency channels of the Dynamic Spectrum (MHz)
+    CS : 2D Array
+        Conjugate Spectrum
+    fd : 1D Astropy Quantity Array
+        Doppler Shift coordinates of the Conjugate Spectrum (mHz)
+    tau : 1D Astropy Quantity Array
+        Time Delay coordinates of the Conjugate Spectrum (us)
+    edges : 1D Astropy Quantity Array
+        Theta-Theta bin edges (mHz)
+    eta_fit : Astropy Quantity
+        Best fit Arc Curvature (s**3)
+    eta_sig : Astropy Quantity
+        Error on best fit Arc Curvature (s**3)
+    etas : 1D Astropy Quantity Array
+        Curvatures search over (s**3)
+    measure : 1D Array
+        Largest eigenvalue (method = 'eigenvalue') or chisq value (method = 'chisq') for each eta
+    etas_fit : 1D Astropy Quantity Array
+        Subarray of etas used for fitting
+    fit_res : tuple
+        Fit parameters for parabola at extremum
+    tau_lim : Float Quantity, optional
+        Largest tau value for SS plots
+    method : String, optional
+        Either 'eigenvalue' or 'chisq' depending on how curvature was found. Defaults to "eigenvalue"
     '''
 
     ## Verify units
@@ -738,16 +770,40 @@ def VLBI_chunk_retrieval(params):
     dynamic spectra and visibilities. Designed for use in parallel phase
     retreival code
 
-    Arguments
-    params -- tuple of relevant parameters
+    Parameters
+    ----------
+    params : List
+        Contains
+        dspec2_list : List
+            A list of the overlapping dynamic spectra for all single dishes and visibilities
+            ordered as [I1 , V12, ..., V1N, I2, V23,...,IN]
+        edges : 1D Astropy Quantity Array
+            Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+        time : 1D Astropy Quanity Array
+            Time bins for the section of the spectra being examined (s)
+        freq : 1D Astropy Quantity Array
+            Frequency channels for the section of the spectra being examined
+        eta : Float Quantity
+            Arc curvature for the section of the spectra being examined
+        idx_t : int
+            Time index of chunk being examined
+        idx_f : int
+            Frequency index of chunk being examined
+        npad : int
+            Number of zeros paddings to add to end of dspec
+        n_dish : int
+            Number of stations used for VLBI
+        verbose : bool
+            Control the number of print statements
+
     '''
 
     ## Read parameters
-    dspec2_list,edges,time2,freq2,eta,idx_t,idx_f,npad,n_dish,verbose = params
+    dspec2_list,edges,time,freq,eta,idx_t,idx_f,npad,n_dish,verbose = params
 
     ## Verify unit compatability
-    time2 = unit_checks(time2,'time2',u.s)
-    freq2 = unit_checks(freq2,'freq2',u.MHz)
+    time = unit_checks(time,'time2',u.s)
+    freq = unit_checks(freq,'freq2',u.MHz)
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
@@ -756,8 +812,8 @@ def VLBI_chunk_retrieval(params):
         print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
 
     ## Determine fd and tau coordinates of Conjugate Spectrum
-    fd = fft_axis(time2, u.mHz, npad)
-    tau = fft_axis(freq2, u.us, npad)
+    fd = fft_axis(time, u.mHz, npad)
+    tau = fft_axis(freq, u.us, npad)
 
     ## Determine which sprectra in dspec2_list are dynamic spectra
     dspec_args=(n_dish*(n_dish+1))/2-np.cumsum(np.linspace(1,n_dish,n_dish))
@@ -831,16 +887,37 @@ def single_chunk_retrieval(params):
     Performs phase retrieval on a single time/frequency chunk.
     Designed for use in parallel phase retreival code
 
-    Arguments
-    params -- tuple of relevant parameters
+    Parameters
+    ----------
+    params : List
+        Contains
+        dspec2 : 2D Array
+            Section of the Dynamic Spectrum to be analyzed
+        edges : 1D Astropy Quantity Array
+            Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+        time : 1D Astropy Quanity Array
+            Time bins for the section of the spectrum being examined (s)
+        freq : 1D Astropy Quantity Array
+            Frequency channels for the section of the spectrum being examined
+        eta : Float Quantity
+            Arc curvature for the section of the spectrum being examined
+        idx_t : int
+            Time index of chunk being examined
+        idx_f : int
+            Frequency index of chunk being examined
+        npad : int
+            Number of zeros paddings to add to end of dspec
+        verbose : bool
+            Control the number of print statements
+
     '''
     
     ## Read parameters
-    dspec2,edges,time2,freq2,eta,idx_t,idx_f,npad,verbose = params
+    dspec2,edges,time,freq,eta,idx_t,idx_f,npad,verbose = params
 
     ## Verify unit compatability
-    time2 = unit_checks(time2,'time2',u.s)
-    freq2 = unit_checks(freq2,'freq2',u.MHz)
+    time2 = unit_checks(time,'time2',u.s)
+    freq2 = unit_checks(freq,'freq2',u.MHz)
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
@@ -885,10 +962,13 @@ def single_chunk_retrieval(params):
     return(model_E,idx_f,idx_t)
 
 def mask_func(w):
-    """ Mask function used to weight chunks for mosaic function
+    """ 
+    Mask function used to weight chunks for mosaic function
 
-    Arguments:
-    w -- Integer length of array to be masked
+    Parameters
+    ----------
+    w : int
+        Length of data to be masked
     """
     x=np.linspace(0,w-1,w)
     return(np.sin((np.pi/2)*x/w)**2)
@@ -896,8 +976,10 @@ def mask_func(w):
 def mosaic(chunks):
     """ Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation and stacking
 
-    Arguments:
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    Parameters
+    ----------
+    chunks 4D Astropy Quantity Array
+        Recovered wavfields for all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
     """
     ## Determine chunks sizes and number in time and freq
     nct=chunks.shape[1]
@@ -938,17 +1020,25 @@ def mosaic(chunks):
     return(E_recov)
 
 def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
-    """Map from Secondary Spectrum to theta-theta space allowing for arclets with different curvature
+    """
+    Map from Secondary Spectrum to theta-theta space allowing for arclets with different curvature
 
-    Arguments:
-    CS -- Conjugate Spectrum in [tau,fd] order with (0,0) in center
-    tau -- Time lags in ascending order
-    fd -- doppler frequency in ascending order
-    eta1-- curvature of the main arc with the units of tau and fd
-    edges1 -- 1d numpy array with the edges of the theta bins along the main
-        arc
-    eta2-- curvature of the arclets with the units of tau and fd
-    edges2 -- 1d numpy array with the edges of the theta bins along the arclets
+    Parameters
+    ----------
+    CS : 2D Array
+        Conjugate Spectrum in [tau,fd] order with (0,0) in center
+    tau : 1D Astropy Quantity Array
+        Time Delay coordinates of Conjugate Spectrum (us)
+    fd : 1D Astropy Quanity Array
+        Doppler Shift coordinates of Conjugate Spectrum (mHz)
+    eta1 : Float Quantity
+        Arc Curvature of the main arc (s**3)
+    edges1 : 1D Astropy Quantity Array
+        Bin edges in theta1 for theta-theta mapping (mHz).
+    eta2 : Float Quanity
+        Arc Curvature of the Inverted Arclets
+    edges2 : 1D Astropy Quantity Array
+            Bin edges for in theta2 theta-theta mapping (mHz). 
     """
     tau = unit_checks(tau,'tau',u.us)
     fd = unit_checks(fd,'fd',u.mHz)
@@ -1004,12 +1094,17 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
 
 
 def unit_checks(var,name,desired):
-    """Checks for unit compatibility (Used internally to help provide useful errors)
+    """
+    Checks for unit compatibility (Used internally to help provide useful errors)
     
-    Arguments:
-    var -- Variable whose units are to be checked
-    name -- String name of variable for displaying errors
-    desired -- Astropy Unit thatvar should have
+    Parameters
+    ----------
+    var : Astropy Quanity
+        Variable whose units are to be checked
+    name : String
+        Name of variable for displaying errors
+    desired : Astropy Unit
+        Desired unit
     
     """
     var*=u.dimensionless_unscaled
@@ -1027,13 +1122,21 @@ def unit_checks(var,name,desired):
     return(var)
 
 def min_edges(fd_lim,fd,tau,eta,factor=2):
-    """Calculates minimum size of edges array such that the Conjugate Spectrum is oversampled by at least some margin at all points
-    Arguments:
-    fd_lim -- Largest value of fd to search out to along main arc
-    fd -- Array of fD values in Conjugate Spcetrum
-    tau --  Array of tau values in Conjugate Spectrum
-    eta -- The curvature to calculate edges for (When doing a curvature search this should be the largest curvature to search over)
-    factor -- Over sample factor 
+    """
+    Calculates minimum size of edges array such that the Conjugate Spectrum is oversampled by at least some margin at all points
+    
+    Parameters
+    ----------
+    fd_lim : Float Quantity
+        Largest value of fd to search out to along main arc
+    fd : 1D Astropy Quanity Array
+        Doppler Shift coordinates of Conjugate Spectrum (mHz)
+    tau : 1D Astropy Quantity Array
+        Time Delay coordinates of Conjugate Spectrum (us)
+    eta : Float Quanity
+        The curvature to calculate edges for (When doing a curvature search this should be the largest curvature to search over)
+    factor : Float
+        Over sample factor 
     """
 
     fd_lim = unit_checks(fd_lim,'fD Limit',fd.unit)
@@ -1049,11 +1152,15 @@ def min_edges(fd_lim,fd,tau,eta,factor=2):
     return(np.linspace(-fd_lim,fd_lim,int(npoints)))
 
 def rotMos(chunks, x):
-    """Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation and stacking
+    """
+    Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation and stacking
 
-    Arguments:
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    x -- Numpy Array of length (n-1) where n is the number of chunks. Contains the phase rotation of each chunk after the first.
+    Parameters
+    ----------
+    chunks :4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    x : 1D Array
+        phase rotation of each chunk after the first.
     """
     ## Determine chunks sizes and number in time and freq
     nct = chunks.shape[1]
@@ -1102,11 +1209,15 @@ def rotMos(chunks, x):
 
 
 def rotFit(x, chunks):
-    """Calculates the sum of the dynamic spectrum for the wavefield produced by rotMos. Should be maximized when all chunks add coherently
+    """
+    Calculates the sum of the dynamic spectrum for the wavefield produced by rotMos. Should be maximized when all chunks add coherently
 
-    Arguments:
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    x -- Numpy Array of length (n-1) where n is the number of chunks. Contains the phase rotation of each chunk after the first.
+    Parameters
+    ----------
+    x : 1D Array
+        phase rotation of each chunk after the first.
+    chunks :4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
     """
     E = rotMos(chunks, x)
     res=-np.sum(np.abs(E) ** 2)
@@ -1114,10 +1225,13 @@ def rotFit(x, chunks):
 
 
 def rotInit(chunks):
-    """Provides an initial estimate for the phase rotations for rotMos or rotfit
+    """
+    Provides an initial estimate for the phase rotations for rotMos or rotfit
 
-    Arguments:
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    Parameters
+    ----------
+    chunks :4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
     """
     ## Determine chunks sizes and number in time and freq
     nct = chunks.shape[1]
@@ -1167,11 +1281,15 @@ def rotInit(chunks):
     return x
 
 def rotDer(x,chunks):
-    """Analytic calculation of the gradient of rotFit for a given set of phase rotations and chunks
+    """
+    Analytic calculation of the gradient of rotFit for a given set of phase rotations and chunks
 
-    Arguments:
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    x -- Numpy Array of length (n-1) where n is the number of chunks. Contains the phase rotation of each chunk after the first.
+    Parameters
+    ----------
+    x : 1D Array
+        phase rotation of each chunk after the first.
+    chunks : 4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
     """
     nct = chunks.shape[1]
     ncf = chunks.shape[0]
@@ -1213,10 +1331,12 @@ def rotDer(x,chunks):
 def fullMos(chunks, p):
     """Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation, rescaling, and stacking
 
-    Arguments:
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
-        chunk and the final n elements are the rescaling amplitudes for each chunk.
+    Parameters
+    ----------
+    chunks : 4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    p : 1D Array
+        Phase rotation of each chunk after the first and then amplitude scaling for all chunks 
     """
     ## Determine chunks sizes and number in time and freq
     nct = chunks.shape[1]
@@ -1271,13 +1391,16 @@ def fullMos(chunks, p):
 def fullMosFit(p, chunks, dspec, N):
     """Combine recovered wavefield chunks into a single composite wavefield by correcting for random phase rotation, rescaling, and stacking
 
-    Arguments:
-    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
-        chunk and the final n elements are the rescaling amplitudes for each chunk.
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    dspec -- Numpy Array of the dynamic spectrum to fit to
-    N -- Numpy Array of the standard deviation of the noise for each point in dspec
-    
+    Parameters
+    ----------
+    p : 1D Array
+        Phase rotation of each chunk after the first and then amplitude scaling for all chunks c
+    chunks : 4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    dspec : 2D Array
+        Dynamic Spectrum to be fit to
+    N : 2D Array
+        Point by point noise standard deviation for Dynamic Spectrum
     """
     W = fullMos(chunks, p)
     M = np.abs(W) ** 2
@@ -1288,12 +1411,16 @@ def fullMosFit(p, chunks, dspec, N):
 def fullMosGrad(p, chunks, dspec, N):
     """Analysic gradient of fullMosFit
 
-    Arguments:
-    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
-        chunk and the final n elements are the rescaling amplitudes for each chunk.
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    dspec -- Numpy Array of the dynamic spectrum to fit to
-    N -- Numpy Array of the standard deviation of the noise for each point in dspec
+    Parameters
+    ----------
+    p : 1D Array
+        Phase rotation of each chunk after the first and then amplitude scaling for all chunks c
+    chunks : 4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    dspec : 2D Array
+        Dynamic Spectrum to be fit to
+    N : 2D Array
+        Point by point noise standard deviation for Dynamic Spectrum
     
     """
     nct = chunks.shape[1]
@@ -1361,12 +1488,16 @@ def fullMosGrad(p, chunks, dspec, N):
 def fullMosHess(p, chunks, dspec, N):
     """Analysic Hessian of fullMosFit
 
-    Arguments:
-    p -- Numpy Array of length (2n-1) where n is the number of chunks. The first n-1 elements are the the phase rotations for each
-        chunk and the final n elements are the rescaling amplitudes for each chunk.
-    chunks -- Numpy Array of recovered chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
-    dspec -- Numpy Array of the dynamic spectrum to fit to
-    N -- Numpy Array of the standard deviation of the noise for each point in dspec
+    Parameters
+    ----------
+    p : 1D Array
+        Phase rotation of each chunk after the first and then amplitude scaling for all chunks c
+    chunks : 4D Astropy Quanity Array
+        Recovered wavefields of all chunks in the form [Chunk # in Freq, Chunk # in Time, Freq within chunk, Time within chunk]
+    dspec : 2D Array
+        Dynamic Spectrum to be fit to
+    N : 2D Array
+        Point by point noise standard deviation for Dynamic Spectrum
     
     """
 
@@ -1531,41 +1662,52 @@ def fullMosHess(p, chunks, dspec, N):
     return H
 
 def errString(fit,sig):
-        exp_fit = int(('%.0e' % fit.value)[2:])
-        exp_err = int(('%.0e' % sig.value)[2:])
+    '''
+    Convert a measurement and a standard deviation into strings in scientific notion for plot labels
 
-        if exp_err==exp_fit:
+     Parameters
+    ----------
+    fit : Float Quantity
+        Fitted Value
+    sig : Float Quanity
+        Standard Deviation of fit
+    
+    '''
+    exp_fit = int(('%.0e' % fit.value)[2:])
+    exp_err = int(('%.0e' % sig.value)[2:])
+
+    if exp_err==exp_fit:
+        fmt = "{:.%se}" % (exp_fit - exp_err)
+        fit_string = fmt.format(fit.value)
+        fit_string = fit_string[:fit_string.index('e')]
+        err_string = fmt.format(sig.value)
+        if err_string[0]=='1':
+            exp_err-=1
             fmt = "{:.%se}" % (exp_fit - exp_err)
             fit_string = fmt.format(fit.value)
             fit_string = fit_string[:fit_string.index('e')]
             err_string = fmt.format(sig.value)
-            if err_string[0]=='1':
-                exp_err-=1
-                fmt = "{:.%se}" % (exp_fit - exp_err)
-                fit_string = fmt.format(fit.value)
-                fit_string = fit_string[:fit_string.index('e')]
-                err_string = fmt.format(sig.value)
-        elif exp_fit>exp_err:
+    elif exp_fit>exp_err:
+        fmt = "{:.%se}" % (exp_fit - exp_err)
+        fit_string = fmt.format(fit.value)
+        fit_string = fit_string[:fit_string.index('e')]
+        err_string = '0%s' % fmt.format(10**exp_fit + sig.value)
+        err_string =err_string[err_string.index('.'):]
+        if err_string[1]=='1':
+            exp_err-=1
             fmt = "{:.%se}" % (exp_fit - exp_err)
             fit_string = fmt.format(fit.value)
             fit_string = fit_string[:fit_string.index('e')]
             err_string = '0%s' % fmt.format(10**exp_fit + sig.value)
             err_string =err_string[err_string.index('.'):]
-            if err_string[1]=='1':
-                exp_err-=1
-                fmt = "{:.%se}" % (exp_fit - exp_err)
-                fit_string = fmt.format(fit.value)
-                fit_string = fit_string[:fit_string.index('e')]
-                err_string = '0%s' % fmt.format(10**exp_fit + sig.value)
-                err_string =err_string[err_string.index('.'):]
-            err_string='0'+err_string
-        else:
-            fmt = "{:.%se}" % (exp_err - exp_fit)
-            err_string = fmt.format(sig.value)
-            err_string = err_string
-            fit_string = '0%s' % fmt.format(10**exp_err + fit.value)
-            fit_string ='0'+fit_string[fit_string.index('.'):fit_string.index('e')]
-        if err_string[err_string.index('e'):]== 'e+00' :
-                err_string=err_string[:err_string.index('e')]
-            
-        return(fit_string,err_string)
+        err_string='0'+err_string
+    else:
+        fmt = "{:.%se}" % (exp_err - exp_fit)
+        err_string = fmt.format(sig.value)
+        err_string = err_string
+        fit_string = '0%s' % fmt.format(10**exp_err + fit.value)
+        fit_string ='0'+fit_string[fit_string.index('.'):fit_string.index('e')]
+    if err_string[err_string.index('e'):]== 'e+00' :
+            err_string=err_string[:err_string.index('e')]
+        
+    return(fit_string,err_string)
