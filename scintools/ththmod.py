@@ -604,7 +604,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     ththE_red=thth_red*0
     ththE_red[ththE_red.shape[0]//2,:]=np.conjugate(V)*np.sqrt(w)
     ##Map back to time/frequency space
-    recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,isdspec = False)
+    recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,hermetian=False)
     model_E=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec.shape[0],:dspec.shape[1]]
     model_E*=(dspec.shape[0]*dspec.shape[1]/4)
     model_E[dspec>0]=np.sqrt(dspec[dspec>0])*np.exp(1j*np.angle(model_E[dspec>0]))
@@ -872,7 +872,7 @@ def VLBI_chunk_retrieval(params):
         ## Build Model TH-TH for dish
         thth_temp*=0
         thth_temp[thth_size//2,:]=np.conjugate(V[d*thth_size:(d+1)*thth_size])*np.sqrt(w)
-        recov_E=rev_map(thth_temp,tau,fd,eta,edges_red,isdspec = False)
+        recov_E=rev_map(thth_temp,tau,fd,eta,edges_red,hermetian = False)
         ## Map back to frequency/time space
         model_E_temp=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2_list[0].shape[0],:dspec2_list[0].shape[1]]
         model_E_temp*=(dspec2_list[0].shape[0]*dspec2_list[0].shape[1]/4)
@@ -949,7 +949,7 @@ def single_chunk_retrieval(params):
         ththE_red=thth_red*0
         ththE_red[ththE_red.shape[0]//2,:]=np.conjugate(V)*np.sqrt(w)
         ##Map back to time/frequency space
-        recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,isdspec = False)
+        recov_E=rev_map(ththE_red,tau,fd,eta,edges_red,hermetian = False)
         model_E=np.fft.ifft2(np.fft.ifftshift(recov_E))[:dspec2.shape[0],:dspec2.shape[1]]
         model_E*=(dspec2.shape[0]*dspec2.shape[1]/4)
         if verbose:
