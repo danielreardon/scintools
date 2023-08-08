@@ -1257,12 +1257,12 @@ class Dynspec:
             self.cwt = self.dyn.shape[1]
             self.nct_fit = 1
             self.nct_ret = 1   
-        if tau_lim:
+        if type(tau_lim)!=type(None):
             tau_lim = thth.unit_checks(tau_lim,'Tau Limit', u.us)
             delmax = tau_lim
         else:
             delmax=None
-        if fref:
+        if type(fref) != type(None):
             self.fref = thth.unit_checks(fref,'reference frequency',u.MHz)
         else:
             self.fref = self.freqs.mean()*u.MHz
@@ -1300,11 +1300,11 @@ class Dynspec:
         self.neta = int(1+ (l1-l0)/np.log10(1+self.fw/10))
         
         fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
-        if edges_lim:
+        if type(edges_lim) != type(None):
             edges_lim = min((thth.unit_checks(edges_lim,'edges limit',u.mHz),fd_cut))
         else:
             edges_lim=fd_cut
-        if tau_lim:
+        if type(tau_lim) != type(None):
             edges_lim=min((edges_lim,np.sqrt(tau_lim/self.eta_max).to(u.mHz)))
 
         if nedge:
@@ -1391,8 +1391,8 @@ class Dynspec:
             thth.PlotFunc(dspec2,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
             if fname:
                 np.savez(fname)
-        except:
-            print('Plotting Error',flush=True)
+        except Exception as e:
+            print(f"Plotting Error :{e}",flush=True)
             plt.figure()
             plt.plot(etas,eigs)
             plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
@@ -1416,6 +1416,7 @@ class Dynspec:
                 time2 = np.copy(self.times[ts])*u.s
                 dspec2=np.copy(self.dyn[fs,ts])
                 dspec2-=np.nanmean(dspec2)
+                dspec2=np.nan_to_num(dspec2)
 
                 params=(dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True,verbose)
                 res = thth.single_search(params)
