@@ -1324,7 +1324,6 @@ class Dynspec:
             print(f'Fractional fitting width: {self.fw}')
             print(f'Zero paddings: {self.npad}')
 
-
     def thetatheta_single(self, cf=0, ct=0,fname=None,verbose=False):
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
@@ -1398,7 +1397,6 @@ class Dynspec:
             plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.ylabel(r'Eigenvalue')
         
-
     def fit_thetatheta(self,verbose=False,plot=False,pool=None):
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
@@ -1451,7 +1449,7 @@ class Dynspec:
             plt.ylabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.legend()
 
-    def thetatheta_chunks(self,verbose=False,pool=None):
+    def thetatheta_chunks(self,verbose=False,pool=None,gs=False):
         if not hasattr(self,"ththeta"):
             self.fit_thetatheta(verbose=verbose,pool=pool)
         self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
@@ -1476,8 +1474,28 @@ class Dynspec:
         if type(pool)!=type(None):
             for res in pool.map(thth.single_chunk_retrieval,pars):
                 self.chunks[res[1],res[2],:,:]=res[0]
+        
+    def calc_wavefield(self,verbose=False,pool=None,gs=False):
+        if not hasattr(self,"chunks"):
+            self.thetatheta_chunks(verbose=verbose,pool=pool)
         self.wavefield = thth.mosaic(self.chunks)
-
+        if gs:
+            self.gerchberg_saxton(verbose=verbose,pool=pool)
+        
+    def gerchberg_saxton(self,verbose=False,pool=None):
+        if not hasattr(self,"wavefield"):
+            self.calc_wavefield(verbose=verbose,pool=pool)
+        WF2=np.copy(self.wavefield)
+        dspec_red = np.copy(self.dyn)[:WF2.shape[0],:WF2.shape[1]]
+        posdspec =  np.isfinite(dspec_red) * (dspec_red>0)
+        tau=thth.fft_axis(self.freqs[:WF2.shape[0]]*u.MHz,u.us)
+        WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
+        CWF=np.fft.fftshift(np.fft.fft2(WF2))
+        CWF[tau<0]=0
+        WF2=np.fft.ifft2(np.fft.ifftshift(CWF))
+        WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
+        self.wavefield=WF2
+        
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
                    scrunched=True, plot_fit=True, ref_freq=1400, velocity=False,
