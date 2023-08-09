@@ -1399,13 +1399,15 @@ class Dynspec:
             plt.ylabel(r'Eigenvalue')
         
 
-    def fit_thetatheta(self,verbose=False,plot=False):
+    def fit_thetatheta(self,verbose=False,plot=False,pool=None):
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
         self.eta_evo = np.zeros((self.ncf_fit,self.nct_fit))*u.s**3
         self.eta_evo_err = np.zeros((self.ncf_fit,self.nct_fit))*u.s**3
         self.f0s = np.zeros(self.ncf_fit)*u.MHz
         self.t0s = np.zeros((self.nct_fit))*u.s
+        if type(pool)!=type(None):
+            pars=list()
         for cf in range(self.ncf_fit):
             fs = slice(cf*self.cwf,(cf+1)*self.cwf)
             freq2=np.copy(self.freqs[fs])*u.MHz
@@ -1419,9 +1421,18 @@ class Dynspec:
                 dspec2=np.nan_to_num(dspec2)
 
                 params=(dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True,verbose)
-                res = thth.single_search(params)
-                self.eta_evo[cf,ct]=res[0]
-                self.eta_evo_err[cf,ct]=res[1]
+                if type(pool)==type(None):
+                    res = thth.single_search(params)
+                    self.eta_evo[cf,ct]=res[0]
+                    self.eta_evo_err[cf,ct]=res[1]
+                else:
+                    pars.append(params)
+        if type(pool)!=type(None):
+            res = pool.map(thth.single_search,pars)
+            for cf in range(self.ncf_fit):
+                for ct in range(self.nct_fit):
+                    self.eta_evo[cf,ct]=res[cf*self.nct_fit+ct][0]
+                    self.eta_evo_err[cf,ct]=res[cf*self.nct_fit+ct][1]
         tofit =  np.isfinite(self.eta_evo)*np.isfinite(self.eta_evo_err)
         A = (np.sum(self.eta_evo[tofit] / (self.f0s[:,np.newaxis] * self.eta_evo_err)[tofit] ** 2)/ np.sum(1 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
         A_err = np.sqrt(1 / np.sum(2 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
@@ -1440,10 +1451,12 @@ class Dynspec:
             plt.ylabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.legend()
 
-    def thetatheta_chunks(self,verbose=False):
+    def thetatheta_chunks(self,verbose=False,pool=None):
         if not hasattr(self,"ththeta"):
-            self.fit_thetatheta(verbose=verbose)
+            self.fit_thetatheta(verbose=verbose,pool=pool)
         self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
+        if type(pool)!=type(None):
+            pars=list()
         for cf in range(self.ncf_ret):
             fs = slice(cf*(self.cwf//2),cf*(self.cwf//2)+self.cwf)
             freq2 = np.copy(self.freqs[fs])*u.MHz
@@ -1455,8 +1468,14 @@ class Dynspec:
                 dspec2=np.copy(self.dyn[fs,ts])
                 dspec2-=np.nanmean(dspec2)
                 params = (dspec2,self.edges*(freq/self.fref),time2,freq2,eta,ct,cf,self.npad,verbose)
-                res = thth.single_chunk_retrieval(params)
-                self.chunks[cf,ct,:,:]=res[0]
+                if type(pool)==type(None):
+                    res = thth.single_chunk_retrieval(params)
+                    self.chunks[cf,ct,:,:]=res[0]
+                else:
+                    pars.append(params)
+        if type(pool)!=type(None):
+            for res in pool.map(thth.single_chunk_retrieval,pars):
+                self.chunks[res[1],res[2],:,:]=res[0]
         self.wavefield = thth.mosaic(self.chunks)
 
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
