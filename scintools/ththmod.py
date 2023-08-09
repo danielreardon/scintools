@@ -193,31 +193,32 @@ def rev_map(thth, tau, fd, eta, edges, hermetian=True):
     tau_edges=(np.linspace(0,tau.shape[0],tau.shape[0]+1)-.5)*(tau[1]-tau[0]).value+tau[0].value
     
     ## Bind TH-TH points back into Conjugate Spectrum
-    recov=np.histogram2d(np.ravel(fd_map.value),
-                         np.ravel(tau_map.value),
-                         bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] +\
-            np.histogram2d(np.ravel(fd_map.value),
-                         np.ravel(tau_map.value),
-                         bins=(fd_edges,tau_edges),
-                         weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
-    norm=np.histogram2d(np.ravel(fd_map.value),
-                         np.ravel(tau_map.value),
-                         bins=(fd_edges,tau_edges))[0]
-    if hermetian:
-        recov += np.histogram2d(np.ravel(-fd_map.value),
-                            np.ravel(-tau_map.value),
+    with np.errstate(divide='ignore'):
+        recov=np.histogram2d(np.ravel(fd_map.value),
+                            np.ravel(tau_map.value),
                             bins=(fd_edges,tau_edges),
-                            weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] -\
-                np.histogram2d(np.ravel(-fd_map.value),
-                            np.ravel(-tau_map.value),
+                            weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] +\
+                np.histogram2d(np.ravel(fd_map.value),
+                            np.ravel(tau_map.value),
                             bins=(fd_edges,tau_edges),
                             weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
-        norm+=np.histogram2d(np.ravel(-fd_map.value),
-                            np.ravel(-tau_map.value),
-                            bins=(fd_edges,tau_edges))[0] 
-    recov/=norm
-    recov=np.nan_to_num(recov)
+        norm=np.histogram2d(np.ravel(fd_map.value),
+                            np.ravel(tau_map.value),
+                            bins=(fd_edges,tau_edges))[0]
+        if hermetian:
+            recov += np.histogram2d(np.ravel(-fd_map.value),
+                                np.ravel(-tau_map.value),
+                                bins=(fd_edges,tau_edges),
+                                weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).real)[0] -\
+                    np.histogram2d(np.ravel(-fd_map.value),
+                                np.ravel(-tau_map.value),
+                                bins=(fd_edges,tau_edges),
+                                weights=np.ravel(thth/np.sqrt(np.abs(2*eta*fd_map.T).value)).imag)[0]*1j
+            norm+=np.histogram2d(np.ravel(-fd_map.value),
+                                np.ravel(-tau_map.value),
+                                bins=(fd_edges,tau_edges))[0] 
+        recov/=norm
+        recov=np.nan_to_num(recov)
     return(recov.T)
 
 def modeler(CS, tau, fd, eta, edges, hermetian=True):
