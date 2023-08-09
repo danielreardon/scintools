@@ -193,7 +193,7 @@ def rev_map(thth, tau, fd, eta, edges, hermetian=True):
     tau_edges=(np.linspace(0,tau.shape[0],tau.shape[0]+1)-.5)*(tau[1]-tau[0]).value+tau[0].value
     
     ## Bind TH-TH points back into Conjugate Spectrum
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide='ignore',invalid='ignore'):
         recov=np.histogram2d(np.ravel(fd_map.value),
                             np.ravel(tau_map.value),
                             bins=(fd_edges,tau_edges),
