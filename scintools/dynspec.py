@@ -1221,12 +1221,12 @@ class Dynspec:
                     plt.close()
                 elif display:
                     plt.show()
-    
+
     def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
                         eta_max=None, eta_min = None, nedge = None,
                         edges_lim = None, tau_lim=None, fw = .1, npad=3, verbose = False):
         """
-        Prepare 
+        Prepare
 
         Parameters
         ----------
@@ -1256,7 +1256,7 @@ class Dynspec:
         else:
             self.cwt = self.dyn.shape[1]
             self.nct_fit = 1
-            self.nct_ret = 1   
+            self.nct_ret = 1
         if tau_lim:
             tau_lim = thth.unit_checks(tau_lim,'Tau Limit', u.us)
             delmax = tau_lim
@@ -1266,10 +1266,10 @@ class Dynspec:
             self.fref = thth.unit_checks(fref,'reference frequency',u.MHz)
         else:
             self.fref = self.freqs.mean()*u.MHz
-        
+
         fd = thth.fft_axis(self.times[:self.cwt]*u.s,u.mHz)
         tau = thth.fft_axis(self.freqs[:self.cwf]*u.MHz,u.us)
-        
+
         self.eta_min = (4*(tau[1]-tau[0])/fd.max()**2).to(u.s**3)
         self.eta_max = (tau.max()/(fd[1]-fd[0])**2).to(u.s**3)
         self.eta_min*= (self.freqs.max()/self.fref.value)**2
@@ -1278,7 +1278,7 @@ class Dynspec:
             self.eta_min=max((eta_min,self.eta_min))
         if type(eta_max)!=type(None):
             self.eta_max=min((eta_max,self.eta_max))
-        
+
         if  (type(eta_min)==type(None)) or (type(eta_max)==type(None)):
             if not hasattr(self,"betaeta"):
                 self.fit_arc(lamsteps=True,numsteps=1e4,
@@ -1298,7 +1298,7 @@ class Dynspec:
         l1=np.log10(self.eta_max.value)
 
         self.neta = int(1+ (l1-l0)/np.log10(1+self.fw/10))
-        
+
         fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
         if edges_lim:
             edges_lim = min((thth.unit_checks(edges_lim,'edges limit',u.mHz),fd_cut))
@@ -1333,7 +1333,7 @@ class Dynspec:
             cf=self.ncf_fit-1
         if ct>=self.nct_fit:
             ct=self.nct_fit-1
-        
+
         fs = slice(cf*self.cwf,(cf+1)*self.cwf)
         ts = slice(ct*self.cwt, (ct+1)*self.cwt)
 
@@ -1397,7 +1397,7 @@ class Dynspec:
             plt.plot(etas,eigs)
             plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.ylabel(r'Eigenvalue')
-        
+
 
     def fit_thetatheta(self,verbose=False,plot=False):
         if not hasattr(self,'cwf'):
@@ -3490,7 +3490,7 @@ class Dynspec:
         """
 
         # Crop frequencies
-        crop_array = np.array((self.freqs > fmin)*(self.freqs < fmax))
+        crop_array = np.array((self.freqs >= fmin)*(self.freqs <= fmax))
         self.dyn = self.dyn[crop_array, :]
         # self.dyn_err = self.dyn_err[crop_array, :]
         self.freqs = self.freqs[crop_array]
@@ -3505,7 +3505,7 @@ class Dynspec:
             self.tobs = tmax - tmin
         else:
             self.tobs = self.tobs - tmin
-        crop_array = np.array((self.times > tmin)*(self.times < tmax))
+        crop_array = np.array((self.times >= tmin)*(self.times <= tmax))
         self.dyn = self.dyn[:, crop_array]
         # self.dyn_err = self.dyn_err[:, crop_array]
         self.nsub = len(self.dyn[0, :])
