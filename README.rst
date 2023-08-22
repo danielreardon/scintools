@@ -28,7 +28,7 @@ Below is a list of works that use Scintools\:
 * `"A Study of Birefringent Scintillation Towards the Millisecond Pulsar J0437-4715", Abdul Hamid (2021) <http://hdl.handle.net/10292/14786>`_
 * `"Probing the local interstellar medium with scintillometry of the bright pulsar B1133+16", McKee et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021arXiv211211980M>`_
 * `"Modelling annual scintillation arc variations in PSR J1643-1224 using the Large European Array for Pulsars", Mall et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220104245M>`_
-* `"Interstellar Scintillation of PSR J2048-1616", Chen et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022ApJ...927...14C>`_ (not explicitly credited)
+* `"Interstellar Scintillation of PSR J2048-1616", Chen et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022ApJ...927...14C>`_
 * `"Orbital dynamics and extreme scattering event properties from long-term scintillation observations of PSR J1603-7202", Walker et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220411077W>`_
 * `"Pulsar Double-lensing Sheds Light on the Origin of Extreme Scattering Events", Zhu et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220806884Z>`_
 * `"The MSPSRπ catalogue: VLBA astrometry of 18 millisecond pulsars", Ding et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023MNRAS.519.4982D>`_
