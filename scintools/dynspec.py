@@ -1282,7 +1282,9 @@ class Dynspec:
         if  (type(eta_min)==type(None)) or (type(eta_max)==type(None)):
             if not hasattr(self,"betaeta"):
                 self.fit_arc(lamsteps=True,numsteps=1e4,
-                            etamin=((self.eta_min*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)),delmax=delmax)
+                            etamin=((self.eta_min*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)),
+                            etamax=((self.eta_max*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)),
+                            delmax=delmax,plot=verbose)
             eta_hough = ((const.c*self.betaeta/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
             err_hough = ((const.c*2*max((self.betaetaerr,self.betaetaerr2))/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
         if type(eta_min)==type(None):
@@ -1340,7 +1342,8 @@ class Dynspec:
         freq2= self.freqs[fs]*u.MHz
 
         dspec2=np.copy(self.dyn[fs,ts])
-        dspec2-=np.nanmean(dspec2)
+        mn = np.nanmean(dspec2)
+        dspec2-=mn
         dspec_pad=np.pad(np.nan_to_num(dspec2),((0,self.npad*self.cwf),(0,self.npad*self.cwt)),mode='constant',constant_values=0)
         CS=np.fft.fftshift(np.fft.fft2(dspec_pad))
         tau=thth.fft_axis(freq2,u.us,self.npad)
@@ -1387,7 +1390,7 @@ class Dynspec:
         ## Plotting
         try:
             # Create diagnostic plots where requested
-            thth.PlotFunc(dspec2,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
+            thth.PlotFunc(np.nan_to_num(dspec2)+mn,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
             if fname:
                 np.savez(fname)
         except Exception as e:
@@ -1465,6 +1468,7 @@ class Dynspec:
                 time2=np.copy(self.times[ts])*u.s
                 dspec2=np.copy(self.dyn[fs,ts])
                 dspec2-=np.nanmean(dspec2)
+                dspec2=np.nan_to_num(dspec2)
                 params = (dspec2,self.edges*(freq/self.fref),time2,freq2,eta,ct,cf,self.npad,verbose)
                 if type(pool)==type(None):
                     res = thth.single_chunk_retrieval(params)
@@ -1482,7 +1486,7 @@ class Dynspec:
         if gs:
             self.gerchberg_saxton(verbose=verbose,pool=pool)
         
-    def gerchberg_saxton(self,verbose=False,pool=None):
+    def gerchberg_saxton(self,niter=1,verbose=False,pool=None):
         if not hasattr(self,"wavefield"):
             self.calc_wavefield(verbose=verbose,pool=pool)
         WF2=np.copy(self.wavefield)
@@ -1490,10 +1494,11 @@ class Dynspec:
         posdspec =  np.isfinite(dspec_red) * (dspec_red>0)
         tau=thth.fft_axis(self.freqs[:WF2.shape[0]]*u.MHz,u.us)
         WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
-        CWF=np.fft.fftshift(np.fft.fft2(WF2))
-        CWF[tau<0]=0
-        WF2=np.fft.ifft2(np.fft.ifftshift(CWF))
-        WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
+        for i in range(niter):
+            CWF=np.fft.fftshift(np.fft.fft2(WF2))
+            CWF[tau<0]=0
+            WF2=np.fft.ifft2(np.fft.ifftshift(CWF))
+            WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
         self.wavefield=WF2
         
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
