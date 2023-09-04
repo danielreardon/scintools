@@ -304,7 +304,7 @@ def chisq_calc(dspec,CS, tau, fd, eta, edges,N,mask=None):
     eta = unit_checks(eta,'eta',u.s**3)
     edges = unit_checks(edges,'edges',u.mHz)
 
-    model=modeler(CS, tau, fd, eta, edges,fd,tau)[3][:dspec.shape[0],:dspec.shape[1]]
+    model=modeler(CS, tau, fd, eta, edges)[3][:dspec.shape[0],:dspec.shape[1]]
     chisq=np.sum((model-dspec)[mask]**2)/N
     return(chisq)
 
