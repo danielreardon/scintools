@@ -1224,7 +1224,7 @@ class Dynspec:
     
     def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
                         eta_max=None, eta_min = None, nedge = None,
-                        edges_lim = None, tau_lim=None, fw = .1, npad=3, verbose = False):
+                        edges_lim = None, arclet_lim = None, tau_lim=None, fw = .1, npad=3, verbose = False):
         """
         Prepare 
 
@@ -1452,10 +1452,13 @@ class Dynspec:
             plt.ylabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.legend()
 
-    def thetatheta_chunks(self,verbose=False,pool=None,gs=False):
+    def thetatheta_chunks(self,verbose=False,pool=None,memmap=False):
         if not hasattr(self,"ththeta"):
             self.fit_thetatheta(verbose=verbose,pool=pool)
-        self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
+        if memmap:
+            self.chunks = np.memmap('memmap.dat',dtype=complex, mode='w+',shape=(self.ncf_ret,self.nct_ret,self.cwf,self.cwt))
+        else:
+            self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
         if type(pool)!=type(None):
             pars=list()
         for cf in range(self.ncf_ret):
@@ -1476,12 +1479,22 @@ class Dynspec:
                 else:
                     pars.append(params)
         if type(pool)!=type(None):
-            for res in pool.map(thth.single_chunk_retrieval,pars):
-                self.chunks[res[1],res[2],:,:]=res[0]
+            if memmap:
+                sub = 20
+                for i in range(len(pars)//sub):
+                    for res in pool.map(thth.single_chunk_retrieval,pars[i*sub:(i+1)*sub]):
+                        self.chunks[res[1],res[2],:,:]=res[0]
+                    print(f"memmap {i} complete")
+                if sub*(len(pars)//sub)<len(pars):
+                    for res in pool.map(thth.single_chunk_retrieval,pars[sub*(len(pars)//sub):]):
+                        self.chunks[res[1],res[2],:,:]=res[0]
+            else:
+                for res in pool.map(thth.single_chunk_retrieval,pars):
+                    self.chunks[res[1],res[2],:,:]=res[0]
         
-    def calc_wavefield(self,verbose=False,pool=None,gs=False):
+    def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False):
         if not hasattr(self,"chunks"):
-            self.thetatheta_chunks(verbose=verbose,pool=pool)
+            self.thetatheta_chunks(verbose=verbose,pool=pool,memmap=memmap)
         self.wavefield = thth.mosaic(self.chunks)
         if gs:
             self.gerchberg_saxton(verbose=verbose,pool=pool)

@@ -52,7 +52,6 @@ def chi_par(x, A, x0, C):
     """
     return A * (x - x0)**2 + C
 
-
 def thth_map(CS, tau, fd, eta, edges, hermetian=True):
     """
     Maping from Conjugate Spectrum space to theta-theta space
@@ -112,7 +111,6 @@ def thth_map(CS, tau, fd, eta, edges, hermetian=True):
 
     return thth
 
-
 def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
     """
     Map from Conjugate Spectrum to theta-theta space for the largest
@@ -156,7 +154,6 @@ def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
                                                      np.diff(edges_red.value).
                                                      mean()])))*edges_red.unit
     return thth_red, edges_red
-
 
 def rev_map(thth, tau, fd, eta, edges, hermetian=True):
     """
@@ -352,7 +349,6 @@ def len_arc(x,eta):
     a=2*eta
     return((a*x*np.sqrt((a*x)**2 + 1) +np.arcsinh(a*x))/(2.*a))
 
-
 def arc_edges(eta, dfd, dtau, fd_max, n):
     '''
     Calculate evenly spaced in arc length edges array (DEVELOPMENT ONLY)
@@ -382,7 +378,6 @@ def arc_edges(eta, dfd, dtau, fd_max, n):
     edges = np.concatenate((-x[::-1], x)) * dfd.value
     return(edges)
 
-
 def ext_find(x, y):
     '''
     Determine extent for imshow to center bins at given coordinates
@@ -400,7 +395,6 @@ def ext_find(x, y):
     ext = [(x[0] - dx / 2).value, (x[-1] + dx / 2).value,
            (y[0] - dy / 2).value, (y[-1] + dy / 2).value]
     return (ext)
-
 
 def fft_axis(x, unit, pad=0):
     '''
@@ -421,7 +415,6 @@ def fft_axis(x, unit, pad=0):
             (pad + 1) * x.shape[0],
             x[1] - x[0]).to_value(unit)) * unit
     return (fx)
-
 
 def single_search(params):
     """
@@ -618,6 +611,11 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     model_E=model_E[:dspec.shape[0],:dspec.shape[1]]
     N_E=recov_E[:recov_E.shape[0]//4,:].mean()
 
+    model = model[:dspec.shape[0],:dspec.shape[1]]
+    model -= model.mean()
+    model *= np.nanstd(dspec)/np.std(model)
+    model +=np.nanmean(dspec)
+
     ## Create derotated thth
     thth_derot=thth_red*np.conjugate(thth2_red)
 
@@ -631,7 +629,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
                aspect='auto',
                extent=ext_find(time.to(u.min), freq),
                origin='lower',
-               vmin=0, vmax=dspec.max())
+               vmin=np.nanmean(dspec)-5*np.nanstd(dspec), vmax=np.nanmean(dspec)+5*np.nanstd(dspec))
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Data Dynamic Spectrum')
@@ -642,7 +640,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
             aspect='auto',
             extent=ext_find(time.to(u.min),freq),
             origin='lower',
-            vmin=0,vmax=dspec.max())
+            vmin=np.nanmean(dspec)-5*np.nanstd(dspec), vmax=np.nanmean(dspec)+5*np.nanstd(dspec))
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Model Dynamic Spectrum')
@@ -763,7 +761,6 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     plt.title('Recovered Secondary Wavefield')
     plt.colorbar()
     plt.tight_layout()
-
 
 def VLBI_chunk_retrieval(params):
     '''
@@ -1092,7 +1089,6 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
     th_cents1 = (edges_red1[1:] + edges_red1[:-1]) / 2
     th_cents2 = (edges_red2[1:] + edges_red2[:-1]) / 2
     return(thth_red,edges_red1,edges_red2)
-
 
 def unit_checks(var,name,desired):
     """
