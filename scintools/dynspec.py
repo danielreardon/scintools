@@ -1224,7 +1224,7 @@ class Dynspec:
     
     def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
                         eta_max=None, eta_min = None, nedge = None,
-                        edges_lim = None, tau_lim=None, fw = .1, npad=3, verbose = False):
+                        edges_lim = None, arclet_lim = None, center_cut = None, tau_lim=None, fw = .1, npad=3, verbose = False):
         """
         Prepare 
 
@@ -1314,6 +1314,20 @@ class Dynspec:
         else:
             self.edges = thth.min_edges(edges_lim,fd,tau,self.eta_max*(self.fref.value/self.freqs.min()), 2
                                         )*(self.freqs.min()/self.fref.value)
+            
+        if type(arclet_lim) != type(None) or type(center_cut) != type(None):
+            self.thin_arc = True
+            if type(arclet_lim) != type(None):
+                self.arclet_lim = thth.unit_checks(arclet_lim,'Arclet Limit',u.mHz)
+            else:
+                self.arclet_lim = edges_lim
+            if type(center_cut) != type(None):
+                self.center_cut = thth.unit_checks(center_cut,'Central Cut',u.mHz)
+            else:
+                self.center_cut = 0
+        else:
+            self.thin_arc = False
+
         if verbose:
             print("\n\t THETA-THETA PROPERTIES\n")
             print(f'Channels per chunk: {self.cwf}')
@@ -1352,8 +1366,12 @@ class Dynspec:
         etas=np.logspace(np.log10(self.eta_min.value),np.log10(self.eta_max.value),self.neta)*u.s**3*(self.fref/freq2.mean())**2
         eigs=np.zeros(self.neta)
         edges = self.edges*(freq2.mean()/self.fref)
-        for i in range(etas.shape[0]):
-            eigs[i]=thth.Eval_calc(CS,tau,fd,etas[i],edges)
+        if not self.thin_arc:
+            for i in range(etas.shape[0]):
+                eigs[i]=thth.Eval_calc(CS,tau,fd,etas[i],edges)
+        else:
+            for i in range(etas.shape[0]):
+                eigs[i]=thth.singularvalue_calc(CS,tau,fd,etas[i],edges,etas[i],edges[np.abs(edges)<self.arclet_lim],self.center_cut)
 
         try:
             ## Remove failed curvatures
@@ -1421,15 +1439,24 @@ class Dynspec:
                 dspec2-=np.nanmean(dspec2)
                 dspec2=np.nan_to_num(dspec2)
 
-                params=(dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True,verbose)
+                params=[dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True,verbose]
+                if self.thin_arc:
+                    params.append(self.edges[np.abs(self.edges)<self.arclet_lim]*(freq2.mean()/self.fref))
+                    params.append(self.center_cut)
                 if type(pool)==type(None):
-                    res = thth.single_search(params)
+                    if self.thin_arc:
+                        res = thth.single_search_thin(params)
+                    else:
+                        res = thth.single_search(params)
                     self.eta_evo[cf,ct]=res[0]
                     self.eta_evo_err[cf,ct]=res[1]
                 else:
                     pars.append(params)
         if type(pool)!=type(None):
-            res = pool.map(thth.single_search,pars)
+            if self.thin_arc:
+                res = pool.map(thth.single_search_thin,pars)
+            else:
+                res = pool.map(thth.single_search,pars)
             for cf in range(self.ncf_fit):
                 for ct in range(self.nct_fit):
                     self.eta_evo[cf,ct]=res[cf*self.nct_fit+ct][0]
@@ -1452,10 +1479,13 @@ class Dynspec:
             plt.ylabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.legend()
 
-    def thetatheta_chunks(self,verbose=False,pool=None,gs=False):
+    def thetatheta_chunks(self,verbose=False,pool=None,memmap=False):
         if not hasattr(self,"ththeta"):
             self.fit_thetatheta(verbose=verbose,pool=pool)
-        self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
+        if memmap:
+            self.chunks = np.memmap('memmap.dat',dtype=complex, mode='w+',shape=(self.ncf_ret,self.nct_ret,self.cwf,self.cwt))
+        else:
+            self.chunks = np.zeros((self.ncf_ret,self.nct_ret,self.cwf,self.cwt),dtype=complex)
         if type(pool)!=type(None):
             pars=list()
         for cf in range(self.ncf_ret):
@@ -1476,12 +1506,22 @@ class Dynspec:
                 else:
                     pars.append(params)
         if type(pool)!=type(None):
-            for res in pool.map(thth.single_chunk_retrieval,pars):
-                self.chunks[res[1],res[2],:,:]=res[0]
+            if memmap:
+                sub = 20
+                for i in range(len(pars)//sub):
+                    for res in pool.map(thth.single_chunk_retrieval,pars[i*sub:(i+1)*sub]):
+                        self.chunks[res[1],res[2],:,:]=res[0]
+                    print(f"memmap {i} complete")
+                if sub*(len(pars)//sub)<len(pars):
+                    for res in pool.map(thth.single_chunk_retrieval,pars[sub*(len(pars)//sub):]):
+                        self.chunks[res[1],res[2],:,:]=res[0]
+            else:
+                for res in pool.map(thth.single_chunk_retrieval,pars):
+                    self.chunks[res[1],res[2],:,:]=res[0]
         
-    def calc_wavefield(self,verbose=False,pool=None,gs=False):
+    def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False):
         if not hasattr(self,"chunks"):
-            self.thetatheta_chunks(verbose=verbose,pool=pool)
+            self.thetatheta_chunks(verbose=verbose,pool=pool,memmap=memmap)
         self.wavefield = thth.mosaic(self.chunks)
         if gs:
             self.gerchberg_saxton(verbose=verbose,pool=pool)

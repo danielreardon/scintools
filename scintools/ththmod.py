@@ -52,7 +52,6 @@ def chi_par(x, A, x0, C):
     """
     return A * (x - x0)**2 + C
 
-
 def thth_map(CS, tau, fd, eta, edges, hermetian=True):
     """
     Maping from Conjugate Spectrum space to theta-theta space
@@ -112,7 +111,6 @@ def thth_map(CS, tau, fd, eta, edges, hermetian=True):
 
     return thth
 
-
 def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
     """
     Map from Conjugate Spectrum to theta-theta space for the largest
@@ -156,7 +154,6 @@ def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
                                                      np.diff(edges_red.value).
                                                      mean()])))*edges_red.unit
     return thth_red, edges_red
-
 
 def rev_map(thth, tau, fd, eta, edges, hermetian=True):
     """
@@ -352,7 +349,6 @@ def len_arc(x,eta):
     a=2*eta
     return((a*x*np.sqrt((a*x)**2 + 1) +np.arcsinh(a*x))/(2.*a))
 
-
 def arc_edges(eta, dfd, dtau, fd_max, n):
     '''
     Calculate evenly spaced in arc length edges array (DEVELOPMENT ONLY)
@@ -382,7 +378,6 @@ def arc_edges(eta, dfd, dtau, fd_max, n):
     edges = np.concatenate((-x[::-1], x)) * dfd.value
     return(edges)
 
-
 def ext_find(x, y):
     '''
     Determine extent for imshow to center bins at given coordinates
@@ -400,7 +395,6 @@ def ext_find(x, y):
     ext = [(x[0] - dx / 2).value, (x[-1] + dx / 2).value,
            (y[0] - dy / 2).value, (y[-1] + dy / 2).value]
     return (ext)
-
 
 def fft_axis(x, unit, pad=0):
     '''
@@ -422,6 +416,135 @@ def fft_axis(x, unit, pad=0):
             x[1] - x[0]).to_value(unit)) * unit
     return (fx)
 
+def singularvalue_calc(CS, tau, fd, eta, edges, etaArclet,edgesArclet,centerCut):
+    tau = unit_checks(tau,'tau',u.us)
+    fd = unit_checks(fd,'fd',u.mHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+    etaArclet = unit_checks(etaArclet,'etaArclet',u.s**3)
+    edgesArclet = unit_checks(edgesArclet,'edgesArclet',u.mHz)
+    centerCut = unit_checks(centerCut,'Center Cut',u.mHz)
+
+    thth_red, edges_red1, edges_red2 = two_curve_map(
+        CS, tau, fd, eta, edges, etaArclet, edgesArclet
+    )
+    cents1 = (edges_red1[1:] + edges_red1[:-1]) / 2
+    thth_red[:, np.abs(cents1) < centerCut] = 0
+    U, S, W = np.linalg.svd(thth_red)
+    return(S[0])
+
+def single_search_thin(params):
+    """
+    Curvature Search for a single chunk of a dynamic spectrum. Designed for use with MPI4py
+    
+    Parameters
+    ----------
+    params : List
+        Contains the following
+        dspec2 -- The chunk of the dynamic spectrum
+        freq -- The frequency channels of that chunk (with units)
+        time -- The time bins of that chunk (with units)
+        eta_l -- The lower limit of curvatures to search (with units)
+        eta_h -- the upper limit of curvatures to search (with units)
+        edges -- The bin edges for Theta-Theta
+        name -- A string filename used if plotting
+        plot -- A bool controlling if the result should be plotted
+        neta -- Number of curvatures to test
+        coher -- A bool for whether to use coherent (True) or incoherent (False) theta-theta
+        verbose -- A bool for how many updates the search prints
+    """
+    
+    ## Read Parameters
+    dspec2,freq,time,etas,edges,name,plot,fw,npad,coher,verbose,edgesArclet,centerCut=params
+
+    ## Verify units
+    time = unit_checks(time,'time',u.s)
+    freq = unit_checks(freq,'freq',u.MHz)
+    etas = unit_checks(etas,'etas',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
+    ## Calculate fD and tau arrays
+    fd = fft_axis(time, u.mHz, npad)
+    tau = fft_axis(freq, u.us, npad)
+
+    ## Pad dynamic Spectrum
+    dspec_pad = np.pad(dspec2,
+                       ((0, npad * dspec2.shape[0]),
+                        (0, npad * dspec2.shape[1])),
+                       mode='constant',
+                       constant_values=dspec2.mean())
+
+    ## Calculate Conjugate Spectrum
+    CS = np.fft.fft2(dspec_pad)
+    CS = np.fft.fftshift(CS)
+    eigs = np.zeros(etas.shape)
+    if coher:
+        ## Loop over all curvatures
+        for i in range(eigs.shape[0]):
+            try:
+                ## Find largest Eigenvalue for curvature
+                eigs[i]=singularvalue_calc(CS, tau, fd, etas[i], edges, etas[i],edgesArclet,centerCut)
+            except:
+                ## Set eigenvalue to NaN in event of failure
+                eigs[i]=np.nan
+    else:
+        SS = np.abs(CS)**2
+        ## Loop over all curvatures
+        for i in range(eigs.shape[0]):
+            try:
+                ## Find largest Eigenvalue for curvature
+                eigs[i]=singularvalue_calc(SS, tau, fd, etas[i], edges, etas[i],edgesArclet,centerCut)
+            except:
+                ## Set eigenvalue to NaN in event of failure
+                eigs[i]=np.nan   
+    
+    ## Fit eigenvalue peak
+    try:
+        ## Remove failed curvatures
+        etas=etas[np.isfinite(eigs)]
+        eigs=eigs[np.isfinite(eigs)]
+
+        ## Reduced range around peak to be withing fw times curvature of maximum eigenvalue
+        etas_fit = etas[np.abs(etas - etas[eigs == eigs.max()]) < fw * etas[eigs == eigs.max()]]
+        eigs_fit = eigs[np.abs(etas - etas[eigs == eigs.max()]) < fw * etas[eigs == eigs.max()]]
+
+        ## Initial Guesses
+        C = eigs_fit.max()
+        x0 = etas_fit[eigs_fit == C][0].value
+        if x0 == etas_fit[0].value:
+            A = (eigs_fit[-1] - C) / ((etas_fit[-1].value - x0)**2)
+        else:
+            A = (eigs_fit[0] - C) / ((etas_fit[0].value - x0)**2)
+
+        ## Fit parabola around peak
+        popt, pcov = curve_fit(chi_par,
+                                etas_fit.value,
+                                eigs_fit,
+                                p0=np.array([A, x0, C]))
+
+        ## Record curvauture fit and error
+        eta_fit = popt[1]*u.us/u.mHz**2
+        eta_sig = np.sqrt((eigs_fit - chi_par(etas_fit.value, *popt)).std() / np.abs(popt[0]))*u.us/u.mHz**2
+    except:
+        ## Return NaN for curvautre and error if fitting fails
+        popt=None
+        eta_fit=np.nan
+        eta_sig=np.nan
+
+    ## Plotting
+    try:
+        if plot:
+            ## Create diagnostic plots where requested
+            PlotFunc(dspec2,time,freq,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
+            plt.savefig(name)
+            plt.close()
+    except:
+        print('Plotting Error',flush=True)
+
+    if verbose:
+        ## Progress Report
+        print('Chunk completed (eta = %s +- %s at %s)' %(eta_fit,eta_sig,freq.mean()),flush=True)
+    return(eta_fit,eta_sig,freq.mean(),time.mean(),eigs)
 
 def single_search(params):
     """
@@ -469,14 +592,15 @@ def single_search(params):
     CS = np.fft.fftshift(CS)
     eigs = np.zeros(etas.shape)
     if coher:
-        ## Loop over all curvatures
-        for i in range(eigs.shape[0]):
-            try:
-                ## Find largest Eigenvalue for curvature
-                eigs[i] = Eval_calc(CS, tau, fd, etas[i], edges)
-            except:
-                ## Set eigenvalue to NaN in event of failure
-                eigs[i]=np.nan
+        if not thinArc:
+            ## Loop over all curvatures
+            for i in range(eigs.shape[0]):
+                try:
+                    ## Find largest Eigenvalue for curvature
+                    eigs[i] = Eval_calc(CS, tau, fd, etas[i], edges)
+                except:
+                    ## Set eigenvalue to NaN in event of failure
+                    eigs[i]=np.nan
     else:
         SS = np.abs(CS)**2
         ## Loop over all curvatures
@@ -618,6 +742,11 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     model_E=model_E[:dspec.shape[0],:dspec.shape[1]]
     N_E=recov_E[:recov_E.shape[0]//4,:].mean()
 
+    model = model[:dspec.shape[0],:dspec.shape[1]]
+    model -= model.mean()
+    model *= np.nanstd(dspec)/np.std(model)
+    model +=np.nanmean(dspec)
+
     ## Create derotated thth
     thth_derot=thth_red*np.conjugate(thth2_red)
 
@@ -631,7 +760,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
                aspect='auto',
                extent=ext_find(time.to(u.min), freq),
                origin='lower',
-               vmin=0, vmax=dspec.max())
+               vmin=np.nanmean(dspec)-5*np.nanstd(dspec), vmax=np.nanmean(dspec)+5*np.nanstd(dspec))
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Data Dynamic Spectrum')
@@ -642,7 +771,7 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
             aspect='auto',
             extent=ext_find(time.to(u.min),freq),
             origin='lower',
-            vmin=0,vmax=dspec.max())
+            vmin=np.nanmean(dspec)-5*np.nanstd(dspec), vmax=np.nanmean(dspec)+5*np.nanstd(dspec))
     plt.xlabel('Time (min)')
     plt.ylabel('Freq (MHz)')
     plt.title('Model Dynamic Spectrum')
@@ -763,7 +892,6 @@ def PlotFunc(dspec,time,freq,CS,fd,tau,
     plt.title('Recovered Secondary Wavefield')
     plt.colorbar()
     plt.tight_layout()
-
 
 def VLBI_chunk_retrieval(params):
     '''
@@ -1092,7 +1220,6 @@ def two_curve_map(CS, tau, fd, eta1, edges1,eta2,edges2):
     th_cents1 = (edges_red1[1:] + edges_red1[:-1]) / 2
     th_cents2 = (edges_red2[1:] + edges_red2[:-1]) / 2
     return(thth_red,edges_red1,edges_red2)
-
 
 def unit_checks(var,name,desired):
     """
