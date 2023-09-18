@@ -592,15 +592,14 @@ def single_search(params):
     CS = np.fft.fftshift(CS)
     eigs = np.zeros(etas.shape)
     if coher:
-        if not thinArc:
-            ## Loop over all curvatures
-            for i in range(eigs.shape[0]):
-                try:
-                    ## Find largest Eigenvalue for curvature
-                    eigs[i] = Eval_calc(CS, tau, fd, etas[i], edges)
-                except:
-                    ## Set eigenvalue to NaN in event of failure
-                    eigs[i]=np.nan
+        ## Loop over all curvatures
+        for i in range(eigs.shape[0]):
+            try:
+                ## Find largest Eigenvalue for curvature
+                eigs[i] = Eval_calc(CS, tau, fd, etas[i], edges)
+            except:
+                ## Set eigenvalue to NaN in event of failure
+                eigs[i]=np.nan
     else:
         SS = np.abs(CS)**2
         ## Loop over all curvatures
