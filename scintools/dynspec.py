@@ -1410,7 +1410,7 @@ class Dynspec:
             # Create diagnostic plots where requested
             thth.PlotFunc(np.nan_to_num(dspec2)+mn,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
             if fname:
-                np.savez(fname)
+                plt.save(fname)
         except Exception as e:
             print(f"Plotting Error :{e}",flush=True)
             plt.figure()
