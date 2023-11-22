@@ -571,13 +571,13 @@ class ACF():
         # ACF of e-field
         gammes = np.exp(-0.5*((SNPX/sqrtar)**2 +
                               (SNPY*sqrtar)**2)**alph2)
-        # Increase spatial resolution by factor of res_fac, for first dnu step
+        # Increase spatial resolution by factor of core_fac, for first dnu step
         snp2 = np.arange(-sp_fac*spmax, sp_fac*spmax + dsp/core_fac,
-                         dsp/core_fac)
+                          dsp/core_fac)
         SNPX2, SNPY2 = np.meshgrid(snp2, snp2)
         # ACF of e-field
         gammes2 = np.exp(-0.5*((SNPX2/sqrtar)**2 +
-                               (SNPY2*sqrtar)**2)**alph2)
+                                (SNPY2*sqrtar)**2)**alph2)
 
         if phasegrad == 0:
             # calculate only one quadrant tn >= 0
@@ -588,21 +588,21 @@ class ACF():
             gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
             # compute dnun=0 first
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
-                                         (sny*sqrtar)**2)**alph2)
+                                          (sny*sqrtar)**2)**alph2)
             gammitv[0, 0] += wn/amp
             for isn in range(0, len(snx)):
                 ARG = ((SNPX2-snx[isn])**2 + (SNPY2-sny[isn])**2)/(2*dnun[1])
                 temp = gammes2 * np.exp(1j*ARG)
                 gammitv[isn, 1] = -1j*((dsp/core_fac)**2 *
-                                       np.sum(temp)/((2*np.pi)*dnun[1]))
+                                        np.sum(temp)/((2*np.pi)*dnun[1]))
             # Now do remainder of dnu array
             for idn in range(2, ndnun):
                 for isn in range(0, len(snx)):
                     ARG = ((SNPX-snx[isn])**2 +
-                           (SNPY-sny[isn])**2)/(2*dnun[idn])
+                            (SNPY-sny[isn])**2)/(2*dnun[idn])
                     temp = gammes * np.exp(1j*ARG)
                     gammitv[isn, idn] = -1j*((dsp/res_fac)**2 * np.sum(temp) /
-                                             ((2*np.pi)*dnun[idn]))
+                                              ((2*np.pi)*dnun[idn]))
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))

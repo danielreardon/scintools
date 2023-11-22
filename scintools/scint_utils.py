@@ -536,7 +536,9 @@ def get_true_anomaly(mjds, pars):
         E = M
     else:
         M = np.asarray(M, dtype=np.float64)
-        E = fsolve(lambda E: E - ECC*np.sin(E) - M, M)
+        E = []
+        for m in M:
+            E.append(fsolve(lambda E: E - ECC*np.sin(E) - m, m))
         E = np.asarray(E, dtype=np.float128)
 
     # true anomaly
@@ -563,7 +565,7 @@ def get_binphase(mjds, pars):
     else:
         OM = pars['OM'] * np.pi/180
         if 'OMDOT' in pars.keys():
-            OM += pars['OMDOT'] * (np.pi/180) / (86400*365.2425) * \
+            OM += pars['OMDOT'] * (np.pi/180) / (365.2425) * \
                 (mjds - pars['T0'])
 
     return U + OM
