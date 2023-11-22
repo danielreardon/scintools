@@ -1529,17 +1529,15 @@ class Dynspec:
     def gerchberg_saxton(self,niter=1,verbose=False,pool=None):
         if not hasattr(self,"wavefield"):
             self.calc_wavefield(verbose=verbose,pool=pool)
-        WF2=np.copy(self.wavefield)
-        dspec_red = np.copy(self.dyn)[:WF2.shape[0],:WF2.shape[1]]
+        dspec_red = np.copy(self.dyn)[:self.wavefield.shape[0],:self.wavefield.shape[1]]
         posdspec =  np.isfinite(dspec_red) * (dspec_red>0)
-        tau=thth.fft_axis(self.freqs[:WF2.shape[0]]*u.MHz,u.us)
-        WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
+        tau=thth.fft_axis(self.freqs[:self.wavefield.shape[0]]*u.MHz,u.us)
+        self.wavefield[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(self.wavefield[posdspec]))
         for i in range(niter):
-            CWF=np.fft.fftshift(np.fft.fft2(WF2))
+            CWF=np.fft.fftshift(np.fft.fft2(self.wavefield))
             CWF[tau<0]=0
-            WF2=np.fft.ifft2(np.fft.ifftshift(CWF))
-            WF2[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(WF2[posdspec]))
-        self.wavefield=WF2
+            self.wavefield=np.fft.ifft2(np.fft.ifftshift(CWF))
+            self.wavefield[posdspec] = np.sqrt(dspec_red[posdspec])*np.exp(1j*np.angle(self.wavefield[posdspec]))
         
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
