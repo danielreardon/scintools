@@ -1419,7 +1419,7 @@ class Dynspec:
             plt.ylabel(r'Eigenvalue')
 
 
-    def fit_thetatheta(self,verbose=False,plot=False):
+    def fit_thetatheta(self,verbose=False,plot=False,pool=None):
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
         self.eta_evo = np.zeros((self.ncf_fit,self.nct_fit))*u.s**3
