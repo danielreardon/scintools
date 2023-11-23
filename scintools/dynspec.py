@@ -1224,7 +1224,7 @@ class Dynspec:
     
     def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
                         eta_max=None, eta_min = None, nedge = None,
-                        edges_lim = None, arclet_lim = None, center_cut = None, tau_lim=None, fw = .1, npad=3, verbose = False):
+                        edges_lim = None, arclet_lim = None, center_cut = None, tau_lim=None, fw = .1, npad=3, verbose = False, fitting_proc = 'standard'):
         """
         Prepare 
 
@@ -1234,9 +1234,41 @@ class Dynspec:
             The number of frequency channels per chunk for theta-theta. Defaults to all channels in dyn
         cwt : int, optional
             The number of integrations per chunk for theta-theta. Defaults to all time bins in dyn
-        fref : as
+        fref : float, optional
+            Reference frequency (in MHz) for curvature and edges limits. Defaults to average frequency of spectrum
+        eta_max : float, optional
+            Maximum curvature (in s**3) at reference frequency to search over. Value taken from Hough transform if not given.
+        eta_min : float, optional
+            Minimum curvature (in s**3) at reference frequency to search over. Value taken from Hough transform if not given.
+        nedge : int, optional
+            Number of points in edges array. Should be even. If not given then the number of points is determined such that
+            the spacing is less than 1 point in fd and less than 1 point in tau at the top of the arc at the highest curvature.
+        edges_lim : float, optional
+            Furthest point (in mHz) in theta-theta space to model. Should be at least the fd value of the apex of the most distant arclet
+            to be modeled. Defaults to half the maximum fd
+        arclet_lim : float, optional
+            Similar to edges_lim, but for how far down the arclet to model. Only used when the fitting procedure is 'thin'. Defaults
+            to edges_lim.
+        center_cut: float, optional
+            Width (in mHz) around fd=0 for which the main arc is not modeled. Only used when the fitting procedure is 'thin'. Defaults to 0
+        tau_lim: float, optional
+            Maximum tau value (in us) of arclet apexes to be modeled. edges_lim is used instead when not given.
+        fw : float, optional
+            Fractional width around the peak of eigenvalue vs curvature plots to fit parabolas to when measuring curvatures. Defaults to .1
+        npad : int, optional
+            Number of additional chunk widths of zero padding in time and frequency. Defaults to 3
+        verbose : bool, optional
+            Option to print details of final theta-theta parameters. Defaults to False
+        fitting_proc : string, optional
+            Method used for curvature fitting. Must be one of 'standard', 'thin', or 'incoherrent'
+            standard : Cohererent theta-theta using full inverted arclets
+            thin : Coherent theta-theta using only a region near the peaks of the arclets.
+            inchorrent : Incoherrent theta-theta using full inverted arclets 
         """
+        fitting_procs = ['standard', 'thin', 'incoherent']
+        assert fitting_proc in fitting_procs, f'fitting_proc must be one of {fitting_procs}'
 
+        self.thetatheta_proc = fitting_proc
         self.npad = npad
         self.fw = fw
         if cwf:
@@ -1275,10 +1307,9 @@ class Dynspec:
         self.eta_min*= (self.freqs.max()/self.fref.value)**2
         self.eta_max*= (self.freqs.min()/self.fref.value)**2
         if type(eta_min)!=type(None):
-            self.eta_min=max((eta_min,self.eta_min))
+            self.eta_min=thth.unit_checks(max((eta_min,self.eta_min)),'eta_min',u.s**3)
         if type(eta_max)!=type(None):
-            self.eta_max=min((eta_max,self.eta_max))
-        
+            self.eta_max=thth.unit_checks(min((eta_max,self.eta_max)), 'eta_max',u.s**3)
         if  (type(eta_min)==type(None)) or (type(eta_max)==type(None)):
             if not hasattr(self,"betaeta"):
                 self.fit_arc(lamsteps=True,numsteps=1e4,
@@ -1315,8 +1346,7 @@ class Dynspec:
             self.edges = thth.min_edges(edges_lim,fd,tau,self.eta_max*(self.fref.value/self.freqs.min()), 2
                                         )*(self.freqs.min()/self.fref.value)
             
-        if type(arclet_lim) != type(None) or type(center_cut) != type(None):
-            self.thin_arc = True
+        if self.thetatheta_proc == 'thin':
             if type(arclet_lim) != type(None):
                 self.arclet_lim = thth.unit_checks(arclet_lim,'Arclet Limit',u.mHz)
             else:
@@ -1325,8 +1355,6 @@ class Dynspec:
                 self.center_cut = thth.unit_checks(center_cut,'Central Cut',u.mHz)
             else:
                 self.center_cut = 0
-        else:
-            self.thin_arc = False
 
         if verbose:
             print("\n\t THETA-THETA PROPERTIES\n")
@@ -1339,6 +1367,7 @@ class Dynspec:
             print(f'Edges has {self.edges.shape[0]} point out to {self.edges[-1]}')
             print(f'Fractional fitting width: {self.fw}')
             print(f'Zero paddings: {self.npad}')
+            print(f'Fitting Procedure: {self.thetatheta_proc}')
 
     def thetatheta_single(self, cf=0, ct=0,fname=None,verbose=False):
         if not hasattr(self,'cwf'):
@@ -1360,16 +1389,21 @@ class Dynspec:
         dspec2-=mn
         dspec_pad=np.pad(np.nan_to_num(dspec2),((0,self.npad*self.cwf),(0,self.npad*self.cwt)),mode='constant',constant_values=0)
         CS=np.fft.fftshift(np.fft.fft2(dspec_pad))
+        if self.thetatheta_proc == 'incoherent':
+            SS=np.abs(CS)
         tau=thth.fft_axis(freq2,u.us,self.npad)
         fd=thth.fft_axis(time2,u.mHz,self.npad)
 
         etas=np.logspace(np.log10(self.eta_min.value),np.log10(self.eta_max.value),self.neta)*u.s**3*(self.fref/freq2.mean())**2
         eigs=np.zeros(self.neta)
         edges = self.edges*(freq2.mean()/self.fref)
-        if not self.thin_arc:
+        if self.thetatheta_proc=='standard':
             for i in range(etas.shape[0]):
                 eigs[i]=thth.Eval_calc(CS,tau,fd,etas[i],edges)
-        else:
+        elif self.thetatheta_proc == 'incoherent':
+            for i in range(etas.shape[0]):
+                eigs[i]=thth.Eval_calc(SS,tau,fd,etas[i],edges)
+        elif self.thetatheta_proc == 'thin':
             for i in range(etas.shape[0]):
                 eigs[i]=thth.singularvalue_calc(CS,tau,fd,etas[i],edges,etas[i],edges[np.abs(edges)<self.arclet_lim],self.center_cut)
 
@@ -1438,13 +1472,13 @@ class Dynspec:
                 dspec2=np.copy(self.dyn[fs,ts])
                 dspec2-=np.nanmean(dspec2)
                 dspec2=np.nan_to_num(dspec2)
-
-                params=[dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,True,verbose]
-                if self.thin_arc:
+                coher = (self.thetatheta_proc != 'incoherent')
+                params=[dspec2,freq2,time2,etas,self.edges*(freq2.mean()/self.fref),None,False,self.fw,self.npad,coher,verbose]
+                if self.thetatheta_proc == 'thin':
                     params.append(self.edges[np.abs(self.edges)<self.arclet_lim]*(freq2.mean()/self.fref))
                     params.append(self.center_cut)
                 if type(pool)==type(None):
-                    if self.thin_arc:
+                    if self.thetatheta_proc == 'thin':
                         res = thth.single_search_thin(params)
                     else:
                         res = thth.single_search(params)
@@ -1453,7 +1487,7 @@ class Dynspec:
                 else:
                     pars.append(params)
         if type(pool)!=type(None):
-            if self.thin_arc:
+            if self.thetatheta_proc == 'thin':
                 res = pool.map(thth.single_search_thin,pars)
             else:
                 res = pool.map(thth.single_search,pars)
