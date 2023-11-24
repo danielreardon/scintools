@@ -1789,6 +1789,7 @@ def fullMosHess(p, chunks, dspec, N):
     return H
 
 def errString(fit,sig):
+
     '''
     Convert a measurement and a standard deviation into strings in scientific notion for plot labels
 
@@ -1838,3 +1839,9 @@ def errString(fit,sig):
             err_string=err_string[:err_string.index('e')]
         
     return(fit_string,err_string)
+
+def errCalc(etas,eigs,fitPars):
+    M = chi_par(etas.value, *fitPars)
+    sigEstimate = np.std(eigs - M)
+    x0Err = np.sqrt(2/np.sum(4*fitPars[0]*(2*fitPars[0]*(fitPars[1]-etas.value)**2 + M - eigs)))*sigEstimate
+    return(x0Err)

@@ -1370,6 +1370,20 @@ class Dynspec:
             print(f'Fitting Procedure: {self.thetatheta_proc}')
 
     def thetatheta_single(self, cf=0, ct=0,fname=None,verbose=False):
+        """
+        Run theta-theta on a single chunk for diagnostics.
+
+        Parameters
+        ----------
+        cf : int, optional
+            The chunk index along the frequency axis. Defaults to 0
+        ct : int, optional
+            The chunk index along the frequency axis. Defaults to 0
+        fname : string, optional
+            File name to save diagnostic plot to. If not given the plot won't be saved
+        verbose : bool, optional
+            Option to print progress information. Currently does nothing
+        """
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
 
@@ -1454,6 +1468,19 @@ class Dynspec:
 
 
     def fit_thetatheta(self,verbose=False,plot=False,pool=None):
+        """
+        Loop theta-theta over all fitting chunks and fits for the global curvature evolution.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Option to print progress information. Defaults to False
+        plot : bool, optional
+            Option to plot final curvature evolution. Defaults to False
+        pool : ThreadPool, optional
+            Pool of workers for parallel processing. Currently supports Pool from multiprocessing and MPIPool from mpipool. Defaults
+            to None and runs chunks in series.
+        """
         if not hasattr(self,'cwf'):
             self.prep_thetatheta(verbose=verbose)
         self.eta_evo = np.zeros((self.ncf_fit,self.nct_fit))*u.s**3
@@ -1515,6 +1542,20 @@ class Dynspec:
             plt.legend()
 
     def thetatheta_chunks(self,verbose=False,pool=None,memmap=False):
+        """
+        Loop theta-theta over all retrieval chunks to generate the chunks array.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Option to print progress information. Defaults to False
+        pool : ThreadPool, optional
+            Pool of workers for parallel processing. Currently supports Pool from multiprocessing and MPIPool from mpipool. Defaults
+            to None and runs chunks in series.
+        memmap : bool, optional
+            Option to use numpy's memmap to save memort by saving the chunks array to disk. Will be slower so use only when necessary.
+            Defaults to False
+        """
         if not hasattr(self,"ththeta"):
             self.fit_thetatheta(verbose=verbose,pool=pool)
         if memmap:
@@ -1555,6 +1596,21 @@ class Dynspec:
                     self.chunks[res[1],res[2],:,:]=res[0]
         
     def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False):
+        """
+        Perform mosaic stacking of the chunks array to construct the final wavefield.
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Option to print progress information. Defaults to False
+        pool : ThreadPool, optional
+            Pool of workers for parallel processing. Currently supports Pool from multiprocessing and MPIPool from mpipool. Defaults
+            to None and runs chunks in series (only if chunks array does not exist).
+        gs : bool, optional
+            Option to use Gerchberg-Saxton algorithm. Defaults to False
+        memmap: bool, optional
+            Option to use memmap for chunks array. Defaults to False
+        """
         if not hasattr(self,"chunks"):
             self.thetatheta_chunks(verbose=verbose,pool=pool,memmap=memmap)
         self.wavefield = thth.mosaic(self.chunks)
@@ -1562,6 +1618,19 @@ class Dynspec:
             self.gerchberg_saxton(verbose=verbose,pool=pool)
         
     def gerchberg_saxton(self,niter=1,verbose=False,pool=None):
+        """
+        Apply Gerchberg-Saxton algortihm to wavefield to enforce causality and amplitude constraints.
+
+        Parameters
+        ----------
+        niter : int, optional
+            Number of iterations of the algorithm to apply. Defaults to 1
+        verbose : bool, optional
+            Option to print progress information. Defaults to False
+        pool : ThreadPool, optional
+            Pool of workers for parallel processing. Currently supports Pool from multiprocessing and MPIPool from mpipool. Defaults
+            to None and runs chunks in series.
+        """
         if not hasattr(self,"wavefield"):
             self.calc_wavefield(verbose=verbose,pool=pool)
         posdspec =  np.isfinite(self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]]) * (self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]]>0)
