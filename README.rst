@@ -18,7 +18,7 @@ Referencing
 
 If your work makes use of Scintools, please cite `Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_ and provide a url link to this github page. If utilising scintools for scintillation timescale, bandwidth, or phase gradient measurements via the autocorrelation function, also cite `Reardon et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230316338R>`_ . If you use the *ththmod.py* module, cite `Baker et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp.3341B>`_ . If using the electromagnetic simulation software (*Simulation* class in *scint_sim.py*), also cite `Coles et al. (2010) <https://ui.adsabs.harvard.edu/abs/2010ApJ...717.1206C>`_
 
-Below is a (probably incomplete) list of works that use Scintools\:
+Below is a list of works that use Scintools\:
 
 * `"Precision orbital dynamics from interstellar scintillation arcs for PSR J0437-4715", Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_
 * `"Interstellar Interferometry: Precise Curvature Measurement from Pulsar Secondary Spectra", Baker et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp.3341B>`_
@@ -39,4 +39,7 @@ Below is a (probably incomplete) list of works that use Scintools\:
 * `"Modelling annual scintillation velocity variations of FRB 20201124A", Main et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023MNRAS.522L..36M>`_
 * `"Pulsar Double Lensing Sheds Light on the Origin of Extreme Scattering Events", Zhu et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023ApJ...950..109Z>`_
 * `"High-resolution VLBI astrometry of pulsar scintillation screens with the θ - θ transform", Baker et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023MNRAS.525..211B>`_
+* `"Interstellar scintillation observations for PSR J0835-4510 at 6656 MHz", Yonghua et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023MNRAS.526.1246X>`_
+* `"Pulsar Scintillation through Thick and Thin: Bow Shocks, Bubbles, and the Broader Interstellar Medium", Ocker et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230913809O>`_
+
 
