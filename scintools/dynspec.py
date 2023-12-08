@@ -45,7 +45,8 @@ import astropy.constants as const
 class Dynspec:
 
     def __init__(self, filename=None, dyn=None, verbose=True, process=False,
-                 lamsteps=False):
+                 lamsteps=False, remove_short_subs=True, subint_thresh=2.33,
+                 mjd=None):
         """
         Initialise a dynamic spectrum object by either reading from file
             or from existing object
@@ -63,12 +64,18 @@ class Dynspec:
         lamsteps : bool, optional
             Use equal steps in wavelength rather than frequency. The default is
             False.
+        remove_short_sub : bool, optional
+            Automatically remove the first subint if it is shorter
+        subint_thresh : float, optional
+            standard deviation threshold to define a subint length outlier
+
 
         """
 
         if filename:
             self.load_file(filename, verbose=verbose, process=process,
-                           lamsteps=lamsteps)
+                           lamsteps=lamsteps, subint_thresh=subint_thresh,
+                           remove_short_subs=remove_short_subs, mjd=mjd)
         elif dyn:
             self.load_dyn_obj(dyn, verbose=verbose, process=process,
                               lamsteps=lamsteps)
@@ -110,7 +117,7 @@ class Dynspec:
         # Calculate properties for the gap
         timegap = round((other.mjd - self.mjd)*86400
                         - self.tobs, 1)  # time between two dynspecs
-        extratimes = np.arange(self.dt/2, timegap, dt)
+        extratimes = np.arange(0, timegap, dt)
         if timegap < dt:
             extratimes = [0]
             nextra = 0
@@ -138,7 +145,8 @@ class Dynspec:
 
         return Dynspec(dyn=newdyn, verbose=False, process=False)
 
-    def load_file(self, filename, verbose=True, process=False, lamsteps=False):
+    def load_file(self, filename, verbose=True, process=False, lamsteps=False,
+                  remove_short_subs=True, subint_thresh=2.33, mjd=None):
         """
         Load a dynamic spectrum from psrflux-format file
 
@@ -153,12 +161,18 @@ class Dynspec:
         lamsteps : bool, optional
             Use equal steps in wavelength rather than frequency. The default is
             False.
+        remove_short_sub : bool, optional
+            Automatically remove the first subint if it is shorter
+        subint_thresh : float, optional
+            standard deviation threshold to define a subint length outlier
+        mjd : float, optional
+            Replace the MJD0 with a custom mjd (e.g. barycentred)
 
         """
 
-        start = time.time()
         # Import all data from filename
         if verbose:
+            start = time.time()
             print("LOADING {0}...".format(filename))
         head = []
         with open(filename, "r") as file:
@@ -175,22 +189,26 @@ class Dynspec:
         self.filename = filename  # full path
         self.header = head
         rawdata = np.loadtxt(filename).transpose()  # read file
-        self.times = np.unique(rawdata[2]*60)  # time since obs start (secs)
+        # time since obs start (secs)
+        self.times = np.unique(rawdata[2]*60)  # Leading edge of integration
+        # Adjust MJD and times to start at 0
+        if mjd is not None:
+            self.mjd = mjd
+        else:
+            self.mjd = self.mjd + self.times[0] / 86400
+        self.times = self.times - self.times[0]  # start at 0
         self.freqs = rawdata[3]  # Observing frequency in MHz.
         fluxes = rawdata[4]  # fluxes
-        self.nchan = int(np.unique(rawdata[1])[-1])  # number of channels
+        self.nchan = int(np.max(rawdata[1])) + 1  # number of channels
         self.bw = self.freqs[-1] - self.freqs[0]  # obs bw
         self.df = round(self.bw/self.nchan, 5)  # channel bw
         self.bw = round(self.bw + self.df, 2)  # correct bw
-        self.nchan += 1  # correct nchan
-        self.nsub = int(np.unique(rawdata[0])[-1]) + 1
-        self.tobs = self.times[-1]+self.times[0]  # initial estimate of tobs
-        self.dt = self.tobs/self.nsub
-        if self.dt > 1:
-            self.dt = round(self.dt)
-        else:
-            self.times = np.linspace(self.times[0], self.times[-1], self.nsub)
-        self.tobs = self.dt * self.nsub  # recalculated tobs
+        self.nsub = int(np.max(rawdata[0])) + 1  # number of subints
+        
+        # initial estimate of tobs and dt
+        self.dt = np.mean(np.diff(self.times))
+        self.tobs = np.max(self.times) + self.dt
+        
         # Now reshape flux arrays into a 2D matrix
         self.freqs = np.unique(self.freqs)
         self.freq = round(np.mean(self.freqs), 2)
@@ -202,14 +220,116 @@ class Dynspec:
             fluxes = np.flip(fluxes, 0)
         # Finished reading, now setup dynamic spectrum
         self.dyn = fluxes  # initialise dynamic spectrum
+        
+        # remove short subints
+        if remove_short_subs:
+            self.remove_short_subs(threshold=subint_thresh)
 
         self.lamsteps = lamsteps
         if process:
             self.auto_processing(lamsteps=lamsteps)  # do automatic processing
-        end = time.time()
         if verbose:
-            print("...LOADED in {0} seconds\n".format(round(end-start, 2)))
+            end = time.time()
+            print("...LOADED in {0} seconds\n".format(round(end - start, 2)))
             self.info()
+                    
+    def remove_short_subs(self, threshold=2.33):
+        """
+        Find and remove short subintegrations from the start of the observation
+
+        Parameters
+        ----------
+        threshold : float, optional
+            Number of sigma of rms subint time differences to define short
+
+        """
+        
+        dt0 = np.abs(np.diff(self.times))[0]  # first subint length
+        dt = np.mean(np.abs(np.diff(self.times))[1:])
+        sdt = np.std(np.abs(np.diff(self.times))[1:])
+        while dt0 - dt <= -threshold*sdt:
+            self.dyn = np.delete(self.dyn, (0), axis=1)
+            self.times = np.delete(self.times, (0))
+            dt0 = np.abs(np.diff(self.times))[0]
+            dt = np.mean(np.abs(np.diff(self.times))[1:])
+            sdt = np.std(np.abs(np.diff(self.times))[1:])
+            
+        self.mjd += np.min(self.times)/86400
+        self.times -= np.min(self.times)  # start at 0
+        self.nsub = len(self.times)
+        self.dt = round(np.mean(np.diff(self.times)), 3)
+        self.tobs = round(max(self.times) + self.dt, 3)
+            
+    def trim_edges(self, bandwagon_frac=0.5, remove_short_sub=True):
+        """
+        Find and remove the band edges
+
+        Parameters
+        ----------
+        bandwagon_frac : float in [0,1], optional
+            Set entire edge to zero if more than this fraction of the edge
+            pixels is zero or NaN. The default is 0.5.
+
+        """
+
+        self.dyn[np.isnan(self.dyn)] = 0  # fill NaNs with zero
+
+        nc = len(self.dyn[0, :])
+        nr = len(self.dyn[:, 0])
+
+        # Trim bottom
+        if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
+            self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
+        rowsum = sum(abs(self.dyn[0, :]))
+        while rowsum == 0:
+            self.dyn = np.delete(self.dyn, (0), axis=0)
+            self.freqs = np.delete(self.freqs, (0))
+            if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
+                self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
+            rowsum = sum(abs(self.dyn[0, :]))
+
+        # Trim top
+        if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
+            self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
+        rowsum = sum(abs(self.dyn[-1, :]))
+        while rowsum == 0:
+            self.dyn = np.delete(self.dyn, (-1), axis=0)
+            self.freqs = np.delete(self.freqs, (-1))
+            if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
+                self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
+            rowsum = sum(abs(self.dyn[-1, :]))
+
+        # Trim left
+        if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
+            self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
+        colsum = sum(abs(self.dyn[:, 0]))
+        while colsum == 0:
+            self.dyn = np.delete(self.dyn, (0), axis=1)
+            self.times = np.delete(self.times, (0))
+            if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
+                self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
+            colsum = sum(abs(self.dyn[:, 0]))
+
+        # Trim right
+        if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
+            self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
+        colsum = sum(abs(self.dyn[:, -1]))
+        while colsum == 0:
+            self.dyn = np.delete(self.dyn, (-1), axis=1)
+            self.times = np.delete(self.times, (-1))
+            if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
+                self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
+            colsum = sum(abs(self.dyn[:, -1]))
+                
+        self.mjd += np.min(self.times)/86400
+        self.times -= np.min(self.times)  # start at 0
+        self.nchan = len(self.freqs)
+        self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 3)
+        self.freq = round(np.mean(self.freqs), 3)
+        self.nsub = len(self.times)
+        self.dt = round(np.mean(np.diff(self.times)), 3)
+        self.tobs = round(max(self.times) + self.dt, 3)
+        self.df = self.bw / self.nchan
 
     def write_file(self, filename=None, verbose=True, note=None):
         """
@@ -297,7 +417,7 @@ class Dynspec:
             print("...LOADED in {0} seconds\n".format(round(end-start, 2)))
             self.info()
 
-    def auto_processing(self, lamsteps=False):
+    def auto_processing(self, lamsteps=False, remove_short_sub=True):
         """
         Automatic processing of a Dynspec object, using common utilities
 
@@ -308,8 +428,9 @@ class Dynspec:
             False.
 
         """
-
-        self.trim_edges()  # remove zeros on band edges
+        
+        # remove zeros on band edges
+        self.trim_edges(remove_short_sub=remove_short_sub)  
         self.refill()  # refill and zeroed regions with linear interpolation
         self.calc_acf()  # calculate the ACF
         if lamsteps:
@@ -2912,87 +3033,7 @@ class Dynspec:
             elif display:
                 plt.show()
         self.cutdyn = cutdyn
-        self.cutsspec = cutsspec
-
-    def trim_edges(self, bandwagon_frac=0.5):
-        """
-        Find and remove the band edges
-
-        Parameters
-        ----------
-        bandwagon_frac : float in [0,1], optional
-            Set entire edge to zero if more than this fraction of the edge
-            pixels is zero or NaN. The default is 0.5.
-
-        """
-
-        self.dyn[np.isnan(self.dyn)] = 0  # fill NaNs with zero
-
-        nc = len(self.dyn[0, :])
-        nr = len(self.dyn[:, 0])
-
-        # Trim bottom
-        if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
-            self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
-            # self.dyn_err[0, :] = np.zeros(np.shape(self.dyn_err[0, :]))
-        rowsum = sum(abs(self.dyn[0, :]))
-        while rowsum == 0:
-            self.dyn = np.delete(self.dyn, (0), axis=0)
-            # self.dyn_err = np.delete(self.dyn_err, (0), axis=0)
-            self.freqs = np.delete(self.freqs, (0))
-            if len(np.argwhere(self.dyn[0, :] == 0)) > bandwagon_frac*nc:
-                self.dyn[0, :] = np.zeros(np.shape(self.dyn[0, :]))
-                # self.dyn_err[0, :] = np.zeros(np.shape(self.dyn_err[0, :]))
-            rowsum = sum(abs(self.dyn[0, :]))
-
-        # Trim top
-        if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
-            self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
-            # self.dyn_err[-1, :] = np.zeros(np.shape(self.dyn_err[-1, :]))
-        rowsum = sum(abs(self.dyn[-1, :]))
-        while rowsum == 0:
-            self.dyn = np.delete(self.dyn, (-1), axis=0)
-            # self.dyn_err = np.delete(self.dyn_err, (-1), axis=0)
-            self.freqs = np.delete(self.freqs, (-1))
-            if len(np.argwhere(self.dyn[-1, :] == 0)) > bandwagon_frac*nc:
-                self.dyn[-1, :] = np.zeros(np.shape(self.dyn[-1, :]))
-                # self.dyn_err[-1, :] = np.zeros(np.shape(self.dyn_err[-1, :]))
-            rowsum = sum(abs(self.dyn[-1, :]))
-
-        # Trim left
-        if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
-            self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
-            # self.dyn_err[:, 0] = np.zeros(np.shape(self.dyn_err[:, 0]))
-        colsum = sum(abs(self.dyn[:, 0]))
-        while colsum == 0:
-            self.dyn = np.delete(self.dyn, (0), axis=1)
-            # self.dyn_err = np.delete(self.dyn_err, (0), axis=1)
-            self.times = np.delete(self.times, (0))
-            if len(np.argwhere(self.dyn[:, 0] == 0)) > bandwagon_frac*nr:
-                self.dyn[:, 0] = np.zeros(np.shape(self.dyn[:, 0]))
-                # self.dyn_err[:, 0] = np.zeros(np.shape(self.dyn_err[:, 0]))
-            colsum = sum(abs(self.dyn[:, 0]))
-
-        # Trim right
-        if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
-            self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
-            # self.dyn_err[:, -1] = np.zeros(np.shape(self.dyn_err[:, -1]))
-        colsum = sum(abs(self.dyn[:, -1]))
-        while colsum == 0:
-            self.dyn = np.delete(self.dyn, (-1), axis=1)
-            # self.dyn_err = np.delete(self.dyn_err, (-1), axis=1)
-            self.times = np.delete(self.times, (-1))
-            if len(np.argwhere(self.dyn[:, -1] == 0)) > bandwagon_frac*nr:
-                self.dyn[:, -1] = np.zeros(np.shape(self.dyn[:, -1]))
-                # self.dyn_err[:, -1] = np.zeros(np.shape(self.dyn_err[:, -1]))
-            colsum = sum(abs(self.dyn[:, -1]))
-
-        self.nchan = len(self.freqs)
-        self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
-        self.freq = round(np.mean(self.freqs), 2)
-        self.nsub = len(self.times)
-        self.tobs = round(max(self.times) - min(self.times) + self.dt, 2)
-        self.mjd = self.mjd + self.times[0]/86400
+        self.cutsspec = cutsspe
 
     def refill(self, method='biharmonic', zeros=True, kernel_size=5,
                linear=True):
@@ -3575,7 +3616,6 @@ class Dynspec:
         # Crop frequencies
         crop_array = np.array((self.freqs >= fmin)*(self.freqs <= fmax))
         self.dyn = self.dyn[crop_array, :]
-        # self.dyn_err = self.dyn_err[crop_array, :]
         self.freqs = self.freqs[crop_array]
         self.nchan = len(self.freqs)
         self.bw = round(max(self.freqs) - min(self.freqs) + self.df, 2)
@@ -3590,10 +3630,10 @@ class Dynspec:
             self.tobs = self.tobs - tmin
         crop_array = np.array((self.times >= tmin)*(self.times <= tmax))
         self.dyn = self.dyn[:, crop_array]
-        # self.dyn_err = self.dyn_err[:, crop_array]
         self.nsub = len(self.dyn[0, :])
-        self.times = np.linspace(self.dt/2, self.tobs - self.dt/2, self.nsub)
-        self.mjd = self.mjd + tmin/86400
+        self.times = self.times[crop_array]
+        self.mjd += np.min(self.times)/86400
+        self.times -= np.min(self.times)  # start at 0
 
     def zap(self, sigma=7):
         """
