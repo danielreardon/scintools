@@ -1,9 +1,9 @@
 astropy
-numpy
+numpy<1.23.0
 scipy
 matplotlib
 lmfit
 emcee
 corner
-scikit-image
+scikit-image==0.16.2
 bilby
