@@ -168,8 +168,9 @@ class Dynspec:
                     head.append(headline)
                     if str.split(headline) != []:
                         if str.split(headline)[0] == 'MJD0:':
-                            # MJD of start of obs
-                            self.mjd = float(str.split(headline)[1])
+                            if not hasattr(self, 'mjd'):  # first occurrence
+                                # MJD of start of obs
+                                self.mjd = float(str.split(headline)[1])
         self.name = os.path.basename(filename)
         self.filename = filename  # full path
         self.header = head
@@ -238,6 +239,7 @@ class Dynspec:
             fn.write("# Created using write_file method in Dynspec class\n")
             if note is not None:
                 fn.write("# Note: {0}\n".format(note))
+            fn.write("# MJD0: {0}\n".format(self.mjd)) # output new start MJD
             fn.write("# Original header begins below:\n")
             for line in self.header:
                 fn.write("# {} \n".format(line))
@@ -245,9 +247,8 @@ class Dynspec:
             for i in range(len(self.times)):
                 ti = self.times[i]/60
                 for j in range(len(self.freqs)):
-                    fi = np.flip(self.freqs)[j]
-                    di = np.flipud(self.dyn)[j, i]
-                    # di_err = self.dyn_err[j, i]
+                    fi = self.freqs[j]
+                    di = self.dyn[j, i]
                     fn.write("{0} {1} {2} {3} {4} {5}\n".
                              format(i, j, ti, fi, di, 0)) #, # di_err))
         if verbose:
