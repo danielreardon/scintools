@@ -1452,7 +1452,7 @@ class Dynspec:
             plt.plot(etas,eigs)
             plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.ylabel(r'Eigenvalue')
-
+        return(etas,eigs,popt)
 
     def fit_thetatheta(self,verbose=False,plot=False,pool=None):
         if not hasattr(self,'cwf'):
