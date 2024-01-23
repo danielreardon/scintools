@@ -1556,12 +1556,12 @@ class Dynspec:
                     self.chunks[res[1],res[2],:,:]=res[0]
 
         
-    def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False):
+    def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False,niter=1):
         if not hasattr(self,"chunks"):
             self.thetatheta_chunks(verbose=verbose,pool=pool,memmap=memmap)
         self.wavefield = thth.mosaic(self.chunks)
         if gs:
-            self.gerchberg_saxton(verbose=verbose,pool=pool)
+            self.gerchberg_saxton(verbose=verbose,pool=pool,niter=niter)
         
     def gerchberg_saxton(self,niter=1,verbose=False,pool=None):
         if not hasattr(self,"wavefield"):
