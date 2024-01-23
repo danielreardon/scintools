@@ -1845,3 +1845,77 @@ def errCalc(etas,eigs,fitPars):
     sigEstimate = np.std(eigs - M)
     x0Err = np.sqrt(2/np.sum(4*fitPars[0]*(2*fitPars[0]*(fitPars[1]-etas.value)**2 + M - eigs)))*sigEstimate
     return(x0Err)
+
+def calc_asymmetry(params):
+    '''
+    Calculates the arc asymmetry from the theta-theta transform
+
+    Parameters
+    ----------
+    params : List
+        Contains
+        dspec2 : 2D Array
+            Section of the Dynamic Spectrum to be analyzed
+        edges : 1D Astropy Quantity Array
+            Bin edges for theta-theta mapping (mHz). Should have an even number of points and be symmetric about 0
+        time : 1D Astropy Quanity Array
+            Time bins for the section of the spectrum being examined (s)
+        freq : 1D Astropy Quantity Array
+            Frequency channels for the section of the spectrum being examined
+        eta : Float Quantity
+            Arc curvature for the section of the spectrum being examined
+        idx_t : int
+            Time index of chunk being examined
+        idx_f : int
+            Frequency index of chunk being examined
+        npad : int
+            Number of zeros paddings to add to end of dspec
+        verbose : bool
+            Control the number of print statements
+
+    '''
+    
+    ## Read parameters
+    dspec2,edges,time,freq,eta,idx_t,idx_f,npad,verbose = params
+
+    ## Verify unit compatability
+    time2 = unit_checks(time,'time2',u.s)
+    freq2 = unit_checks(freq,'freq2',u.MHz)
+    eta = unit_checks(eta,'eta',u.s**3)
+    edges = unit_checks(edges,'edges',u.mHz)
+
+    if verbose:
+        ## Progress Reporting
+        print("Starting Chunk %s-%s" %(idx_f,idx_t),flush=True)
+
+    ## Determine fd and tau coordinates of Conjugate Spectrum
+    fd = fft_axis(time2, u.mHz, npad)
+    tau = fft_axis(freq2, u.us, npad)
+
+    ## Pad dynamic spectrum to help with peiodicity problem
+    dspec_pad = np.pad(dspec2,
+                       ((0, npad * dspec2.shape[0]),
+                        (0, npad * dspec2.shape[1])),
+                       mode='constant',
+                       constant_values=dspec2.mean())
+
+    ## Compute Conjugate Spectrum
+    CS = np.fft.fft2(dspec_pad)
+    CS = np.fft.fftshift(CS)
+
+    ## Try phase retrieval on chunk
+    try:
+        ## Calculate Reduced TH-TH and largest eigenvalue/vector pair
+        thth_red, thth2_red, recov, model, edges_red,w,V = modeler(CS, tau, fd, eta, edges)
+        cents=(edges_red[1:]+edges_red[:-1])/2
+        leftV = V[:(cents.shape[0]-1)//2]
+        rightV = V[1+(cents.shape[0]-1)//2:]
+        asymm = (np.sum(np.abs(leftV)**2)- np.sum(np.abs(rightV)**2))/(np.sum(np.abs(leftV)**2) + np.sum(np.abs(rightV)**2))
+        if verbose:
+            ## Progress Reporting
+            print("Chunk %s-%s success" %(idx_f,idx_t),flush=True)
+    except Exception as e:
+        ## If chunk cannot be recovered print Error and return zero array (Prevents failure of a single chunk from ending phase retrieval)
+        print(e,flush=True)
+        asymm = np.nan
+    return(asymm,idx_f,idx_t)

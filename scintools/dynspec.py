@@ -1466,7 +1466,7 @@ class Dynspec:
             plt.plot(etas,eigs)
             plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.ylabel(r'Eigenvalue')
-
+        return(etas,eigs,popt)
 
     def fit_thetatheta(self,verbose=False,plot=False,pool=None):
         """
@@ -1595,8 +1595,9 @@ class Dynspec:
             else:
                 for res in pool.map(thth.single_chunk_retrieval,pars):
                     self.chunks[res[1],res[2],:,:]=res[0]
+
         
-    def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False):
+    def calc_wavefield(self,verbose=False,pool=None,gs=False,memmap=False,niter=1):
         """
         Perform mosaic stacking of the chunks array to construct the final wavefield.
 
@@ -1616,7 +1617,7 @@ class Dynspec:
             self.thetatheta_chunks(verbose=verbose,pool=pool,memmap=memmap)
         self.wavefield = thth.mosaic(self.chunks)
         if gs:
-            self.gerchberg_saxton(verbose=verbose,pool=pool)
+            self.gerchberg_saxton(verbose=verbose,pool=pool,niter=niter)
         
     def gerchberg_saxton(self,niter=1,verbose=False,pool=None):
         """
@@ -1636,13 +1637,41 @@ class Dynspec:
             self.calc_wavefield(verbose=verbose,pool=pool)
         posdspec =  np.isfinite(self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]]) * (self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]]>0)
         tau=thth.fft_axis(self.freqs[:self.wavefield.shape[0]]*u.MHz,u.us)
+        self.wavefield*=np.sqrt(self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]][posdspec].mean()/np.abs(self.wavefield[posdspec]**2).mean())
         self.wavefield[posdspec] = np.sqrt(self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]][posdspec])*np.exp(1j*np.angle(self.wavefield[posdspec]))
         for i in range(niter):
             CWF=np.fft.fftshift(np.fft.fft2(self.wavefield))
             CWF[tau<0]=0
             self.wavefield=np.fft.ifft2(np.fft.ifftshift(CWF))
             self.wavefield[posdspec] = np.sqrt(self.dyn[:self.wavefield.shape[0],:self.wavefield.shape[1]][posdspec])*np.exp(1j*np.angle(self.wavefield[posdspec]))
-        
+
+    def calc_asymmetry(self,verbose=False,pool=None):
+        if not hasattr(self,"ththeta"):
+            self.fit_thetatheta(verbose=verbose,pool=pool)
+        self.asymmetry = np.zeros((self.ncf_fit,self.nct_fit),dtype=complex)
+        if type(pool)!=type(None):
+            pars=list()
+        for cf in range(self.ncf_fit):
+            fs = slice(cf*self.cwf,(cf+1)*self.cwf)
+            freq2 = np.copy(self.freqs[fs])*u.MHz
+            freq=freq2.mean()
+            eta = self.ththeta*(self.fref/freq)**2
+            for ct in range(self.nct_fit):
+                ts=slice(ct*self.cwt//2,(ct+1)*self.cwt)
+                time2=np.copy(self.times[ts])*u.s
+                dspec2=np.copy(self.dyn[fs,ts])
+                dspec2-=np.nanmean(dspec2)
+                dspec2=np.nan_to_num(dspec2)
+                params = (dspec2,self.edges*(freq/self.fref),time2,freq2,eta,ct,cf,self.npad,verbose)
+                if type(pool)==type(None):
+                    res = thth.calc_asymmetry(params)
+                    self.asymmetry[cf,ct]=res[0]
+                else:
+                    pars.append(params)
+        if type(pool)!=type(None):
+            for res in pool.map(thth.calc_asymmetry,pars):
+                self.asymmetry[res[1],res[2]]=res[0]
+    
     def norm_sspec(self, eta=None, delmax=None, plot=False, startbin=1,
                    maxnormfac=5, minnormfac=0, cutmid=0, lamsteps=True,
                    scrunched=True, plot_fit=True, ref_freq=1400, velocity=False,
