@@ -601,7 +601,7 @@ def single_search(params):
                 ## Set eigenvalue to NaN in event of failure
                 eigs[i]=np.nan
     else:
-        SS = np.abs(CS)**2
+        SS = np.abs(CS)
         ## Loop over all curvatures
         for i in range(eigs.shape[0]):
             try:
