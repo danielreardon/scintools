@@ -1223,9 +1223,7 @@ class Dynspec:
                 elif display:
                     plt.show()
 
-    def prep_thetatheta(self, cwf=None, cwt=None, fref=None,
-                        eta_max=None, eta_min = None, nedge = None,
-                        edges_lim = None, arclet_lim = None, center_cut = None, tau_lim=None, fw = .1, npad=3, verbose = False, fitting_proc = 'standard'):
+    def prep_thetatheta(self, fw = .1, npad=3, verbose = False, fitting_proc = 'standard',**kwargs):
         """
         Prepare
 
@@ -1272,7 +1270,8 @@ class Dynspec:
         self.thetatheta_proc = fitting_proc
         self.npad = npad
         self.fw = fw
-        if cwf:
+        if 'cwf' in kwargs.keys():
+            cwf = kwargs['cwf']
             self.cwf = 2*(cwf//2)
             self.ncf_fit = self.dyn.shape[0]//self.cwf
             hwf = self.cwf//2
@@ -1281,7 +1280,8 @@ class Dynspec:
             self.cwf = self.dyn.shape[0]
             self.ncf_fit = 1
             self.ncf_ret = 1
-        if cwt:
+        if 'cwt' in kwargs.keys():
+            cwt = kwargs['cwt']
             self.cwt = 2*(cwt//2)
             self.nct_fit = self.dyn.shape[1]//self.cwt
             hwt = self.cwt//2
@@ -1290,13 +1290,13 @@ class Dynspec:
             self.cwt = self.dyn.shape[1]
             self.nct_fit = 1
             self.nct_ret = 1
-        if tau_lim:
-            tau_lim = thth.unit_checks(tau_lim,'Tau Limit', u.us)
+        if 'tau_lim' in kwargs.keys():
+            tau_lim = thth.unit_checks(kwargs['tau_lim'],'Tau Limit', u.us)
             delmax = tau_lim
         else:
             delmax=None
-        if type(fref) != type(None):
-            self.fref = thth.unit_checks(fref,'reference frequency',u.MHz)
+        if 'fref' in kwargs.keys():
+            self.fref = thth.unit_checks(kwargs['fref'],'reference frequency',u.MHz)
         else:
             self.fref = self.freqs.mean()*u.MHz
 
@@ -1307,11 +1307,13 @@ class Dynspec:
         self.eta_max = (tau.max()/(fd[1]-fd[0])**2).to(u.s**3)
         self.eta_min*= (self.freqs.max()/self.fref.value)**2
         self.eta_max*= (self.freqs.min()/self.fref.value)**2
-        if type(eta_min)!=type(None):
+        if 'eta_min' in kwargs.keys():
+            eta_min = kwargs['eta_min']
             self.eta_min=thth.unit_checks(max((eta_min,self.eta_min)),'eta_min',u.s**3)
-        if type(eta_max)!=type(None):
+        if 'eta_max' in kwargs.keys():
+            eta_max = kwargs['eta_max']
             self.eta_max=thth.unit_checks(min((eta_max,self.eta_max)), 'eta_max',u.s**3)
-        if  (type(eta_min)==type(None)) or (type(eta_max)==type(None)):
+        if  not ( 'eta_min' in kwargs.keys() and 'eta_max' in kwargs.keys()):
             if not hasattr(self,"betaeta"):
                 self.fit_arc(lamsteps=True,numsteps=1e4,
                             etamin=((self.eta_min*self.fref**2).to(u.s)/const.c).to_value(1/(u.m*u.mHz**2)),
@@ -1319,14 +1321,10 @@ class Dynspec:
                             delmax=delmax,plot=verbose)
             eta_hough = ((const.c*self.betaeta/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
             err_hough = ((const.c*2*max((self.betaetaerr,self.betaetaerr2))/(u.m*u.mHz**2))/self.fref**2).to(u.s**3)
-        if type(eta_min)==type(None):
+        if not ('eta_min' in kwargs.keys()):
             self.eta_min=max((self.eta_min,eta_hough-err_hough))
-        else:
-            self.eta_min = eta_min
-        if type(eta_max)==type(None):
+        if not ('eta_max' in kwargs.keys()):
             self.eta_max=min((self.eta_max,eta_hough+err_hough))
-        else:
-            self.eta_max= eta_max
 
         l0=np.log10(self.eta_min.value)
         l1=np.log10(self.eta_max.value)
@@ -1334,26 +1332,27 @@ class Dynspec:
         self.neta = int(1+ (l1-l0)/np.log10(1+self.fw/10))
 
         fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
-        if type(edges_lim) != type(None):
-            edges_lim = min((thth.unit_checks(edges_lim,'edges limit',u.mHz),fd_cut))
+        if 'edges_lim' in kwargs.keys():
+            edges_lim = min((thth.unit_checks(kwargs['edges_lim']'edges limit',u.mHz),fd_cut))
         else:
             edges_lim=fd_cut
-        if type(tau_lim) != type(None):
+        if 'tau_lim' in kwargs.keys():
             edges_lim=min((edges_lim,np.sqrt(tau_lim/self.eta_max).to(u.mHz)))
 
-        if nedge:
-            self.edges = thth.unit_checks(np.linspace(-edges_lim,edges_lim,2*(nedge//2)),'edges',u.mHz)
+        if 'nedge' in kwargs.keys():
+            assert np.mod(kwargs['nedge'],2)==0, 'nedge must be even!'
+            self.edges = thth.unit_checks(np.linspace(-edges_lim,edges_lim,kwargs['nedge']),'edges',u.mHz)
         else:
             self.edges = thth.min_edges(edges_lim,fd,tau,self.eta_max*(self.fref.value/self.freqs.min()), 2
                                         )*(self.freqs.min()/self.fref.value)
             
         if self.thetatheta_proc == 'thin':
-            if type(arclet_lim) != type(None):
-                self.arclet_lim = thth.unit_checks(arclet_lim,'Arclet Limit',u.mHz)
+            if 'arclet_lim' in kwargs.keys():
+                self.arclet_lim = thth.unit_checks(kwargs['arclet_lim'],'Arclet Limit',u.mHz)
             else:
                 self.arclet_lim = edges_lim
-            if type(center_cut) != type(None):
-                self.center_cut = thth.unit_checks(center_cut,'Central Cut',u.mHz)
+            if 'center_cut' in kwargs.keys():
+                self.center_cut = thth.unit_checks(kwargs['center_cut'],'Central Cut',u.mHz)
             else:
                 self.center_cut = 0
 
