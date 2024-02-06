@@ -21,7 +21,7 @@ from scintools.scint_models import scint_acf_model, scint_acf_model_2d_approx,\
                          fit_parabola, fit_log_parabola, fitter, \
                          powerspectrum_model
 from scintools.scint_utils import is_valid, svd_model, interp_nan_2d,\
-    centres_to_edges
+    centres_to_edges, get_window
 import scintools.ththmod as thth
 from scipy.interpolate import griddata, interp1d, RectBivariateSpline
 from scipy.signal import convolve2d, medfilt, savgol_filter
@@ -3535,27 +3535,10 @@ class Dynspec:
         nf = np.shape(dyn)[0]
         nt = np.shape(dyn)[1]
         dyn = dyn - np.mean(dyn)  # subtract mean
-
+        
         if window is not None:
-            # Window the dynamic spectrum
-            if window.lower() == 'hanning':
-                cw = np.hanning(np.floor(window_frac*nt))
-                sw = np.hanning(np.floor(window_frac*nf))
-            elif window.lower() == 'hamming':
-                cw = np.hamming(np.floor(window_frac*nt))
-                sw = np.hamming(np.floor(window_frac*nf))
-            elif window.lower() == 'blackman':
-                cw = np.blackman(np.floor(window_frac*nt))
-                sw = np.blackman(np.floor(window_frac*nf))
-            elif window.lower() == 'bartlett':
-                cw = np.bartlett(np.floor(window_frac*nt))
-                sw = np.bartlett(np.floor(window_frac*nf))
-            else:
-                print('Window unknown.. Please add it!')
-            chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
-                                    np.ones([nt-len(cw)]))
-            subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
-                                      np.ones([nf-len(sw)]))
+            chan_window, subint_window = get_window(nt, nf, window=window,
+                                                    frac=window_frac)
             dyn = np.multiply(chan_window, dyn)
             dyn = np.transpose(np.multiply(subint_window,
                                            np.transpose(dyn)))

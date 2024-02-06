@@ -803,6 +803,31 @@ def make_pickle(obj, filepath):
     with open(filepath, 'wb') as f_out:
         for idx in range(0, n_bytes, max_bytes):
             f_out.write(bytes_out[idx:idx+max_bytes])
+    return     
+
+def get_window(nt, nf, window='hanning', frac=0.1):
+    """
+    Returns a window to apply before computing an FFT
+    """
+    if window.lower() == 'hanning':
+        cw = np.hanning(np.floor(frac*nt))
+        sw = np.hanning(np.floor(frac*nf))
+    elif window.lower() == 'hamming':
+        cw = np.hamming(np.floor(frac*nt))
+        sw = np.hamming(np.floor(frac*nf))
+    elif window.lower() == 'blackman':
+        cw = np.blackman(np.floor(frac*nt))
+        sw = np.blackman(np.floor(frac*nf))
+    elif window.lower() == 'bartlett':
+        cw = np.bartlett(np.floor(frac*nt))
+        sw = np.bartlett(np.floor(frac*nf))
+    else:
+        print('Window unknown.. Please add it!')
+    chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
+                            np.ones([nt-len(cw)]))
+    subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
+                              np.ones([nf-len(sw)]))
+    return chan_window, subint_window
 
 
 def calculate_curvature_peak_probability(power_data, noise_level, smooth=True,

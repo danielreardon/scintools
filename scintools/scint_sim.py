@@ -17,6 +17,7 @@ from scipy.special import gamma
 from scipy.interpolate import griddata
 import scipy.constants as sc
 import matplotlib.pyplot as plt
+from scintools.scint_utils import is_valid, get_window
 
 
 class Simulation():
@@ -470,10 +471,10 @@ class ACF():
         if auto_sampling:
             # calculate to 6 spatial scales along major axis
             self.sp_fac = 6 * ar/spmax
-            # adjust to 81 pixels, doubles at ar=3
-            self.res_fac = (1 + ar/3)*81/nt
-            # triple near core
-            self.core_fac = 3
+            # adjust to 101 pixels, doubles at ar=3
+            self.res_fac = 1 + ar/3
+            # quadruple near core
+            self.core_fac = 4
         else:
             self.sp_fac = spatial_factor
             self.res_fac = resolution_factor
@@ -724,24 +725,36 @@ class ACF():
         if display:
             plt.show()
 
-    def calc_sspec(self):
+    def calc_sspec(self, window='hanning', window_frac=1):
         """
         Calculate the secondary spectrum
         """
-        arr = np.fft.fftshift(self.acf)
+        nf, nt = np.shape(self.acf)
+        chan_window, subint_window = get_window(nt, nf, window=window,
+                                                frac=window_frac)
+        arr = np.multiply(chan_window, self.acf)
+        arr = np.transpose(np.multiply(subint_window,
+                                       np.transpose(arr)))
+        arr = np.fft.fftshift(arr)
         arr = np.fft.fft2(arr)
         arr = np.fft.fftshift(arr)
         arr = np.sqrt(np.real(arr * np.conj(arr)))
         self.sspec = 10*np.log10(arr)
 
-    def plot_sspec(self, display=True):
+    def plot_sspec(self, display=True, vmin=None, vmax=None):
         """
         Plots the simulated ACF
         """
         if not hasattr(self, 'sspec'):
             self.calc_sspec()
+            
+        sspec = self.sspec
+        medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        vmin = medval - 3 if vmin is None else vmin
+        vmax = maxval - 3 if vmax is None else vmax
 
-        plt.pcolormesh(self.tn, self.fn, self.sspec)
+        plt.pcolormesh(self.tn, self.fn, sspec, vmin=vmin, vmax=vmax)
         plt.colorbar()
         plt.xlabel(r'Delay')
         plt.ylabel(r'Doppler')
