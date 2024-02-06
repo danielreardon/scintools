@@ -4,6 +4,7 @@ scipy
 matplotlib
 lmfit
 emcee
-corner
-scikit-image==0.16.2
+pillow
+six
+scikit-image
 bilby
