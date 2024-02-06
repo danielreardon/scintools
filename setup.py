@@ -10,7 +10,7 @@ from setuptools import setup
 
 setup(
     name='scintools',
-    version='0.2',
+    version='0.4',
     description='Tools for analysing pulsar scintillation.',
     long_description="See: `github.com/danielreardon/scintools \
                       <https://github.com/danielreardon/scintools>`_.",
