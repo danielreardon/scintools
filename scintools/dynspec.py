@@ -3033,7 +3033,7 @@ class Dynspec:
             elif display:
                 plt.show()
         self.cutdyn = cutdyn
-        self.cutsspec = cutsspe
+        self.cutsspec = cutsspec
 
     def refill(self, method='biharmonic', zeros=True, kernel_size=5,
                linear=True):
