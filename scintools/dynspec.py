@@ -34,11 +34,6 @@ except Exception as e:
     print(e)
     print("skimage not found: cannot use biharmonic inpainting")
     biharmonic = False
-try:
-    import corner
-except Exception as e:
-    print(e)
-    print("Corner.py not found: cannot plot mcmc results")
 import astropy.units as u
 import astropy.constants as const
 
@@ -2897,26 +2892,6 @@ class Dynspec:
                 if display:
                     plt.show()
                 plt.close(fig[0])
-
-            elif method == 'sspec':
-                '''
-                sspec plotting routine
-                '''
-
-            if mcmc and method == "acf2d":
-                corner.corner(results.flatchain,
-                              labels=results.var_names,
-                              truths=list(results.params.valuesdict().
-                                          values()))
-                if filename is not None:
-                    filename_name = ''.join(filename.split('.')[0:-1])
-                    filename_extension = filename.split('.')[-1]
-                    plt.savefig(filename_name + '_corner.'
-                                + filename_extension, dpi=dpi,
-                                bbox_inches='tight', pad_inches=0.1)
-                if display:
-                    plt.show()
-                plt.close()
 
         return results
 

@@ -1,9 +1,10 @@
 astropy
-numpy
+numpy<1.23.0
 scipy
 matplotlib
 lmfit
 emcee
-corner
+pillow
+six
 scikit-image
 bilby

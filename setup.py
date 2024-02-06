@@ -19,7 +19,7 @@ setup(
         'Topic :: Scientific/Engineering :: Physics',
         'Topic :: Scientific/Engineering :: Mathematics',
         'Intended Audience :: Science/Research',
-        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     keywords='dynamic-spectrum, pulsar-timing, scintillation,\
@@ -29,7 +29,10 @@ setup(
     author_email='dreardon@swin.edu.au',
     license='MIT',
     packages=['scintools'],
-    install_requires=['numpy', 'scipy', 'matplotlib', 'corner', 'lmfit', 'astropy', 'emcee', 'bilby', 'pillow', 'six', 'scikit-image'],
+    install_requires=['numpy<1.23.0', 'scipy', 'matplotlib', 'lmfit', 'astropy', 'emcee', 'bilby', 'pillow', 'six', 'scikit-image'],
     include_package_data=True,
     zip_safe=False,
 )
+
+
+
