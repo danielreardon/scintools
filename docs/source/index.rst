@@ -20,7 +20,7 @@ Welcome to the documentation for Scintools!
    
    scint_utils
 
-
+   thetatheta
 
 Indices and tables
 ==================
