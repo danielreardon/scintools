@@ -16,17 +16,17 @@ is a package for the analysis and simulation of pulsar scintillation data. This 
 Referencing
 ===============================
 
-If your work makes use of Scintools, please cite `Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_ or the `Astrophysics Source Code Library record <https://ui.adsabs.harvard.edu/abs/2020ascl.soft11019R>`_ and provide a url link to this github page. If utilising scintools for scintillation timescale, bandwidth, or phase gradient measurements via the autocorrelation function, also cite `Reardon et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230316338R>`_ . If you use the *ththmod.py* module, cite `Baker et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp.3341B>`_ . If using the electromagnetic simulation software (*Simulation* class in *scint_sim.py*), also cite `Coles et al. (2010) <https://ui.adsabs.harvard.edu/abs/2010ApJ...717.1206C>`_
+If your work makes use of Scintools, please cite `Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_ or the `Astrophysics Source Code Library record <https://ui.adsabs.harvard.edu/abs/2020ascl.soft11019R>`_ and provide a url link to this github page. If utilising scintools for scintillation timescale, bandwidth, or phase gradient measurements via the autocorrelation function, also cite `Reardon et al. (2023) <https://ui.adsabs.harvard.edu/abs/2023arXiv230316338R>`_ . If you use the *ththmod.py* module, cite `Sprenger et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.500.1114S>`_ and `Baker et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022MNRAS.510.4573B>`_ . If using the electromagnetic simulation software (*Simulation* class in *scint_sim.py*), also cite `Coles et al. (2010) <https://ui.adsabs.harvard.edu/abs/2010ApJ...717.1206C>`_
 
 Below is a list of works that use Scintools\:
 
 * `"Precision orbital dynamics from interstellar scintillation arcs for PSR J0437-4715", Reardon et al. (2020) <https://ui.adsabs.harvard.edu/abs/2020arXiv200912757R>`_
-* `"Interstellar Interferometry: Precise Curvature Measurement from Pulsar Secondary Spectra", Baker et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp.3341B>`_
 * `"Scintillation Arcs in Pulsar B0450-18", Rickett et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021ApJ...907...49R>`_
 * `"ASKAP observations of multiple rapid scintillators reveal a degrees-long plasma filament", Wang et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp..186W>`_
 * `"A supernova remnant association for the fast-moving pulsar PSR J0908-4913", Johnston et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021MNRAS.507L..41J>`_
 * `"A Study of Birefringent Scintillation Towards the Millisecond Pulsar J0437-4715", Abdul Hamid (2021) <http://hdl.handle.net/10292/14786>`_
 * `"Probing the local interstellar medium with scintillometry of the bright pulsar B1133+16", McKee et al. (2021) <https://ui.adsabs.harvard.edu/abs/2021arXiv211211980M>`_
+* `"Interstellar interferometry: precise curvature measurement from pulsar secondary spectra", Baker et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022MNRAS.510.4573B>`_
 * `"Modelling annual scintillation arc variations in PSR J1643-1224 using the Large European Array for Pulsars", Mall et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220104245M>`_
 * `"Interstellar Scintillation of PSR J2048-1616", Chen et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022ApJ...927...14C>`_
 * `"Orbital dynamics and extreme scattering event properties from long-term scintillation observations of PSR J1603-7202", Walker et al. (2022) <https://ui.adsabs.harvard.edu/abs/2022arXiv220411077W>`_
