@@ -242,7 +242,7 @@ class Simulation():
         spi = np.real(np.multiply(self.spe, np.conj(self.spe)))
         self.spi = spi
 
-        self.x = np.linspace(0, self.dx*(self.nx), (self.nx+1))
+        self.x = np.linspace(0, self.dx*(self.nx), (self.nx))
         ifreq = np.arange(0, self.nf+1)
         lam_norm = 1.0 + self.dlam * (ifreq - 1 - (self.nf / 2)) / self.nf
         self.lams = lam_norm / np.mean(lam_norm)
