@@ -1333,7 +1333,7 @@ class Dynspec:
 
         fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
         if 'edges_lim' in kwargs.keys():
-            edges_lim = min((thth.unit_checks(kwargs['edges_lim']'edges limit',u.mHz),fd_cut))
+            edges_lim = min((thth.unit_checks(kwargs['edges_lim'],'edges limit',u.mHz),fd_cut))
         else:
             edges_lim=fd_cut
         if 'tau_lim' in kwargs.keys():
