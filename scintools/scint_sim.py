@@ -85,7 +85,7 @@ class Simulation():
         if lamsteps:
             self.name += ',lamsteps'
 
-        self.header = self.name
+        self.header = [self.name, 'MJD0: {}'.format(mjd)]
         if efield:
             dyn = np.real(self.spe)
         else:
@@ -244,7 +244,7 @@ class Simulation():
         self.spi = spi
 
         self.x = np.linspace(0, self.dx*(self.nx), (self.nx))
-        ifreq = np.arange(0, self.nf+1)
+        ifreq = np.linspace(0, self.nf-1, self.nf)
         lam_norm = 1.0 + self.dlam * (ifreq - 1 - (self.nf / 2)) / self.nf
         self.lams = lam_norm / np.mean(lam_norm)
         frfreq = 1.0 + self.dlam * (-0.5 + ifreq / self.nf)

@@ -217,7 +217,7 @@ class Dynspec:
         self.dyn = fluxes  # initialise dynamic spectrum
         
         # remove short subints
-        if remove_short_subs:
+        if remove_short_subs and np.std(np.diff(self.times)) != 0:
             self.remove_short_subs(threshold=subint_thresh)
 
         self.lamsteps = lamsteps
@@ -242,7 +242,7 @@ class Dynspec:
         dt0 = np.abs(np.diff(self.times))[0]  # first subint length
         dt = np.mean(np.abs(np.diff(self.times))[1:])
         sdt = np.std(np.abs(np.diff(self.times))[1:])
-        while dt0 - dt <= -threshold*sdt:
+        while dt0 - dt <= -threshold*sdt and sdt >= 0:
             self.dyn = np.delete(self.dyn, (0), axis=1)
             self.times = np.delete(self.times, (0))
             dt0 = np.abs(np.diff(self.times))[0]
@@ -356,9 +356,14 @@ class Dynspec:
                 fn.write("# Note: {0}\n".format(note))
             fn.write("# MJD0: {0}\n".format(self.mjd)) # output new start MJD
             fn.write("# Original header begins below:\n")
+            isub=False
             for line in self.header:
                 fn.write("# {} \n".format(line))
-
+                if 'isub' in line:
+                    isub=True
+                    
+            if not isub:
+                fn.write('# isub ichan time(min) freq(MHz) flux flux_err\n')
             for i in range(len(self.times)):
                 ti = self.times[i]/60
                 for j in range(len(self.freqs)):
@@ -4150,7 +4155,7 @@ class SimDyn():
         if sim.lamsteps:
             self.name += ',lamsteps'
 
-        self.header = self.name
+        self.header = self.header
         self.dyn = sim.spi
         dlam = sim.dlam
 
