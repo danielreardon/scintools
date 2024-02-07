@@ -25,7 +25,7 @@ class Simulation():
     def __init__(self, mb2=2, rf=1, ds=0.01, alpha=5/3, ar=1, psi=0,
                  inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
                  seed=None, nx=None, ny=None, dx=None, dy=None, plot=False,
-                 verbose=False, freq=1400, dt=30, mjd=50000, nsub=None,
+                 verbose=False, freq=1400, dt=30, mjd=60000, nsub=None,
                  efield=False, noise=None):
         """
         Electromagnetic simulator based on original code by Coles et al. (2010)
@@ -209,8 +209,8 @@ class Simulation():
     def get_intensity(self, verbose=True):
         spe = np.zeros([self.nx, self.nf],
                        dtype=np.dtype(np.csingle)) + \
-                       1j*np.zeros([self.nx, self.nf],
-                                   dtype=np.dtype(np.csingle))
+            1j*np.zeros([self.nx, self.nf],
+                        dtype=np.dtype(np.csingle))
         for ifreq in range(0, self.nf):
             if verbose:
                 if ifreq % round(self.nf/100) == 0:
@@ -574,11 +574,11 @@ class ACF():
                               (SNPY*sqrtar)**2)**alph2)
         # Increase spatial resolution by factor of core_fac, for first dnu step
         snp2 = np.arange(-sp_fac*spmax, sp_fac*spmax + dsp/core_fac,
-                          dsp/core_fac)
+                         dsp/core_fac)
         SNPX2, SNPY2 = np.meshgrid(snp2, snp2)
         # ACF of e-field
         gammes2 = np.exp(-0.5*((SNPX2/sqrtar)**2 +
-                                (SNPY2*sqrtar)**2)**alph2)
+                               (SNPY2*sqrtar)**2)**alph2)
 
         if phasegrad == 0:
             # calculate only one quadrant tn >= 0
@@ -589,21 +589,21 @@ class ACF():
             gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
             # compute dnun=0 first
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
-                                          (sny*sqrtar)**2)**alph2)
+                                         (sny*sqrtar)**2)**alph2)
             gammitv[0, 0] += wn/amp
             for isn in range(0, len(snx)):
                 ARG = ((SNPX2-snx[isn])**2 + (SNPY2-sny[isn])**2)/(2*dnun[1])
                 temp = gammes2 * np.exp(1j*ARG)
                 gammitv[isn, 1] = -1j*((dsp/core_fac)**2 *
-                                        np.sum(temp)/((2*np.pi)*dnun[1]))
+                                       np.sum(temp)/((2*np.pi)*dnun[1]))
             # Now do remainder of dnu array
             for idn in range(2, ndnun):
                 for isn in range(0, len(snx)):
                     ARG = ((SNPX-snx[isn])**2 +
-                            (SNPY-sny[isn])**2)/(2*dnun[idn])
+                           (SNPY-sny[isn])**2)/(2*dnun[idn])
                     temp = gammes * np.exp(1j*ARG)
                     gammitv[isn, idn] = -1j*((dsp/res_fac)**2 * np.sum(temp) /
-                                              ((2*np.pi)*dnun[idn]))
+                                             ((2*np.pi)*dnun[idn]))
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
@@ -747,7 +747,7 @@ class ACF():
         """
         if not hasattr(self, 'sspec'):
             self.calc_sspec()
-            
+
         sspec = self.sspec
         medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
         maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
@@ -1063,4 +1063,3 @@ class Brightness():
         plt.xlabel('Delay')
         plt.ylabel('Log Power')
         plt.show()
-
