@@ -1583,7 +1583,7 @@ class Dynspec:
             plt.ylabel(r'Eigenvalue')
         return(etas,eigs,popt)
 
-    def fit_thetatheta(self,verbose=False,plot=False,pool=None):
+    def fit_thetatheta(self,verbose=False,plot=False,pool=None,time_avg=False):
         """
         Loop theta-theta over all fitting chunks and fits for the global curvature evolution.
 
@@ -1639,18 +1639,29 @@ class Dynspec:
                 for ct in range(self.nct_fit):
                     self.eta_evo[cf,ct]=res[cf*self.nct_fit+ct][0]
                     self.eta_evo_err[cf,ct]=res[cf*self.nct_fit+ct][1]
-        tofit =  np.isfinite(self.eta_evo)*np.isfinite(self.eta_evo_err)
-        A = (np.sum(self.eta_evo[tofit] / (self.f0s[:,np.newaxis] * self.eta_evo_err)[tofit] ** 2)/ np.sum(1 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
-        A_err = np.sqrt(1 / np.sum(2 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+        if time_avg:
+            eta_avg = np.nanmean(self.eta_evo,1)
+            eta_count = np.nansum(self.eta_evo,1)/eta_avg
+            avg_err = np.nanstd(self.eta_evo,1)/np.sqrt(eta_count-1)
+            tofit =  np.isfinite(eta_avg)*np.isfinite(avg_err)
+            A = (np.sum(eta_avg[tofit] / (self.f0s * avg_err)[tofit] ** 2)/ np.sum(1 / ((self.f0s**2) * avg_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+            A_err = np.sqrt(1 / np.sum(2 / ((self.f0s**2) * avg_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+        else:
+            tofit =  np.isfinite(self.eta_evo)*np.isfinite(self.eta_evo_err)
+            A = (np.sum(self.eta_evo[tofit] / (self.f0s[:,np.newaxis] * self.eta_evo_err)[tofit] ** 2)/ np.sum(1 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+            A_err = np.sqrt(1 / np.sum(2 / ((self.f0s[:,np.newaxis]**2) * self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
         self.ththeta = A/self.fref**2
         self.ththetaerr = A_err/self.fref**2
 
         if plot:
             fit_string,err_string = thth.errString(self.ththeta*(self.fref/np.floor(self.fref))**2,self.ththetaerr*(self.fref/np.floor(self.fref))**2)
             plt.figure()
-            plt.errorbar(np.ravel(self.f0s.value[:,np.newaxis]*np.ones(self.eta_evo.shape)),
-                         np.ravel(self.eta_evo.value),
-                         yerr=np.ravel(self.eta_evo_err.value),fmt='.')
+            if time_avg:
+                plt.errorbar(self.f0s.value,eta_avg,yerr=avg_err,fmt='.')
+            else:
+                plt.errorbar(np.ravel(self.f0s.value[:,np.newaxis]*np.ones(self.eta_evo.shape)),
+                            np.ravel(self.eta_evo.value),
+                            yerr=np.ravel(self.eta_evo_err.value),fmt='.')
             plt.plot(self.f0s,A/self.f0s**2,label = r'$\eta_{%s}$ = %s $\pm$ %s $s^3$' %
             (np.floor(self.fref),fit_string, err_string))
             plt.xlabel(r'$\rm{Freq}~\left(\rm{MHz}\right)$')
