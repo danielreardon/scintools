@@ -1488,7 +1488,7 @@ class Dynspec:
             print(f'Zero paddings: {self.npad}')
             print(f'Fitting Procedure: {self.thetatheta_proc}')
 
-    def thetatheta_single(self, cf=0, ct=0,fname=None,verbose=False):
+    def thetatheta_single(self, cf=0, ct=0,fname=None,verbose=False,plot=True,arrays=False):
         """
         Run theta-theta on a single chunk for diagnostics.
 
@@ -1573,18 +1573,20 @@ class Dynspec:
             eta_sig=np.nan
 
         ## Plotting
-        try:
-            # Create diagnostic plots where requested
-            thth.PlotFunc(np.nan_to_num(dspec2)+mn,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
-            if fname:
-                plt.savefig(fname)
-        except Exception as e:
-            print(f"Plotting Error :{e}",flush=True)
-            plt.figure()
-            plt.plot(etas,eigs)
-            plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
-            plt.ylabel(r'Eigenvalue')
-        return(etas,eigs,popt)
+        if plot:
+            try:
+                # Create diagnostic plots where requested
+                thth.PlotFunc(np.nan_to_num(dspec2)+mn,time2,freq2,CS,fd,tau,edges,eta_fit,eta_sig,etas,eigs,etas_fit,popt)
+                if fname:
+                    plt.savefig(fname)
+            except Exception as e:
+                print(f"Plotting Error :{e}",flush=True)
+                plt.figure()
+                plt.plot(etas,eigs)
+                plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
+                plt.ylabel(r'Eigenvalue')
+        if arrays:
+            return(etas,eigs,popt)
 
     def fit_thetatheta(self,verbose=False,plot=False,pool=None,time_avg=False):
         """
