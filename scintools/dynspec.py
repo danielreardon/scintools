@@ -1447,7 +1447,10 @@ class Dynspec:
 
         self.neta = int(1+ (l1-l0)/np.log10(1+self.fw/10))
 
-        fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
+        if self.thetatheta_proc=='thin':
+            fd_cut = (fd.max())*(self.fref.value/self.freqs.max())
+        else:
+            fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
         if 'edges_lim' in kwargs.keys():
             edges_lim = min((thth.unit_checks(kwargs['edges_lim'],'edges limit',u.mHz),fd_cut))
         else:
