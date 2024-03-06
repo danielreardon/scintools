@@ -46,7 +46,7 @@ def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
     surgical_cleaner = cleaners.load_cleaner('surgical')
     surgical_parameters = 'chan_numpieces=1,subint_numpieces=1,\
                            chanthresh={},subintthresh={}'.format(
-                           channel_threshold, subint_threshold)
+        channel_threshold, subint_threshold)
     surgical_cleaner.parse_config_string(surgical_parameters)
     surgical_cleaner.run(archive)
 
@@ -76,8 +76,8 @@ def autocorr(arr):
         for y in range(-nc, nc):
             segment = (arr[max(0, x):min(x+nr, nr),
                            max(0, y):min(y+nc, nc)] - mean) \
-                    * (arr[max(0, -x):min(-x+nr, nr),
-                           max(0, -y):min(-y+nc, nc)] - mean)
+                * (arr[max(0, -x):min(-x+nr, nr),
+                       max(0, -y):min(-y+nc, nc)] - mean)
             numerator = np.ma.sum(segment)
             autocorr[x+nr][y+nc] = numerator / (std ** 2)
     autocorr /= np.nanmax(autocorr)
@@ -292,7 +292,8 @@ def get_ssb_delay(mjds, raj, decj, message=True):
     from astropy.constants import au, c
     from astropy.coordinates import BarycentricTrueEcliptic, SkyCoord
 
-    coord = SkyCoord('{0} {1}'.format(raj, decj), frame=BarycentricTrueEcliptic,
+    coord = SkyCoord('{0} {1}'.format(raj, decj),
+                     frame=BarycentricTrueEcliptic,
                      unit=(u.hourangle, u.deg))
     psr_xyz = coord.cartesian.xyz.value
 
@@ -304,7 +305,7 @@ def get_ssb_delay(mjds, raj, decj, message=True):
         t.append(e_dot_p*au.value/c.value)
 
     if message:
-        print('Returned SSB Roemer delays (in seconds) should be ' + \
+        print('Returned SSB Roemer delays (in seconds) should be ' +
               'ADDED to site arrival times')
 
     return np.array(t)
@@ -589,8 +590,8 @@ def acor(arr):
     auto_correlation = correlate(arr, arr, mode='full')
     auto_correlation = auto_correlation[auto_correlation.size//2:]
     auto_correlation /= auto_correlation[0]
-    indices = np.where(auto_correlation<0.5)[0]
-    if len(indices)>0:
+    indices = np.where(auto_correlation < 0.5)[0]
+    if len(indices) > 0:
         return indices[0]
     else:
         return 0
@@ -803,6 +804,32 @@ def make_pickle(obj, filepath):
     with open(filepath, 'wb') as f_out:
         for idx in range(0, n_bytes, max_bytes):
             f_out.write(bytes_out[idx:idx+max_bytes])
+    return
+
+
+def get_window(nt, nf, window='hanning', frac=0.1):
+    """
+    Returns a window to apply before computing an FFT
+    """
+    if window.lower() == 'hanning':
+        cw = np.hanning(np.floor(frac*nt))
+        sw = np.hanning(np.floor(frac*nf))
+    elif window.lower() == 'hamming':
+        cw = np.hamming(np.floor(frac*nt))
+        sw = np.hamming(np.floor(frac*nf))
+    elif window.lower() == 'blackman':
+        cw = np.blackman(np.floor(frac*nt))
+        sw = np.blackman(np.floor(frac*nf))
+    elif window.lower() == 'bartlett':
+        cw = np.bartlett(np.floor(frac*nt))
+        sw = np.bartlett(np.floor(frac*nf))
+    else:
+        print('Window unknown.. Please add it!')
+    chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
+                            np.ones([nt-len(cw)]))
+    subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
+                              np.ones([nf-len(sw)]))
+    return chan_window, subint_window
 
 
 def calculate_curvature_peak_probability(power_data, noise_level, smooth=True,

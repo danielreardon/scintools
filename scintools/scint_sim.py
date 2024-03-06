@@ -17,6 +17,7 @@ from scipy.special import gamma
 from scipy.interpolate import griddata
 import scipy.constants as sc
 import matplotlib.pyplot as plt
+from scintools.scint_utils import is_valid, get_window
 
 
 class Simulation():
@@ -24,7 +25,7 @@ class Simulation():
     def __init__(self, mb2=2, rf=1, ds=0.01, alpha=5/3, ar=1, psi=0,
                  inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
                  seed=None, nx=None, ny=None, dx=None, dy=None, plot=False,
-                 verbose=False, freq=1400, dt=30, mjd=50000, nsub=None,
+                 verbose=False, freq=1400, dt=30, mjd=60000, nsub=None,
                  efield=False, noise=None):
         """
         Electromagnetic simulator based on original code by Coles et al. (2010)
@@ -84,7 +85,7 @@ class Simulation():
         if lamsteps:
             self.name += ',lamsteps'
 
-        self.header = self.name
+        self.header = [self.name, 'MJD0: {}'.format(mjd)]
         if efield:
             dyn = np.real(self.spe)
         else:
@@ -208,8 +209,8 @@ class Simulation():
     def get_intensity(self, verbose=True):
         spe = np.zeros([self.nx, self.nf],
                        dtype=np.dtype(np.csingle)) + \
-                       1j*np.zeros([self.nx, self.nf],
-                                   dtype=np.dtype(np.csingle))
+            1j*np.zeros([self.nx, self.nf],
+                        dtype=np.dtype(np.csingle))
         for ifreq in range(0, self.nf):
             if verbose:
                 if ifreq % round(self.nf/100) == 0:
@@ -243,7 +244,7 @@ class Simulation():
         self.spi = spi
 
         self.x = np.linspace(0, self.dx*(self.nx), (self.nx))
-        ifreq = np.arange(0, self.nf+1)
+        ifreq = np.linspace(0, self.nf-1, self.nf)
         lam_norm = 1.0 + self.dlam * (ifreq - 1 - (self.nf / 2)) / self.nf
         self.lams = lam_norm / np.mean(lam_norm)
         frfreq = 1.0 + self.dlam * (-0.5 + ifreq / self.nf)
@@ -470,10 +471,10 @@ class ACF():
         if auto_sampling:
             # calculate to 6 spatial scales along major axis
             self.sp_fac = 6 * ar/spmax
-            # adjust to 81 pixels, doubles at ar=3
-            self.res_fac = (1 + ar/3)*81/nt
-            # triple near core
-            self.core_fac = 3
+            # adjust to 101 pixels, doubles at ar=3
+            self.res_fac = 1 + ar/3
+            # quadruple near core
+            self.core_fac = 4
         else:
             self.sp_fac = spatial_factor
             self.res_fac = resolution_factor
@@ -573,11 +574,11 @@ class ACF():
                               (SNPY*sqrtar)**2)**alph2)
         # Increase spatial resolution by factor of core_fac, for first dnu step
         snp2 = np.arange(-sp_fac*spmax, sp_fac*spmax + dsp/core_fac,
-                          dsp/core_fac)
+                         dsp/core_fac)
         SNPX2, SNPY2 = np.meshgrid(snp2, snp2)
         # ACF of e-field
         gammes2 = np.exp(-0.5*((SNPX2/sqrtar)**2 +
-                                (SNPY2*sqrtar)**2)**alph2)
+                               (SNPY2*sqrtar)**2)**alph2)
 
         if phasegrad == 0:
             # calculate only one quadrant tn >= 0
@@ -588,21 +589,21 @@ class ACF():
             gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
             # compute dnun=0 first
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
-                                          (sny*sqrtar)**2)**alph2)
+                                         (sny*sqrtar)**2)**alph2)
             gammitv[0, 0] += wn/amp
             for isn in range(0, len(snx)):
                 ARG = ((SNPX2-snx[isn])**2 + (SNPY2-sny[isn])**2)/(2*dnun[1])
                 temp = gammes2 * np.exp(1j*ARG)
                 gammitv[isn, 1] = -1j*((dsp/core_fac)**2 *
-                                        np.sum(temp)/((2*np.pi)*dnun[1]))
+                                       np.sum(temp)/((2*np.pi)*dnun[1]))
             # Now do remainder of dnu array
             for idn in range(2, ndnun):
                 for isn in range(0, len(snx)):
                     ARG = ((SNPX-snx[isn])**2 +
-                            (SNPY-sny[isn])**2)/(2*dnun[idn])
+                           (SNPY-sny[isn])**2)/(2*dnun[idn])
                     temp = gammes * np.exp(1j*ARG)
                     gammitv[isn, idn] = -1j*((dsp/res_fac)**2 * np.sum(temp) /
-                                              ((2*np.pi)*dnun[idn]))
+                                             ((2*np.pi)*dnun[idn]))
 
             # equation A1 convert ACF of E to ACF of I
             gammitv = np.real(gammitv * np.conj(gammitv))
@@ -724,24 +725,36 @@ class ACF():
         if display:
             plt.show()
 
-    def calc_sspec(self):
+    def calc_sspec(self, window='hanning', window_frac=1):
         """
         Calculate the secondary spectrum
         """
-        arr = np.fft.fftshift(self.acf)
+        nf, nt = np.shape(self.acf)
+        chan_window, subint_window = get_window(nt, nf, window=window,
+                                                frac=window_frac)
+        arr = np.multiply(chan_window, self.acf)
+        arr = np.transpose(np.multiply(subint_window,
+                                       np.transpose(arr)))
+        arr = np.fft.fftshift(arr)
         arr = np.fft.fft2(arr)
         arr = np.fft.fftshift(arr)
         arr = np.sqrt(np.real(arr * np.conj(arr)))
         self.sspec = 10*np.log10(arr)
 
-    def plot_sspec(self, display=True):
+    def plot_sspec(self, display=True, vmin=None, vmax=None):
         """
         Plots the simulated ACF
         """
         if not hasattr(self, 'sspec'):
             self.calc_sspec()
 
-        plt.pcolormesh(self.tn, self.fn, self.sspec)
+        sspec = self.sspec
+        medval = np.median(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        maxval = np.max(sspec[is_valid(sspec)*np.array(np.abs(sspec) > 0)])
+        vmin = medval - 3 if vmin is None else vmin
+        vmax = maxval - 3 if vmax is None else vmax
+
+        plt.pcolormesh(self.tn, self.fn, sspec, vmin=vmin, vmax=vmax)
         plt.colorbar()
         plt.xlabel(r'Delay')
         plt.ylabel(r'Doppler')
@@ -1050,4 +1063,3 @@ class Brightness():
         plt.xlabel('Delay')
         plt.ylabel('Log Power')
         plt.show()
-
