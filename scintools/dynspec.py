@@ -1534,7 +1534,7 @@ class Dynspec:
             print(f'Zero paddings: {self.npad}')
             print(f'Fitting Procedure: {self.thetatheta_proc}')
 
-    def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False):
+    def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False plot=True, arrays=False):
         """
         Run theta-theta on a single chunk for diagnostics.
 
