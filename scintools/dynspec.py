@@ -1526,15 +1526,15 @@ class Dynspec:
             print(f'Reference Frequency: {self.fref}')
             print(
                 f'Eta range: {self.eta_min} to {self.eta_max}'
-                'with {self.neta} points')
+                f'with {self.neta} points')
             print(
                 f'Edges has {self.edges.shape[0]} point out to'
-                '{self.edges[-1]}')
+                f'{self.edges[-1]}')
             print(f'Fractional fitting width: {self.fw}')
             print(f'Zero paddings: {self.npad}')
             print(f'Fitting Procedure: {self.thetatheta_proc}')
 
-    def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False plot=True, arrays=False):
+    def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False, plot=True, arrays=False):
         """
         Run theta-theta on a single chunk for diagnostics.
 
