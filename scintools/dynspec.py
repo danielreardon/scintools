@@ -1860,8 +1860,7 @@ class Dynspec:
             from multiprocessing and MPIPool from mpipool. Defaults
             to None and runs chunks in series.
         """
-        if not hasattr(self, "wavefield"):
-            self.calc_wavefield(verbose=verbose, pool=pool)
+        self.calc_wavefield(verbose=verbose, pool=pool)
         posdspec = np.isfinite(self.dyn[:self.wavefield.shape[0],
                                         :self.wavefield.shape[1]]) * (
             self.dyn[:self.wavefield.shape[0], :self.wavefield.shape[1]] > 0)
