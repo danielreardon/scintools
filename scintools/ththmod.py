@@ -669,7 +669,7 @@ def single_search_thin(params):
     try:
         if plot:
             # Create diagnostic plots where requested
-            PlotFunc(
+            plot_func(
                 dspec2,
                 time,
                 freq,
@@ -722,6 +722,7 @@ def single_search(params):
         neta -- Number of curvatures to test
         coher -- A bool for whether to use coherent (True) or incoherent
                 (False) theta-theta
+        tauMask -- Sets all points with abs(tau)<tauMask  to 0
         verbose -- A bool for how many updates the search prints
     """
 
@@ -737,7 +738,8 @@ def single_search(params):
         fw,
         npad,
         coher,
-        verbose,
+        tauMask,
+        verbose
     ) = params
 
     # Verify units
@@ -761,6 +763,7 @@ def single_search(params):
     # Calculate Conjugate Spectrum
     CS = np.fft.fft2(dspec_pad)
     CS = np.fft.fftshift(CS)
+    CS[np.abs(tau)<tauMask]=0
     eigs = np.zeros(etas.shape)
     if coher:
         # Loop over all curvatures
@@ -838,7 +841,7 @@ def single_search(params):
     try:
         if plot:
             # Create diagnostic plots where requested
-            PlotFunc(
+            plot_func(
                 dspec2,
                 time,
                 freq,
@@ -871,7 +874,7 @@ def single_search(params):
     return (eta_fit, eta_sig, freq.mean(), time.mean(), eigs)
 
 
-def PlotFunc(
+def plot_func(
     dspec,
     time,
     freq,
@@ -1022,11 +1025,12 @@ def PlotFunc(
     plt.title("Model Dynamic Spectrum")
 
     # Data Secondary Spectrum
+    SS = np.abs(CS) ** 2
     plt.subplot(grid[1, 0])
     plt.imshow(
-        np.abs(CS) ** 2,
+        SS,
         norm=LogNorm(
-            vmin=np.median(np.abs(CS) ** 2), vmax=np.abs(CS).max() ** 2
+            vmin=np.median(SS[SS>0]), vmax=SS.max()
         ),
         origin="lower",
         aspect="auto",
@@ -1046,7 +1050,7 @@ def PlotFunc(
     plt.imshow(
         np.abs(recov) ** 2,
         norm=LogNorm(
-            vmin=np.median(np.abs(CS) ** 2), vmax=np.abs(CS).max() ** 2
+            vmin=np.median(SS[SS>0]), vmax=SS.max()
         ),
         origin="lower",
         aspect="auto",
@@ -1056,13 +1060,14 @@ def PlotFunc(
     plt.ylim((0, tau_lim.value))
     plt.title("Model Secondary Spectrum")
 
+    Sthth = np.abs(thth_red) ** 2
     # Data TH-TH
     plt.subplot(grid[2, 0])
     plt.imshow(
-        np.abs(thth_red) ** 2,
+        Sthth,
         norm=LogNorm(
-            vmin=np.median(np.abs(thth_red) ** 2),
-            vmax=np.abs(thth_red).max() ** 2,
+            vmin=np.median(Sthth[Sthth>0]),
+            vmax=Sthth.max(),
         ),
         origin="lower",
         aspect="auto",
@@ -1082,8 +1087,8 @@ def PlotFunc(
     plt.imshow(
         np.abs(thth2_red) ** 2,
         norm=LogNorm(
-            vmin=np.median(np.abs(thth_red) ** 2),
-            vmax=np.abs(thth_red).max() ** 2,
+            vmin=np.median(Sthth[Sthth>0]),
+            vmax=Sthth.max(),
         ),
         origin="lower",
         aspect="auto",
@@ -1103,7 +1108,7 @@ def PlotFunc(
     plt.imshow(
         thth_derot.real,
         norm=SymLogNorm(
-            np.median(np.abs(thth_red) ** 2),
+            np.median(np.abs(thth_red[thth_red!=0]) ** 2),
             vmin=-np.abs(thth_derot).max(),
             vmax=np.abs(thth_derot).max(),
         ),
@@ -1125,7 +1130,7 @@ def PlotFunc(
     plt.imshow(
         thth_derot.imag,
         norm=SymLogNorm(
-            np.median(np.abs(thth_red) ** 2),
+            np.median(np.abs(thth_red[thth_red!=0]) ** 2),
             vmin=-np.abs(thth_derot).max(),
             vmax=np.abs(thth_derot).max(),
         ),
@@ -1224,6 +1229,8 @@ def VLBI_chunk_retrieval(params):
             Number of zeros paddings to add to end of dspec
         n_dish : int
             Number of stations used for VLBI
+        tauMask : Astropy Quantity
+            Sets all points with abs(tau)<tauMask  to 0
         verbose : bool
             Control the number of print statements
 
@@ -1240,6 +1247,7 @@ def VLBI_chunk_retrieval(params):
         idx_f,
         npad,
         n_dish,
+        tauMask,
         verbose,
     ) = params
 
@@ -1277,6 +1285,7 @@ def VLBI_chunk_retrieval(params):
 
             # Calculate Conjugate Spectrum (or Conjugate Visibility)
             CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
+            CS[np.abs(tau)<tauMask]=0
             # Calculate TH-TH for dynamic spectra
             thth_single, edges_red = thth_redmap(CS, tau, fd, eta, edges)
         else:
@@ -1293,6 +1302,7 @@ def VLBI_chunk_retrieval(params):
 
             # Calculate Conjugate Spectrum (or Conjugate Visibility)
             CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
+            CS[np.abs(tau)<tauMask]=0
             # Calculate THTH for Visiblities
             thth_single, edges_red = thth_redmap(
                 CS, tau, fd, eta, edges, hermetian=False
@@ -1383,13 +1393,15 @@ def single_chunk_retrieval(params):
             Frequency index of chunk being examined
         npad : int
             Number of zeros paddings to add to end of dspec
+        tauMask : Astropy Quantity
+            Sets all points with abs(tau)<tauMask  to 0
         verbose : bool
             Control the number of print statements
 
     """
 
     # Read parameters
-    dspec2, edges, time, freq, eta, idx_t, idx_f, npad, verbose = params
+    dspec2, edges, time, freq, eta, idx_t, idx_f, npad, tauMask, verbose = params
 
     # Verify unit compatability
     time2 = unit_checks(time, "time2", u.s)
@@ -1416,6 +1428,7 @@ def single_chunk_retrieval(params):
     # Compute Conjugate Spectrum
     CS = np.fft.fft2(dspec_pad)
     CS = np.fft.fftshift(CS)
+    CS[np.abs(tau)<tauMask]=0
 
     # Try phase retrieval on chunk
     try:

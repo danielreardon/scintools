@@ -1516,6 +1516,10 @@ class Dynspec:
                     kwargs['center_cut'], 'Central Cut', u.mHz)
             else:
                 self.center_cut = 0
+        if 'tau_mask' in kwargs.keys():
+            self.thth_tau_mask = kwargs['tau_mask']
+        else:
+            self.thth_tau_mask = 0*u.us
 
         if verbose:
             print("\n\t THETA-THETA PROPERTIES\n")
@@ -1528,11 +1532,12 @@ class Dynspec:
                 f'Eta range: {self.eta_min} to {self.eta_max}'
                 f'with {self.neta} points')
             print(
-                f'Edges has {self.edges.shape[0]} point out to'
+                f'Edges has {self.edges.shape[0]} point out to '
                 f'{self.edges[-1]}')
             print(f'Fractional fitting width: {self.fw}')
             print(f'Zero paddings: {self.npad}')
             print(f'Fitting Procedure: {self.thetatheta_proc}')
+            print(f'Masking |tau| < {self.thth_tau_mask}')
 
     def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False, plot=True, arrays=False):
         """
@@ -1564,6 +1569,9 @@ class Dynspec:
         time2 = self.times[ts]*u.s
         freq2 = self.freqs[fs]*u.MHz
 
+        tau = thth.fft_axis(freq2, u.us, self.npad)
+        fd = thth.fft_axis(time2, u.mHz, self.npad)
+
         dspec2 = np.copy(self.dyn[fs, ts])
         mn = np.nanmean(dspec2)
         dspec2 -= mn
@@ -1571,10 +1579,9 @@ class Dynspec:
             0, self.npad*self.cwf), (0, self.npad*self.cwt)), mode='constant',
             constant_values=0)
         CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
+        CS[np.abs(tau)<self.thth_tau_mask]=0
         if self.thetatheta_proc == 'incoherent':
             SS = np.abs(CS)
-        tau = thth.fft_axis(freq2, u.us, self.npad)
-        fd = thth.fft_axis(time2, u.mHz, self.npad)
 
         etas = np.logspace(np.log10(self.eta_min.value), np.log10(
             self.eta_max.value), self.neta)*u.s**3*(self.fref/freq2.mean())**2
@@ -1637,7 +1644,7 @@ class Dynspec:
         if plot:
             try:
                 # Create diagnostic plots where requested
-                thth.PlotFunc(np.nan_to_num(dspec2)+mn, time2, freq2, CS, fd, tau,
+                thth.plot_func(np.nan_to_num(dspec2)+mn, time2, freq2, CS, fd, tau,
                               edges, eta_fit, eta_sig, etas, eigs, etas_fit, popt)
                 if fname:
                     plt.savefig(fname)
@@ -1690,7 +1697,10 @@ class Dynspec:
                 coher = (self.thetatheta_proc != 'incoherent')
                 params = [dspec2, freq2, time2, etas, self.edges *
                           (freq2.mean()/self.fref), None, False, self.fw,
-                          self.npad, coher, verbose]
+                          self.npad, coher]
+                if self.thetatheta_proc == 'standard':
+                    params.append(self.thth_tau_mask)
+                params.append(verbose)
                 if self.thetatheta_proc == 'thin':
                     params.append(
                         self.edges[np.abs(self.edges) <
