@@ -1451,13 +1451,11 @@ class Dynspec:
         self.eta_min *= (self.freqs.max()/self.fref.value)**2
         self.eta_max *= (self.freqs.min()/self.fref.value)**2
         if 'eta_min' in kwargs.keys():
-            eta_min = kwargs['eta_min']
-            self.eta_min = thth.unit_checks(
-                max((eta_min, self.eta_min)), 'eta_min', u.s**3)
+            eta_min = thth.unit_checks(kwargs['eta_min'], 'eta_min', u.s**3)
+            self.eta_min = max((eta_min, self.eta_min))
         if 'eta_max' in kwargs.keys():
-            eta_max = kwargs['eta_max']
-            self.eta_max = thth.unit_checks(
-                min((eta_max, self.eta_max)), 'eta_max', u.s**3)
+            eta_max = thth.unit_checks(kwargs['eta_max'], 'eta_max', u.s**3)
+            self.eta_max = min((eta_max, self.eta_max))
         if not ('eta_min' in kwargs.keys() and 'eta_max' in kwargs.keys()):
             if not hasattr(self, "betaeta"):
                 self.fit_arc(lamsteps=True, numsteps=1e4,
@@ -1806,7 +1804,7 @@ class Dynspec:
                 dspec2 -= np.nanmean(dspec2)
                 dspec2 = np.nan_to_num(dspec2)
                 params = (dspec2, self.edges*(freq/self.fref), time2,
-                          freq2, eta, ct, cf, self.npad, verbose)
+                          freq2, eta, ct, cf, self.npad,self.thth_tau_mask, verbose)
                 if pool is None:
                     res = thth.single_chunk_retrieval(params)
                     self.chunks[cf, ct, :, :] = res[0]
