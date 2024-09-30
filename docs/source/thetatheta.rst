@@ -17,11 +17,5 @@ Tutorials
 
 :ref:`dynspec_thth`.
 
-Functions
-----------------------
-
-.. automodule:: scintools.ththmod
-   :members:
-
 .. [Sprenger2021] Sprenger T., Wucknitz O., Main R., Baker D., Brisken W., 2021, MNRAS, 500, 1114
 .. [Baker2022]

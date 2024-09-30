@@ -22,7 +22,7 @@ def svd_model(arr, nmodes=1):
 
     Parameters
     ----------
-    arr : 2D Array
+    arr : `~numpy.ndarray`
         The array to be modeled with the SVD
     nmodes: int, optional
         Number of modes used in the SVD model. Defaults to 1
@@ -41,7 +41,7 @@ def chi_par(x, A, x0, C):
 
     Parameters
     ----------
-    x : 1D Array
+    x : `~numpy.ndarray`
         X coordinates of the
     A : float
         Coefficient for the quadratic term
@@ -59,15 +59,15 @@ def thth_map(CS, tau, fd, eta, edges, hermetian=True):
 
     Parameters
     ----------
-    CS : 2D Array
+    CS : `~numpy.ndarray`
         Conjugate Spectrum
-    tau : 1D Array
+    tau : `~astropy.units.Quantity`
         Time delay coordinates for the CS (us).
-    fd : 1D Array
+    fd : `~astropy.units.Quantity`
         Doppler shift coordinates for the CS (mHz)
     eta : float
         Arc curvature (s**3)
-    edges: 1D Array
+    edges: `~astropy.units.Quantity`
         Bin edges for theta-theta mapping (mHz). Should have an even number of
         points and be symmetric about 0
     hermetian: bool, optional
@@ -123,15 +123,15 @@ def thth_redmap(CS, tau, fd, eta, edges, hermetian=True):
 
     Parameters
     ----------
-    CS : 2D Array
+    CS : `~numpy.ndarray`
         Conjugate Spectrum
-    tau : 1D Array
+    tau : `~astropy.units.Quantity`
         Time delay coordinates for the CS (us).
-    fd : 1D Array
+    fd : `~astropy.units.Quantity`
         Doppler shift coordinates for the CS (mHz)
     eta : float
         Arc curvature (s**3)
-    edges: 1D Array
+    edges: `~astropy.units.Quantity`
         Bin edges for theta-theta mapping (mHz). Should have an even number of
         points and be symmetric about 0
     hermetian: bool, optional
@@ -179,15 +179,15 @@ def rev_map(thth, tau, fd, eta, edges, hermetian=True):
 
     Parameters
     ----------
-    thth : 2D Array
+    thth : `~numpy.ndarray`
         Theta-theta matrix to be mapped
-    tau : 1D Array
+    tau : `~astropy.units.Quantity`
         Time delay coordinates for the CS (us).
-    fd : 1D Array
+    fd : `~astropy.units.Quantity`
         Doppler shift coordinates for the CS (mHz)
     eta : float
         Arc curvature (s**3)
-    edges: 1D Array
+    edges: `~astropy.units.Quantity`
         Bin edges for theta-theta mapping (mHz). Should have an even number of
         points and be symmetric about 0
     hermetian: bool, optional
@@ -278,15 +278,15 @@ def modeler(CS, tau, fd, eta, edges, hermetian=True):
 
     Parameters
     ----------
-    CS : 2D Array
+    CS : `~numpy.ndarray`
         Theta-theta matrix to be mapped
-    tau : 1D Array
+    tau : `~astropy.units.Quantity`
         Time delay coordinates for the CS (us).
-    fd : 1D Array
+    fd : `~astropy.units.Quantity`
         Doppler shift coordinates for the CS (mHz)
     eta : float
         Arc curvature (s**3)
-    edges: 1D Array
+    edges: `~astropy.units.Quantity`
         Bin edges for theta-theta mapping (mHz). Should have an even number of
         points and be symmetric about 0
     hermetian: bool, optional
@@ -334,22 +334,22 @@ def chisq_calc(dspec, CS, tau, fd, eta, edges, N, mask=None):
 
     Parameters
     ----------
-    dspec : 2D Array
+    dspec : `~numpy.ndarray`
         Dynamic spectrum to be fit to
-    CS : 2D Array
+    CS : `~numpy.ndarray`
         Theta-theta matrix to be mapped
-    tau : 1D Array
+    tau : `~astropy.units.Quantity`
         Time delay coordinates for the CS (us).
-    fd : 1D Array
+    fd : `~astropy.units.Quantity`
         Doppler shift coordinates for the CS (mHz)
-    eta : float
+    eta : `~astropy.units.Quantity`
         Arc curvature (s**3)
-    edges: 1D Array
+    edges: `~astropy.units.Quantity`
         Bin edges for theta-theta mapping (mHz). Should have an even number of
         points and be symmetric about 0
-    N : 2D Array
+    N : `~numpy.ndarray`
         Standard deviation of the noise at each point in dspec
-    mask 2D Array bool, optional
+    mask `~numpy.ndarray` bool, optional
         Sets which points in dspec to calculate chisquared for.
         Defaults to all finite points
     """
@@ -375,15 +375,15 @@ def Eval_calc(CS, tau, fd, eta, edges):
 
     Parameters
     ----------
-    CS : 2D Array
+    CS : `~numpy.ndarray`
         Theta-theta matrix to be mapped
-    tau : 1D Array
+    tau : `~astropy.units.Quantity`
         Time delay coordinates for the CS (us).
-    fd : 1D Array
+    fd : `~astropy.units.Quantity`
         Doppler shift coordinates for the CS (mHz)
-    eta : float
+    eta : `~astropy.units.Quantity`
         Arc curvature (s**3)
-    edges: 1D Astropy Quantity Array
+    edges: `~astropy.units.Quantity`
         Bin edges for theta-theta mapping (mHz). Should have an even number of
         points and be symmetric about 0 (mHz)
     """
@@ -423,13 +423,13 @@ def arc_edges(eta, dfd, dtau, fd_max, n):
 
     Parameters:
     ----------
-    eta : float
+    eta : `~astropy.units.Quantity`
         The curvature of the parabola
-    dfd : float
+    dfd : `~astropy.units.Quantity`
         Doppler shift resolution of conjugate spectrum (mHz)
-    dtau : float
+    dtau : `~astropy.units.Quantity`
         Time delay resolution of conjugate spectrum (us)
-    fd_max : float
+    fd_max : `~astropy.units.Quantity`
         Extent of arc in Doppler shift
     n  : int
         Integer number of points in array (must be even)
@@ -453,9 +453,9 @@ def ext_find(x, y):
 
     Parameters
     ----------
-    x : 1D Array Quantity
+    x : `~astropy.units.Quantity`
         X coordinates of data
-    y : 1D Array Quantity
+    y : `~astropy.units.Quantity`
         Y coordiantes of data
 
     """
@@ -476,9 +476,9 @@ def fft_axis(x, unit, pad=0):
 
     Parameters
     ----------
-    x : 1D Array Quantity
+    x : `~astropy.units.Quantity`
         Coordinate array to find Fourier conjugate of
-    unit : Atropy Unit
+    unit : `~astropy.units.Unit`
         Desired unit for fourier coordinates
     pad : int, optional
         Integer giving how many additional copies of the data are padded in
@@ -521,19 +521,29 @@ def single_search_thin(params):
     Parameters
     ----------
     params : List
-        Contains the following
-        dspec2 -- The chunk of the dynamic spectrum
-        freq -- The frequency channels of that chunk (with units)
-        time -- The time bins of that chunk (with units)
-        eta_l -- The lower limit of curvatures to search (with units)
-        eta_h -- the upper limit of curvatures to search (with units)
-        edges -- The bin edges for Theta-Theta
-        name -- A string filename used if plotting
-        plot -- A bool controlling if the result should be plotted
-        neta -- Number of curvatures to test
-        coher -- A bool for whether to use coherent (True) or incoherent
+        dspec2 : `~numpy.ndarray`
+            The chunk of the dynamic spectrum
+        freq : `~astropy.units.Quantity`
+            The frequency channels of that chunk (with units)
+        time : `~astropy.units.Quantity`
+            The time bins of that chunk (with units)
+        eta_l : `~astropy.units.Quantity`
+            The lower limit of curvatures to search (with units)
+        eta_h : `~astropy.units.Quantity`
+            the upper limit of curvatures to search (with units)
+        edges : `~astropy.units.Quantity`
+            The bin edges for Theta-Theta
+        name : string
+            A string filename used if plotting
+        plot : bool
+            A bool controlling if the result should be plotted
+        neta : int
+            Number of curvatures to test
+        coher : bool
+            A bool for whether to use coherent (True) or incoherent
                 (False) theta-theta
-        verbose -- A bool for how many updates the search prints
+        verbose : bool
+            A bool for how many updates the search prints
     """
 
     # Read Parameters
@@ -710,20 +720,31 @@ def single_search(params):
     Parameters
     ----------
     params : List
-        Contains the following
-        dspec2 -- The chunk of the dynamic spectrum
-        freq -- The frequency channels of that chunk (with units)
-        time -- The time bins of that chunk (with units)
-        eta_l -- The lower limit of curvatures to search (with units)
-        eta_h -- the upper limit of curvatures to search (with units)
-        edges -- The bin edges for Theta-Theta
-        name -- A string filename used if plotting
-        plot -- A bool controlling if the result should be plotted
-        neta -- Number of curvatures to test
-        coher -- A bool for whether to use coherent (True) or incoherent
-                (False) theta-theta
-        tauMask -- Sets all points with abs(tau)<tauMask  to 0
-        verbose -- A bool for how many updates the search prints
+        dspec2 : `~numpy.ndarray`
+            The chunk of the dynamic spectrum
+        freq : `~astropy.units.Quantity`
+            The frequency channels of that chunk (with units)
+        time : `~astropy.units.Quantity`
+            The time bins of that chunk (with units)
+        eta_l : `~astropy.units.Quantity`
+            The lower limit of curvatures to search (with units)
+        eta_h : `~astropy.units.Quantity`
+            The upper limit of curvatures to search (with units)
+        edges : `~astropy.units.Quantity`
+            The bin edges for Theta-Theta
+        name : string
+            A string filename used if plotting
+        plot : bool
+            A bool controlling if the result should be plotted
+        neta : int
+            Number of curvatures to test
+        coher : bool
+            A bool for whether to use coherent (True) or incoherent
+            (False) theta-theta
+        tauMask : `~astropy.units.Quantity`
+            Sets all points with abs(tau)<tauMask  to 0
+        verbose : bool
+            A bool for how many updates the search prints
     """
 
     # Read Parameters
@@ -896,34 +917,34 @@ def plot_func(
 
     Parameters
     ----------
-    dspec : 2D Array
+    dspec : `~numpy.ndarray`
         The Dynamic Spectrum
-    time : 1D Astropy Quantity Array
+    time : `~astropy.units.Quantity`
         Time bins of the Dynamic Spectrum (s)
-    freq : 1D Astropy Quantity Array
+    freq : `~astropy.units.Quantity`
         Frequency channels of the Dynamic Spectrum (MHz)
-    CS : 2D Array
+    CS : `~numpy.ndarray`
         Conjugate Spectrum
-    fd : 1D Astropy Quantity Array
+    fd : `~astropy.units.Quantity`
         Doppler Shift coordinates of the Conjugate Spectrum (mHz)
-    tau : 1D Astropy Quantity Array
+    tau : `~astropy.units.Quantity`
         Time Delay coordinates of the Conjugate Spectrum (us)
-    edges : 1D Astropy Quantity Array
+    edges : `~astropy.units.Quantity`
         Theta-Theta bin edges (mHz)
-    eta_fit : Astropy Quantity
+    eta_fit : `~astropy.units.Quantity`
         Best fit Arc Curvature (s**3)
-    eta_sig : Astropy Quantity
+    eta_sig : `~astropy.units.Quantity`
         Error on best fit Arc Curvature (s**3)
-    etas : 1D Astropy Quantity Array
+    etas : `~astropy.units.Quantity`
         Curvatures search over (s**3)
     measure : 1D Array
         Largest eigenvalue (method = 'eigenvalue') or chisq value
         (method = 'chisq') for each eta
-    etas_fit : 1D Astropy Quantity Array
+    etas_fit : `~astropy.units.Quantity`
         Subarray of etas used for fitting
     fit_res : tuple
         Fit parameters for parabola at extremum
-    tau_lim : Float Quantity, optional
+    tau_lim : `~astropy.units.Quantity`, optional
         Largest tau value for SS plots
     method : String, optional
         Either 'eigenvalue' or 'chisq' depending on how curvature was found.
@@ -1208,18 +1229,17 @@ def VLBI_chunk_retrieval(params):
     Parameters
     ----------
     params : List
-        Contains
         dspec2_list : List
             A list of the overlapping dynamic spectra for all single dishes
             and visibilities ordered as [I1 , V12, ..., V1N, I2, V23,...,IN]
-        edges : 1D Astropy Quantity Array
+        edges : `~astropy.units.Quantity`
             Bin edges for theta-theta mapping (mHz). Should have an even number
             of points and be symmetric about 0
-        time : 1D Astropy Quanity Array
+        time : `~astropy.units.Quantity`
             Time bins for the section of the spectra being examined (s)
-        freq : 1D Astropy Quantity Array
+        freq : `~astropy.units.Quantity`
             Frequency channels for the section of the spectra being examined
-        eta : Float Quantity
+        eta : `~astropy.units.Quantity`
             Arc curvature for the section of the spectra being examined
         idx_t : int
             Time index of chunk being examined
@@ -1229,7 +1249,7 @@ def VLBI_chunk_retrieval(params):
             Number of zeros paddings to add to end of dspec
         n_dish : int
             Number of stations used for VLBI
-        tauMask : Astropy Quantity
+        tauMask : `~astropy.units.Quantity`
             Sets all points with abs(tau)<tauMask  to 0
         verbose : bool
             Control the number of print statements
@@ -1375,17 +1395,16 @@ def single_chunk_retrieval(params):
     Parameters
     ----------
     params : List
-        Contains
-        dspec2 : 2D Array
+        dspec2 : `~numpy.ndarray`
             Section of the Dynamic Spectrum to be analyzed
-        edges : 1D Astropy Quantity Array
+        edges : `~astropy.units.Quantity`
             Bin edges for theta-theta mapping (mHz). Should have an even number
             of points and be symmetric about 0
-        time : 1D Astropy Quanity Array
+        time : `~astropy.units.Quantity`
             Time bins for the section of the spectrum being examined (s)
-        freq : 1D Astropy Quantity Array
+        freq : `~astropy.units.Quantity`
             Frequency channels for the section of the spectrum being examined
-        eta : Float Quantity
+        eta : `~astropy.units.Quantity`
             Arc curvature for the section of the spectrum being examined
         idx_t : int
             Time index of chunk being examined
@@ -1393,7 +1412,7 @@ def single_chunk_retrieval(params):
             Frequency index of chunk being examined
         npad : int
             Number of zeros paddings to add to end of dspec
-        tauMask : Astropy Quantity
+        tauMask : `~astropy.units.Quantity`
             Sets all points with abs(tau)<tauMask  to 0
         verbose : bool
             Control the number of print statements
@@ -1544,17 +1563,17 @@ def two_curve_map(CS, tau, fd, eta1, edges1, eta2, edges2):
     ----------
     CS : 2D Array
         Conjugate Spectrum in [tau,fd] order with (0,0) in center
-    tau : 1D Astropy Quantity Array
+    tau : `~astropy.units.Quantity`
         Time Delay coordinates of Conjugate Spectrum (us)
-    fd : 1D Astropy Quanity Array
+    fd : `~astropy.units.Quantity`
         Doppler Shift coordinates of Conjugate Spectrum (mHz)
-    eta1 : Float Quantity
+    eta1 : `~astropy.units.Quantity`
         Arc Curvature of the main arc (s**3)
-    edges1 : 1D Astropy Quantity Array
+    edges1 : `~astropy.units.Quantity`
         Bin edges in theta1 for theta-theta mapping (mHz).
-    eta2 : Float Quanity
+    eta2 : `~astropy.units.Quantity`
         Arc Curvature of the Inverted Arclets
-    edges2 : 1D Astropy Quantity Array
+    edges2 : `~astropy.units.Quantity`
             Bin edges for in theta2 theta-theta mapping (mHz).
     """
     tau = unit_checks(tau, "tau", u.us)
@@ -1656,13 +1675,13 @@ def min_edges(fd_lim, fd, tau, eta, factor=2):
 
     Parameters
     ----------
-    fd_lim : Float Quantity
+    fd_lim : `~astropy.units.Quantity`
         Largest value of fd to search out to along main arc
-    fd : 1D Astropy Quanity Array
+    fd : `~astropy.units.Quantity`
         Doppler Shift coordinates of Conjugate Spectrum (mHz)
-    tau : 1D Astropy Quantity Array
+    tau : `~astropy.units.Quantity`
         Time Delay coordinates of Conjugate Spectrum (us)
-    eta : Float Quanity
+    eta : `~astropy.units.Quantity`
         The curvature to calculate edges for
         (When doing a curvature search this should be the largest curvature
          to search over)
@@ -2370,17 +2389,16 @@ def calc_asymmetry(params):
     Parameters
     ----------
     params : List
-        Contains
-        dspec2 : 2D Array
+        dspec2 : `~numpy.ndarray`
             Section of the Dynamic Spectrum to be analyzed
-        edges : 1D Astropy Quantity Array
+        edges : `~astropy.units.Quantity`
             Bin edges for theta-theta mapping (mHz). Should have an even number
             of points and be symmetric about 0
-        time : 1D Astropy Quanity Array
+        time : `~astropy.units.Quantity`
             Time bins for the section of the spectrum being examined (s)
-        freq : 1D Astropy Quantity Array
+        freq : `~astropy.units.Quantity`
             Frequency channels for the section of the spectrum being examined
-        eta : Float Quantity
+        eta : `~astropy.units.Quantity`
             Arc curvature for the section of the spectrum being examined
         idx_t : int
             Time index of chunk being examined

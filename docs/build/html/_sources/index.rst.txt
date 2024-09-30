@@ -22,6 +22,8 @@ Welcome to the documentation for Scintools!
 
    thetatheta
 
+   reference
+
 Indices and tables
 ==================
 
