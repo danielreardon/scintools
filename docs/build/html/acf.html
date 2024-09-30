@@ -1,97 +1,55 @@
-
-
 <!DOCTYPE html>
-<html class="writer-html4" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ACF class &mdash; scintools 0.2 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-
-  
-  
-  
-  
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/jupyter-sphinx.css?v=572af1d6" />
+      <link rel="stylesheet" type="text/css" href="_static/thebelab.css" />
 
   
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-    
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'./',
-              VERSION:'0.2',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=10f1778b"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="_static/thebelab-helper.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="scint_models module" href="scint_models.html" />
     <link rel="prev" title="Simulation class" href="simulation.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home" alt="Documentation Home"> scintools
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            scintools
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="dynspec.html">Dynspec class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulation.html">Simulation class</a></li>
@@ -101,170 +59,105 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="scint_models.html">scint_models module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scint_utils.html">scint_utils module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="thetatheta.html">$theta-theta space$</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">scintools</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
-      <li>ACF class</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">ACF class</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/acf.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="acf-class">
-<h1>ACF class<a class="headerlink" href="#acf-class" title="Permalink to this headline">¶</a></h1>
+             
+  <section id="acf-class">
+<h1>ACF class<a class="headerlink" href="#acf-class" title="Link to this heading"></a></h1>
 <p>The scintools <code class="docutils literal notranslate"><span class="pre">ACF</span></code> class, found in the <code class="docutils literal notranslate"><span class="pre">scint_sim</span></code> module, features tools for simulating and plotting autocorrelation functions. Based on the theoretical treatment found in Appendix A of <a class="reference external" href="https://iopscience.iop.org/article/10.1088/0004-637X/787/2/161/">Rickett, Coles et al. (2014)</a>.</p>
-<em class="property">class </em><code class="descclassname">scintools.</code><code class="descname">ACF</code><span class="sig-paren">(</span><em>s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3, phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1</em><span class="sig-paren">)</span><dl class="docutils">
-<dt></dt>
-<dd><p class="first">Simulation class.</p>
-<dl class="last docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>s_max</strong> (<cite>float, optional</cite>) - number of coherence spatial scales to calculate over.</li>
-<li><strong>dnu_max</strong> (<cite>float, optional</cite>) - number of decorrelation bandwidths to calculate over.</li>
-<li><strong>ns</strong> (<cite>int, optional</cite>) - number of spatial steps</li>
-<li><strong>nf</strong> (<cite>int, optional</cite>) - number of frequency steps.</li>
-<li><strong>ar</strong> (<cite>float, optional</cite>) - axial ratio of anisotropy</li>
-<li><strong>alpha</strong> (<cite>float, optional</cite>) - structure function exponent. 5/3 is a Kolmogorov profile (default) while 2 is Gaussian.</li>
-<li><strong>phasegrad_x</strong> (<cite>float, optional</cite>) - phase gradient in x</li>
-<li><strong>phasegrad_y</strong> (<cite>float, optional</cite>) - phase gradient in y</li>
-<li><strong>V_x</strong> (<cite>float, optional</cite>) - effective velocity in the x direction</li>
-<li><strong>V_y</strong> (<cite>float, optional</cite>) - effective velocity in the y direction</li>
-<li><strong>psi</strong> (<cite>float, optional</cite>) - orientation of anisotropy in degrees</li>
-<li><strong>amp</strong> (<cite>float, optional</cite>) - amplitude to scale the ACF by. By default ACF is normalized to the range [0, 1].</li>
+<em class="property">class </em><code class="descclassname">scintools.</code><code class="descname">ACF</code><span class="sig-paren">(</span><em>s_max=5, dnu_max=5, ns=256, nf=256, ar=1, alpha=5/3, phasegrad_x=0, phasegrad_y=0, V_x=1, V_y=0, psi=0, amp=1</em><span class="sig-paren">)</span><dl>
+<dt></dt><dd><p>Simulation class.</p>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>s_max</strong> (<cite>float, optional</cite>) - number of coherence spatial scales to calculate over.</p></li>
+<li><p><strong>dnu_max</strong> (<cite>float, optional</cite>) - number of decorrelation bandwidths to calculate over.</p></li>
+<li><p><strong>ns</strong> (<cite>int, optional</cite>) - number of spatial steps</p></li>
+<li><p><strong>nf</strong> (<cite>int, optional</cite>) - number of frequency steps.</p></li>
+<li><p><strong>ar</strong> (<cite>float, optional</cite>) - axial ratio of anisotropy</p></li>
+<li><p><strong>alpha</strong> (<cite>float, optional</cite>) - structure function exponent. 5/3 is a Kolmogorov profile (default) while 2 is Gaussian.</p></li>
+<li><p><strong>phasegrad_x</strong> (<cite>float, optional</cite>) - phase gradient in x</p></li>
+<li><p><strong>phasegrad_y</strong> (<cite>float, optional</cite>) - phase gradient in y</p></li>
+<li><p><strong>V_x</strong> (<cite>float, optional</cite>) - effective velocity in the x direction</p></li>
+<li><p><strong>V_y</strong> (<cite>float, optional</cite>) - effective velocity in the y direction</p></li>
+<li><p><strong>psi</strong> (<cite>float, optional</cite>) - orientation of anisotropy in degrees</p></li>
+<li><p><strong>amp</strong> (<cite>float, optional</cite>) - amplitude to scale the ACF by. By default ACF is normalized to the range [0, 1].</p></li>
 </ul>
 </dd>
 </dl>
 </dd>
 </dl>
-<div class="section" id="methods">
-<h2>Methods<a class="headerlink" href="#methods" title="Permalink to this headline">¶</a></h2>
+<section id="methods">
+<h2>Methods<a class="headerlink" href="#methods" title="Link to this heading"></a></h2>
 <code class="descname">calc_acf</code><span class="sig-paren">(</span><em>plot=False</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Computes 2D ACF of intensity vs t and v where optimal sampling of t and v is provided with the output ACF.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>plot</strong> (<cite>bool, optional</cite>) - plot the simulated ACF</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>plot</strong> (<cite>bool, optional</cite>) - plot the simulated ACF</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
 <code class="descname">plot_acf</code><span class="sig-paren">(</span><em></em><span class="sig-paren">)</span><p></p>
 <blockquote>
-<div>Plot the simulated ACF</div></blockquote>
-</div>
-</div>
+<div><p>Plot the simulated ACF</p>
+</div></blockquote>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="scint_models.html" class="btn btn-neutral float-right" title="scint_models module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="simulation.html" class="btn btn-neutral float-left" title="Simulation class" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="simulation.html" class="btn btn-neutral float-left" title="Simulation class" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="scint_models.html" class="btn btn-neutral float-right" title="scint_models module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        
-        &copy; Copyright 2019, Daniel J. Reardon
-
-    </p>
+    <p>&#169; Copyright 2019, Daniel J. Reardon.</p>
   </div>
-    
-    
-    
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>

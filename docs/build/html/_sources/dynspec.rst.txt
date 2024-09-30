@@ -1,6 +1,8 @@
 Dynspec class
 =============
 
+Note: documentation is currently being developed by a student. In the meantime, please email Daniel for any questions on usage: dreardon@swin.edu.au
+
 This will serve as a list of features available within the Dynspec class, in dynspec.py
 
 Importing dynamic spectra
