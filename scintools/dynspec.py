@@ -1451,13 +1451,11 @@ class Dynspec:
         self.eta_min *= (self.freqs.max()/self.fref.value)**2
         self.eta_max *= (self.freqs.min()/self.fref.value)**2
         if 'eta_min' in kwargs.keys():
-            eta_min = kwargs['eta_min']
-            self.eta_min = thth.unit_checks(
-                max((eta_min, self.eta_min)), 'eta_min', u.s**3)
+            eta_min = thth.unit_checks(kwargs['eta_min'], 'eta_min', u.s**3)
+            self.eta_min = max((eta_min, self.eta_min))
         if 'eta_max' in kwargs.keys():
-            eta_max = kwargs['eta_max']
-            self.eta_max = thth.unit_checks(
-                min((eta_max, self.eta_max)), 'eta_max', u.s**3)
+            eta_max = thth.unit_checks(kwargs['eta_max'], 'eta_max', u.s**3)
+            self.eta_max = min((eta_max, self.eta_max))
         if not ('eta_min' in kwargs.keys() and 'eta_max' in kwargs.keys()):
             if not hasattr(self, "betaeta"):
                 self.fit_arc(lamsteps=True, numsteps=1e4,
@@ -1480,7 +1478,10 @@ class Dynspec:
 
         self.neta = int(1 + (l1-l0)/np.log10(1+self.fw/10))
 
-        fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
+        if self.thetatheta_proc=='thin':
+            fd_cut = (fd.max())*(self.fref.value/self.freqs.max())
+        else:
+            fd_cut = (fd.max()/2)*(self.fref.value/self.freqs.max())
         if 'edges_lim' in kwargs.keys():
             edges_lim = min(
                 (thth.unit_checks(kwargs['edges_lim'], 'edges limit', u.mHz),
@@ -1513,6 +1514,10 @@ class Dynspec:
                     kwargs['center_cut'], 'Central Cut', u.mHz)
             else:
                 self.center_cut = 0
+        if 'tau_mask' in kwargs.keys():
+            self.thth_tau_mask = kwargs['tau_mask']
+        else:
+            self.thth_tau_mask = 0*u.us
 
         if verbose:
             print("\n\t THETA-THETA PROPERTIES\n")
@@ -1523,15 +1528,16 @@ class Dynspec:
             print(f'Reference Frequency: {self.fref}')
             print(
                 f'Eta range: {self.eta_min} to {self.eta_max}'
-                'with {self.neta} points')
+                f'with {self.neta} points')
             print(
-                f'Edges has {self.edges.shape[0]} point out to'
-                '{self.edges[-1]}')
+                f'Edges has {self.edges.shape[0]} point out to '
+                f'{self.edges[-1]}')
             print(f'Fractional fitting width: {self.fw}')
             print(f'Zero paddings: {self.npad}')
             print(f'Fitting Procedure: {self.thetatheta_proc}')
+            print(f'Masking |tau| < {self.thth_tau_mask}')
 
-    def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False):
+    def thetatheta_single(self, cf=0, ct=0, fname=None, verbose=False, plot=True, arrays=False):
         """
         Run theta-theta on a single chunk for diagnostics.
 
@@ -1561,6 +1567,9 @@ class Dynspec:
         time2 = self.times[ts]*u.s
         freq2 = self.freqs[fs]*u.MHz
 
+        tau = thth.fft_axis(freq2, u.us, self.npad)
+        fd = thth.fft_axis(time2, u.mHz, self.npad)
+
         dspec2 = np.copy(self.dyn[fs, ts])
         mn = np.nanmean(dspec2)
         dspec2 -= mn
@@ -1568,10 +1577,9 @@ class Dynspec:
             0, self.npad*self.cwf), (0, self.npad*self.cwt)), mode='constant',
             constant_values=0)
         CS = np.fft.fftshift(np.fft.fft2(dspec_pad))
+        CS[np.abs(tau)<self.thth_tau_mask]=0
         if self.thetatheta_proc == 'incoherent':
             SS = np.abs(CS)
-        tau = thth.fft_axis(freq2, u.us, self.npad)
-        fd = thth.fft_axis(time2, u.mHz, self.npad)
 
         etas = np.logspace(np.log10(self.eta_min.value), np.log10(
             self.eta_max.value), self.neta)*u.s**3*(self.fref/freq2.mean())**2
@@ -1630,22 +1638,24 @@ class Dynspec:
             eta_fit = np.nan
             eta_sig = np.nan
 
-        # Plotting
-        try:
-            # Create diagnostic plots where requested
-            thth.PlotFunc(np.nan_to_num(dspec2)+mn, time2, freq2, CS, fd, tau,
-                          edges, eta_fit, eta_sig, etas, eigs, etas_fit, popt)
-            if fname:
-                plt.savefig(fname)
-        except Exception as e:
-            print(f"Plotting Error :{e}", flush=True)
-            plt.figure()
-            plt.plot(etas, eigs)
-            plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
-            plt.ylabel(r'Eigenvalue')
-        return (etas, eigs, popt)
+        ## Plotting
+        if plot:
+            try:
+                # Create diagnostic plots where requested
+                thth.plot_func(np.nan_to_num(dspec2)+mn, time2, freq2, CS, fd, tau,
+                              edges, eta_fit, eta_sig, etas, eigs, etas_fit, popt)
+                if fname:
+                    plt.savefig(fname)
+            except Exception as e:
+                print(f"Plotting Error :{e}", flush=True)
+                plt.figure()
+                plt.plot(etas,eigs)
+                plt.xlabel(r'$\eta~\left(\rm{s}^3\right)$')
+                plt.ylabel(r'Eigenvalue')
+        if arrays:
+            return(etas,eigs,popt)
 
-    def fit_thetatheta(self, verbose=False, plot=False, pool=None):
+    def fit_thetatheta(self, verbose=False, plot=False, pool=None, time_avg=False):
         """
         Loop theta-theta over all fitting chunks and fits for the global
         curvature evolution.
@@ -1685,7 +1695,10 @@ class Dynspec:
                 coher = (self.thetatheta_proc != 'incoherent')
                 params = [dspec2, freq2, time2, etas, self.edges *
                           (freq2.mean()/self.fref), None, False, self.fw,
-                          self.npad, coher, verbose]
+                          self.npad, coher]
+                if self.thetatheta_proc == 'standard':
+                    params.append(self.thth_tau_mask)
+                params.append(verbose)
                 if self.thetatheta_proc == 'thin':
                     params.append(
                         self.edges[np.abs(self.edges) <
@@ -1707,17 +1720,27 @@ class Dynspec:
                 res = pool.map(thth.single_search, pars)
             for cf in range(self.ncf_fit):
                 for ct in range(self.nct_fit):
-                    self.eta_evo[cf, ct] = res[cf*self.nct_fit+ct][0]
-                    self.eta_evo_err[cf, ct] = res[cf*self.nct_fit+ct][1]
-        tofit = np.isfinite(self.eta_evo)*np.isfinite(self.eta_evo_err)
-        A = (np.sum(self.eta_evo[tofit] / (self.f0s[:, np.newaxis] *
-                                           self.eta_evo_err)[tofit] ** 2) /
-             np.sum(1 / ((self.f0s[:, np.newaxis]**2) *
-                         self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
-        A_err = np.sqrt(
-            1 / np.sum(2 /
-                       ((self.f0s[:, np.newaxis]**2) *
-                        self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+                    self.eta_evo[cf,ct]=res[cf*self.nct_fit+ct][0]
+                    self.eta_evo_err[cf,ct]=res[cf*self.nct_fit+ct][1]
+        if time_avg:
+            eta_avg = np.nanmean(self.eta_evo,1)
+            eta_count = np.nansum(self.eta_evo,1)/eta_avg
+            avg_err = np.nanstd(self.eta_evo,1)/np.sqrt(eta_count-1)
+            tofit =  np.isfinite(eta_avg)*np.isfinite(avg_err)
+            A = (np.sum(eta_avg[tofit] / (self.f0s * 
+                                          avg_err)[tofit] ** 2) /
+                np.sum(1 / (self.f0s**2 * avg_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+            A_err = np.sqrt(1 / np.sum(2 / ((self.f0s**2) * avg_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+        else:
+            tofit =  np.isfinite(self.eta_evo)*np.isfinite(self.eta_evo_err)
+            A = (np.sum(self.eta_evo[tofit] / (self.f0s[:, np.newaxis] *
+                                               self.eta_evo_err)[tofit] ** 2) /
+                np.sum(1 / ((self.f0s[:, np.newaxis]**2) *
+                            self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
+            A_err = np.sqrt(
+                1 / np.sum(2 /
+                           ((self.f0s[:, np.newaxis]**2) *
+                            self.eta_evo_err)[tofit] ** 2)).to(u.s**3 * u.MHz**2)
         self.ththeta = A/self.fref**2
         self.ththetaerr = A_err/self.fref**2
 
@@ -1727,13 +1750,15 @@ class Dynspec:
                 thth.errString(self.ththeta*(fr/np.floor(fr))**2,
                                self.ththetaerr*(fr/np.floor(fr))**2)
             plt.figure()
-            plt.errorbar(np.ravel(self.f0s.value[:, np.newaxis] *
-                                  np.ones(self.eta_evo.shape)),
-                         np.ravel(self.eta_evo.value),
-                         yerr=np.ravel(self.eta_evo_err.value), fmt='.')
-            plt.plot(self.f0s, A/self.f0s**2,
-                     label=r'$\eta_{%s}$ = %s $\pm$ %s $s^3$' %
-                     (np.floor(fr), fit_string, err_string))
+            if time_avg:
+                plt.errorbar(self.f0s.value, eta_avg, yerr=avg_err, fmt='.')
+            else:
+                plt.errorbar(np.ravel(self.f0s.value[:,np.newaxis] *
+                                      np.ones(self.eta_evo.shape)),
+                             np.ravel(self.eta_evo.value),
+                             yerr=np.ravel(self.eta_evo_err.value), fmt='.')
+            plt.plot(self.f0s,A/self.f0s**2,label = r'$\eta_{%s}$ = %s $\pm$ %s $s^3$' %
+            (np.floor(self.fref),fit_string, err_string))
             plt.xlabel(r'$\rm{Freq}~\left(\rm{MHz}\right)$')
             plt.ylabel(r'$\eta~\left(\rm{s}^3\right)$')
             plt.legend()
@@ -1779,7 +1804,7 @@ class Dynspec:
                 dspec2 -= np.nanmean(dspec2)
                 dspec2 = np.nan_to_num(dspec2)
                 params = (dspec2, self.edges*(freq/self.fref), time2,
-                          freq2, eta, ct, cf, self.npad, verbose)
+                          freq2, eta, ct, cf, self.npad,self.thth_tau_mask, verbose)
                 if pool is None:
                     res = thth.single_chunk_retrieval(params)
                     self.chunks[cf, ct, :, :] = res[0]
@@ -1843,8 +1868,7 @@ class Dynspec:
             from multiprocessing and MPIPool from mpipool. Defaults
             to None and runs chunks in series.
         """
-        if not hasattr(self, "wavefield"):
-            self.calc_wavefield(verbose=verbose, pool=pool)
+        self.calc_wavefield(verbose=verbose, pool=pool)
         posdspec = np.isfinite(self.dyn[:self.wavefield.shape[0],
                                         :self.wavefield.shape[1]]) * (
             self.dyn[:self.wavefield.shape[0], :self.wavefield.shape[1]] > 0)

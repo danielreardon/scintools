@@ -1,96 +1,56 @@
-
-
 <!DOCTYPE html>
-<html class="writer-html4" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>scint_utils module &mdash; scintools 0.2 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-
-  
-  
-  
-  
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/jupyter-sphinx.css?v=572af1d6" />
+      <link rel="stylesheet" type="text/css" href="_static/thebelab.css" />
 
   
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-    
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'./',
-              VERSION:'0.2',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=10f1778b"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="_static/thebelab-helper.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="$theta-theta space$" href="thetatheta.html" />
     <link rel="prev" title="scint_models module" href="scint_models.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home" alt="Documentation Home"> scintools
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            scintools
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="dynspec.html">Dynspec class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulation.html">Simulation class</a></li>
@@ -102,89 +62,49 @@
 <li class="toctree-l2"><a class="reference internal" href="#other-utilities">Other utilities</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="thetatheta.html">$theta-theta space$</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">scintools</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
-      <li>scint_utils module</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">scint_utils module</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/scint_utils.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="scint-utils-module">
-<h1>scint_utils module<a class="headerlink" href="#scint-utils-module" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="astrophysical-modelling">
-<h2>Astrophysical modelling<a class="headerlink" href="#astrophysical-modelling" title="Permalink to this headline">¶</a></h2>
+             
+  <section id="scint-utils-module">
+<h1>scint_utils module<a class="headerlink" href="#scint-utils-module" title="Link to this heading"></a></h1>
+<section id="astrophysical-modelling">
+<h2>Astrophysical modelling<a class="headerlink" href="#astrophysical-modelling" title="Link to this heading"></a></h2>
 <code class="descname">get_ssb_delay</code><span class="sig-paren">(</span><em>mjds, raj, decj</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Get Romer delay to Solar System Barycentre (SSB) for correction of site arrival times to barycentric.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</li>
-<li><strong>raj</strong> (<cite>float</cite>) - right ascension (J2000) of the pulsar in degrees</li>
-<li><strong>decj</strong> (<cite>float</cite>) - declination (J2000) of the pulsar in degrees</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</p></li>
+<li><p><strong>raj</strong> (<cite>float</cite>) - right ascension (J2000) of the pulsar in degrees</p></li>
+<li><p><strong>decj</strong> (<cite>float</cite>) - declination (J2000) of the pulsar in degrees</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>List of Romer delays</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>List of Romer delays</p></li>
 </ul>
 </dd>
 </dl>
@@ -192,18 +112,16 @@
 <code class="descname">get_earth_velocity</code><span class="sig-paren">(</span><em>mjds, raj, decj</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Calculates the component of Earth’s velocity transverse to the line of sight, in RA and DEC</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</li>
-<li><strong>raj</strong> (<cite>float</cite>) - right ascension (J2000) of the pulsar in degrees</li>
-<li><strong>decj</strong> (<cite>float</cite>) - declination (J2000) of the pulsar in degrees</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</p></li>
+<li><p><strong>raj</strong> (<cite>float</cite>) - right ascension (J2000) of the pulsar in degrees</p></li>
+<li><p><strong>decj</strong> (<cite>float</cite>) - declination (J2000) of the pulsar in degrees</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>List of Earth velocities in RA</li>
-<li>List of Earth velocities in dec</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>List of Earth velocities in RA</p></li>
+<li><p>List of Earth velocities in dec</p></li>
 </ul>
 </dd>
 </dl>
@@ -211,35 +129,31 @@
 <code class="descname">get_true_anomaly</code><span class="sig-paren">(</span><em>mjds, pars</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Calculates true anomalies for an array of barycentric MJDs and a parameter dictionary</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</li>
-<li><strong>pars</strong> (<cite>dict</cite>) - parameter file containing the orbital eccentricity (‘ECC’), binary period (‘PB’), MJD of binary period measurement (‘T0’), and binary period derivative,  (‘PBDOT’).</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>mjds</strong> (<cite>numpy 1D array</cite>) - list of modified Julian dates to calculate over</p></li>
+<li><p><strong>pars</strong> (<cite>dict</cite>) - parameter file containing the orbital eccentricity (‘ECC’), binary period (‘PB’), MJD of binary period measurement (‘T0’), and binary period derivative, <span class="math notranslate nohighlight">\(\dot P\)</span> (‘PBDOT’).</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>List of true anomalies</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>List of true anomalies</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
-</div>
-<div class="section" id="reading-and-writing-data">
-<h2>Reading and writing data<a class="headerlink" href="#reading-and-writing-data" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="reading-and-writing-data">
+<h2>Reading and writing data<a class="headerlink" href="#reading-and-writing-data" title="Link to this heading"></a></h2>
 <code class="descname">read_dynlist</code><span class="sig-paren">(</span><em>file_path</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Reads list of dynamic spectra filenames from path</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>file_path</strong> (<cite>str</cite>) - file path containing the dynamic spectra files</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>file_path</strong> (<cite>str</cite>) - file path containing the dynamic spectra files</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>List of dynamic spectrum file paths</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>List of dynamic spectrum file paths</p></li>
 </ul>
 </dd>
 </dl>
@@ -247,11 +161,10 @@
 <code class="descname">write_results</code><span class="sig-paren">(</span><em>filename, dyn=None</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Appends dynamic spectrum information and parameters of interest to file</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>filename</strong> (<cite>str</cite>) - path of the file to write to</li>
-<li><strong>dyn</strong> (<cite>Dynspec object</cite>) - Dynspec object</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>filename</strong> (<cite>str</cite>) - path of the file to write to</p></li>
+<li><p><strong>dyn</strong> (<cite>Dynspec object</cite>) - Dynspec object</p></li>
 </ul>
 </dd>
 </dl>
@@ -259,15 +172,13 @@
 <code class="descname">read_results</code><span class="sig-paren">(</span><em>filename</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Reads a CSV results file written by <cite>write_results()</cite></p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>filename</strong> (<cite>str</cite>) - path of the file to read from</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>filename</strong> (<cite>str</cite>) - path of the file to read from</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Dictionary of parameters from file</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Dictionary of parameters from file</p></li>
 </ul>
 </dd>
 </dl>
@@ -275,16 +186,14 @@
 <code class="descname">float_array_from_dict</code><span class="sig-paren">(</span><em>dictionary, key</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Convert an array stored in dictionary to a numpy array</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>dictionary</strong> (<cite>dict</cite>) - dictionary containing the array</li>
-<li><strong>key</strong> (<cite>str</cite>) - key of the array</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>dictionary</strong> (<cite>dict</cite>) - dictionary containing the array</p></li>
+<li><p><strong>key</strong> (<cite>str</cite>) - key of the array</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>numpy array from stored array</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>numpy array from stored array</p></li>
 </ul>
 </dd>
 </dl>
@@ -292,15 +201,13 @@
 <code class="descname">read_par</code><span class="sig-paren">(</span><em>parfile</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Reads a parameter file and return a dictionary of parameter names and values</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>parfile</strong> (<cite>str</cite>) - path to parameter file for conversion</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>parfile</strong> (<cite>str</cite>) - path to parameter file for conversion</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>resulting dictionary</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>resulting dictionary</p></li>
 </ul>
 </dd>
 </dl>
@@ -308,35 +215,32 @@
 <code class="descname">pars_to_params</code><span class="sig-paren">(</span><em>pars, params=None</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Converts a dictionary of parameter file parameters from <code class="docutils literal notranslate"><span class="pre">read_par()</span></code> to an <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object to use in models. By default, parameters are not varied.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>pars</strong> (<cite>dict</cite>) - dictionary of parameters</li>
-<li><strong>params</strong> (<cite>lmfit Parameters() object, optional</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object to append parameters to. If None, initializes new object.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>pars</strong> (<cite>dict</cite>) - dictionary of parameters</p></li>
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object, optional</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object to append parameters to. If None, initializes new object.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>appended <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>appended <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
-</div>
-<div class="section" id="other-utilities">
-<h2>Other utilities<a class="headerlink" href="#other-utilities" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="other-utilities">
+<h2>Other utilities<a class="headerlink" href="#other-utilities" title="Link to this heading"></a></h2>
 <code class="descname">clean_archive</code><span class="sig-paren">(</span><em>archive, template=None, bandwagon=0.99, channel_threshold=7, subint_threshold=5, output_directory=None</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Cleans a psrchive archive object using <code class="docutils literal notranslate"><span class="pre">coast_guard</span></code>.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>archive</strong> (<cite>psarchive archive object</cite>) - psarchive archive</li>
-<li><strong>template</strong> (<cite>str, optional</cite>) -</li>
-<li><strong>bandwagon</strong> (<cite>float, optional</cite>) - bandwagon value</li>
-<li><strong>channel_threshold</strong> (<cite>float, optional</cite>) - channel threshold</li>
-<li><strong>subint_threshold</strong> (<cite>float, optional</cite>) - sub-integration threshold</li>
-<li><strong>output_directory</strong> (<cite>str</cite>) - directory to output the cleaned archive</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>archive</strong> (<cite>psarchive archive object</cite>) - psarchive archive</p></li>
+<li><p><strong>template</strong> (<cite>str, optional</cite>) -</p></li>
+<li><p><strong>bandwagon</strong> (<cite>float, optional</cite>) - bandwagon value</p></li>
+<li><p><strong>channel_threshold</strong> (<cite>float, optional</cite>) - channel threshold</p></li>
+<li><p><strong>subint_threshold</strong> (<cite>float, optional</cite>) - sub-integration threshold</p></li>
+<li><p><strong>output_directory</strong> (<cite>str</cite>) - directory to output the cleaned archive</p></li>
 </ul>
 </dd>
 </dl>
@@ -344,15 +248,13 @@
 <code class="descname">is_valid</code><span class="sig-paren">(</span><em>array</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Returns boolean array of values that are finite an not nan.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>array</strong> (<cite>numpy ndarray</cite>) - input array</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>array</strong> (<cite>numpy ndarray</cite>) - input array</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Boolean ndarray</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Boolean ndarray</p></li>
 </ul>
 </dd>
 </dl>
@@ -362,16 +264,14 @@
 <div><p>Slow FT of dynamic spectrum along points of t*(f / fref), account for phase scaling of f_D. Given a uniform t axis, this reduces to a regular FT.</p>
 <p>Uses Olaf’s c-implemation if possible, otherwise reverts to a slow, pure Python/numpy method.</p>
 <p>Reference freq is currently hardcoded to the middle of the band.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>dynspec</strong> (<cite>numpy 2D array</cite>) - input dynamic spectrum</li>
-<li><strong>freqs</strong> (<cite>numpy 1D array</cite>) - frequency axis of the dynamic spectrum in MHz</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>dynspec</strong> (<cite>numpy 2D array</cite>) - input dynamic spectrum</p></li>
+<li><p><strong>freqs</strong> (<cite>numpy 1D array</cite>) - frequency axis of the dynamic spectrum in MHz</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Fourier-transformed dynamic spectrum</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Fourier-transformed dynamic spectrum</p></li>
 </ul>
 </dd>
 </dl>
@@ -379,17 +279,15 @@
 <code class="descname">svd_model</code><span class="sig-paren">(</span><em>arr, nmodes=1</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Take SVD of a dynamic spectrum, divide by the largest N modes</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>arr</strong> (<cite>numpy 2D array</cite>) - input dynamic spectrum</li>
-<li><strong>nmodes</strong> (<cite>int, optional</cite>) - number of singular values to compute up to.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>arr</strong> (<cite>numpy 2D array</cite>) - input dynamic spectrum</p></li>
+<li><p><strong>nmodes</strong> (<cite>int, optional</cite>) - number of singular values to compute up to.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Array divided by absolute value of SVD model</li>
-<li>SVD model</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Array divided by absolute value of SVD model</p></li>
+<li><p>SVD model</p></li>
 </ul>
 </dd>
 </dl>
@@ -397,12 +295,11 @@
 <code class="descname">make_dynspec</code><span class="sig-paren">(</span><em>archive, template=None, phasebin=1</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Creates a <cite>psrflux</cite>-format dynamic spectrum from an archive <code class="docutils literal notranslate"><span class="pre">$</span> <span class="pre">psrflux</span> <span class="pre">-s</span> <span class="pre">[template]</span> <span class="pre">-e</span> <span class="pre">dynspec</span> <span class="pre">[archive]</span></code></p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>archive</strong> (<cite>psarchive archive object</cite>) - psarchive archive</li>
-<li><strong>template</strong> (<cite>str, optional</cite>) -</li>
-<li><strong>phasebin</strong> (<cite>int, optional</cite>) -</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>archive</strong> (<cite>psarchive archive object</cite>) - psarchive archive</p></li>
+<li><p><strong>template</strong> (<cite>str, optional</cite>) -</p></li>
+<li><p><strong>phasebin</strong> (<cite>int, optional</cite>) -</p></li>
 </ul>
 </dd>
 </dl>
@@ -410,15 +307,13 @@
 <code class="descname">remove_duplicates</code><span class="sig-paren">(</span><em>dyn_files</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Filters out dynamic spectra from simultaneous observations.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>dyn_files</strong> (<cite>list or numpy 1D array or str</cite>) - list of dynamic spectrum file paths</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>dyn_files</strong> (<cite>list or numpy 1D array or str</cite>) - list of dynamic spectrum file paths</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Filtered list of dynamic spectrum file paths</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Filtered list of dynamic spectrum file paths</p></li>
 </ul>
 </dd>
 </dl>
@@ -426,73 +321,49 @@
 <code class="descname">make_pickle</code><span class="sig-paren">(</span><em>dyn, process=True, sspec=True, acf=True, lamsteps=True</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Pickles a dynamic spectrum object.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>dyn</strong> (<cite>Dynspec object</cite>) - dynamic spectrum Dynspec object.</li>
-<li><strong>process</strong> (<cite>bool, optional</cite>) - perform default processing. Involves trimming the edges, refilling, correction, and calculation of the ACF and secondary spectrum.</li>
-<li><strong>sspec</strong> (<cite>numpy 2D array, optional</cite>) - input secondary spectrum.</li>
-<li><strong>acf</strong> (<cite>numpy 2D array, optional</cite>) - input autocorrelation function.</li>
-<li><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>dyn</strong> (<cite>Dynspec object</cite>) - dynamic spectrum Dynspec object.</p></li>
+<li><p><strong>process</strong> (<cite>bool, optional</cite>) - perform default processing. Involves trimming the edges, refilling, correction, and calculation of the ACF and secondary spectrum.</p></li>
+<li><p><strong>sspec</strong> (<cite>numpy 2D array, optional</cite>) - input secondary spectrum.</p></li>
+<li><p><strong>acf</strong> (<cite>numpy 2D array, optional</cite>) - input autocorrelation function.</p></li>
+<li><p><strong>lamsteps</strong> (<cite>bool, optional</cite>) - option to use wavelength steps instead of default frequency steps.</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-      
-        <a href="scint_models.html" class="btn btn-neutral float-left" title="scint_models module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="scint_models.html" class="btn btn-neutral float-left" title="scint_models module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="thetatheta.html" class="btn btn-neutral float-right" title="$theta-theta space$" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        
-        &copy; Copyright 2019, Daniel J. Reardon
-
-    </p>
+    <p>&#169; Copyright 2019, Daniel J. Reardon.</p>
   </div>
-    
-    
-    
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>

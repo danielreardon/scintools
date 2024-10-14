@@ -1,97 +1,56 @@
-
-
 <!DOCTYPE html>
-<html class="writer-html4" lang="en" >
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>scint_models module &mdash; scintools 0.2 documentation</title>
-  
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-
-  
-  
-  
-  
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+      <link rel="stylesheet" type="text/css" href="_static/jupyter-sphinx.css?v=572af1d6" />
+      <link rel="stylesheet" type="text/css" href="_static/thebelab.css" />
 
   
   <!--[if lt IE 9]>
     <script src="_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-    
-      <script type="text/javascript">
-          var DOCUMENTATION_OPTIONS = {
-              URL_ROOT:'./',
-              VERSION:'0.2',
-              LANGUAGE:'None',
-              COLLAPSE_INDEX:false,
-              FILE_SUFFIX:'.html',
-              HAS_SOURCE:  true,
-              SOURCELINK_SUFFIX: '.txt'
-          };
-      </script>
-        <script type="text/javascript" src="_static/jquery.js"></script>
-        <script type="text/javascript" src="_static/underscore.js"></script>
-        <script type="text/javascript" src="_static/doctools.js"></script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=10f1778b"></script>
+        <script src="_static/doctools.js?v=888ff710"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script src="_static/thebelab-helper.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@jupyter-widgets/html-manager@^1.0.1/dist/embed-amd.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="scint_utils module" href="scint_utils.html" />
     <link rel="prev" title="ACF class" href="acf.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home" alt="Documentation Home"> scintools
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            scintools
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Contents:</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="dynspec.html">Dynspec class</a></li>
 <li class="toctree-l1"><a class="reference internal" href="simulation.html">Simulation class</a></li>
@@ -103,91 +62,51 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="scint_utils.html">scint_utils module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="thetatheta.html">$theta-theta space$</a></li>
 </ul>
 
-            
-          
         </div>
-        
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">scintools</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
-        
-      <li>scint_models module</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">scint_models module</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/scint_models.rst.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="scint-models-module">
-<h1>scint_models module<a class="headerlink" href="#scint-models-module" title="Permalink to this headline">¶</a></h1>
+             
+  <section id="scint-models-module">
+<h1>scint_models module<a class="headerlink" href="#scint-models-module" title="Link to this heading"></a></h1>
 <p>The <code class="docutils literal notranslate"><span class="pre">scint_models</span></code> module contains various functions for modelling and fitting scintillation data.</p>
-<div class="section" id="acf-fitting">
-<h2>ACF fitting<a class="headerlink" href="#acf-fitting" title="Permalink to this headline">¶</a></h2>
+<section id="acf-fitting">
+<h2>ACF fitting<a class="headerlink" href="#acf-fitting" title="Link to this heading"></a></h2>
 <code class="descname">tau_acf_model</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models a 1D cut through the center of the ACF along the time axis and returns the residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at  width (‘tau’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF pixel values corresponding to xdata and running through the center of the ACF.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at <span class="math notranslate nohighlight">\(1/e\)</span> width (‘tau’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF pixel values corresponding to xdata and running through the center of the ACF.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -195,18 +114,16 @@
 <code class="descname">dnu_acf_model</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models a 1D cut through the center of the ACF along the frequency axis and returns the residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - frequency of the channels from the center of the ACF to the maximum frequency.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF pixel values corresponding to xdata and running through the center of the ACF.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - frequency of the channels from the center of the ACF to the maximum frequency.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF pixel values corresponding to xdata and running through the center of the ACF.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -214,18 +131,16 @@
 <code class="descname">scint_acf_model</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Applies <code class="docutils literal notranslate"><span class="pre">tau_acf_model</span></code> and <code class="docutils literal notranslate"><span class="pre">dnu_acf_model</span></code> simultaneously and returns the concatenated residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at  width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’), as well as half the number of sub-integrations in the ACF (‘nt’).</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time concatenated with the frequency of the channels from the center of the ACF to the maximum frequency.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF pixel values corresponding to xdata and running through the center of the ACF.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at <span class="math notranslate nohighlight">\(1/e\)</span> width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’), as well as half the number of sub-integrations in the ACF (‘nt’).</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time concatenated with the frequency of the channels from the center of the ACF to the maximum frequency.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF pixel values corresponding to xdata and running through the center of the ACF.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -233,19 +148,17 @@
 <code class="descname">scint_acf_model_2d_approx</code><span class="sig-paren">(</span><em>params, tdata, fdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models an approximate 2D ACF that incorporates a phase gradient.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at  width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), white-noise spike (‘wn’), and phase gradient (‘phasegrad’), as well as the observation frequency (‘freq’), total observation time (‘tobs’), and half the number of sub-integrations in the ACF (‘nt’).</li>
-<li><strong>tdata</strong> (<cite>numpy 1D array</cite>) - times of sub-integrations along the desired range, centered on the sub-integration left of that of the white-noise spike.</li>
-<li><strong>fdata</strong> (<cite>numpy 1D array</cite>) - frequencies of channels along the desired range, centered on the channel below that of the white-noise spike.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF cropped to the range of times and frequencies matching <code class="docutils literal notranslate"><span class="pre">tdata</span></code> and <code class="docutils literal notranslate"><span class="pre">fdata</span></code>.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at <span class="math notranslate nohighlight">\(1/e\)</span> width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), white-noise spike (‘wn’), and phase gradient (‘phasegrad’), as well as the observation frequency (‘freq’), total observation time (‘tobs’), and half the number of sub-integrations in the ACF (‘nt’).</p></li>
+<li><p><strong>tdata</strong> (<cite>numpy 1D array</cite>) - times of sub-integrations along the desired range, centered on the sub-integration left of that of the white-noise spike.</p></li>
+<li><p><strong>fdata</strong> (<cite>numpy 1D array</cite>) - frequencies of channels along the desired range, centered on the channel below that of the white-noise spike.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF cropped to the range of times and frequencies matching <code class="docutils literal notranslate"><span class="pre">tdata</span></code> and <code class="docutils literal notranslate"><span class="pre">fdata</span></code>.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -253,17 +166,15 @@
 <code class="descname">scint_acf_model_2d</code><span class="sig-paren">(</span><em>params, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models an analytical 2D ACF using the <code class="docutils literal notranslate"><span class="pre">scint_sim</span></code> <code class="docutils literal notranslate"><span class="pre">ACF</span></code> class. This method is significantly slower than <code class="docutils literal notranslate"><span class="pre">scint_acf_model_2d_approx()</span></code>.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at  width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), white-noise spike (‘wn’), phase gradient in x and y (‘phasegrad_x’, ‘phasegrad_y’), axial ratio of anisotropy (‘ar’), orientation of anisotropy relative to y (‘psi’), and effective velocity in x and y (‘v_ra’, ‘v_dec’), as well as the total bandwidth of the observation (‘bw’), total observation time (‘tobs’), and half the number of sub-integrations and channels in the ACF (‘nt’, ‘nf’).</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF cropped symmetrically around its center to a desired range.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at <span class="math notranslate nohighlight">\(1/e\)</span> width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), white-noise spike (‘wn’), phase gradient in x and y (‘phasegrad_x’, ‘phasegrad_y’), axial ratio of anisotropy (‘ar’), orientation of anisotropy relative to y (‘psi’), and effective velocity in x and y (‘v_ra’, ‘v_dec’), as well as the total bandwidth of the observation (‘bw’), total observation time (‘tobs’), and half the number of sub-integrations and channels in the ACF (‘nt’, ‘nf’).</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - ACF cropped symmetrically around its center to a desired range.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -271,18 +182,16 @@
 <code class="descname">tau_sspec_model</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models a 1D cut through the center of the ACF along the time axis and applies a Fourier transform.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at  width (‘tau’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - profile from secondary spectrum corresponding to the ACF to model summed along all columns (all ).</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at <span class="math notranslate nohighlight">\(1/e\)</span> width (‘tau’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - profile from secondary spectrum corresponding to the ACF to model summed along all columns (all <span class="math notranslate nohighlight">\(f_t\)</span>).</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -290,18 +199,16 @@
 <code class="descname">dnu_sspec_model</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models a 1D cut through the center of the ACF along the frequency axis and applies a Fourier tranform.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), decorrelation bandwidth at half power (‘tau’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - frequency of the channels from the center of the ACF to the maximum frequency.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - profile from secondary spectrum corresponding to the ACF to model summed along all rows (all  or ).</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), decorrelation bandwidth at half power (‘tau’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’).</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - frequency of the channels from the center of the ACF to the maximum frequency.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - profile from secondary spectrum corresponding to the ACF to model summed along all rows (all <span class="math notranslate nohighlight">\(f_\tau\)</span> or <span class="math notranslate nohighlight">\(f_\lambda\)</span>).</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -309,40 +216,36 @@
 <code class="descname">scint_sspec_model</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Applies <code class="docutils literal notranslate"><span class="pre">tau_sspec_model</span></code> and <code class="docutils literal notranslate"><span class="pre">dnu_sspec_model</span></code> simultaneously and returns the concatenated residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at  width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’), as well as half the number of sub-integrations in the ACF (‘nt’).</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time concatenated with the frequency of the channels from the center of the ACF to the maximum frequency.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - profile from secondary spectrum corresponding to the ACF to model summed along all columns (all ) concatenated with it summed along all rows (all  or ).</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the current best-fit amplitude (‘amp’), timescale at <span class="math notranslate nohighlight">\(1/e\)</span> width (‘tau’), decorrelation bandwidth at half power (‘dnu’), index of exponential function (‘alpha’, 2 is Gaussian, 5/3 is Kolmogorov), and white-noise spike (‘wn’), as well as half the number of sub-integrations in the ACF (‘nt’).</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - time of sub-integrations from the center of the ACF to the maximum time concatenated with the frequency of the channels from the center of the ACF to the maximum frequency.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - profile from secondary spectrum corresponding to the ACF to model summed along all columns (all <span class="math notranslate nohighlight">\(f_t\)</span>) concatenated with it summed along all rows (all <span class="math notranslate nohighlight">\(f_\tau\)</span> or <span class="math notranslate nohighlight">\(f_\lambda\)</span>).</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
-</div>
-<div class="section" id="secondary-spectrum-fitting">
-<h2>Secondary spectrum fitting<a class="headerlink" href="#secondary-spectrum-fitting" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="secondary-spectrum-fitting">
+<h2>Secondary spectrum fitting<a class="headerlink" href="#secondary-spectrum-fitting" title="Link to this heading"></a></h2>
 <code class="descname">arc_power_curve</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
-<div><p>Returns a template for the power curve in secondary spectrum against  or normalised .</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object.</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) - square root arc curvatures.</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - secondary spectrum power profile.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<div><p>Returns a template for the power curve in secondary spectrum against <span class="math notranslate nohighlight">\(\sqrt{\eta}\)</span> or normalised <span class="math notranslate nohighlight">\(f_t\)</span>.</p>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object.</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) - square root arc curvatures.</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - secondary spectrum power profile.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
@@ -350,18 +253,16 @@
 <code class="descname">fit_parabola</code><span class="sig-paren">(</span><em>x, y</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Fit a parabola and return the value and error for the peak.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>x</strong> (<cite>numpy 1D array</cite>) - x values of the peak profile</li>
-<li><strong>y</strong> (<cite>numpy 1D array</cite>) - y values of the peak profile</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>x</strong> (<cite>numpy 1D array</cite>) - x values of the peak profile</p></li>
+<li><p><strong>y</strong> (<cite>numpy 1D array</cite>) - y values of the peak profile</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>y values of the fit</li>
-<li>Fit peak value</li>
-<li>Fit peak error</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>y values of the fit</p></li>
+<li><p>Fit peak value</p></li>
+<li><p>Fit peak error</p></li>
 </ul>
 </dd>
 </dl>
@@ -369,18 +270,16 @@
 <code class="descname">fit_log_parabola</code><span class="sig-paren">(</span><em>x, y</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Fit a log-parabola and return the value and error for the peak.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>x</strong> (<cite>numpy 1D array</cite>) - x values of the peak profile</li>
-<li><strong>y</strong> (<cite>numpy 1D array</cite>) - y values of the peak profile</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>x</strong> (<cite>numpy 1D array</cite>) - x values of the peak profile</p></li>
+<li><p><strong>y</strong> (<cite>numpy 1D array</cite>) - y values of the peak profile</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>y values of the fit</li>
-<li>Fit peak value</li>
-<li>Fit peak error</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>y values of the fit</p></li>
+<li><p>Fit peak value</p></li>
+<li><p>Fit peak error</p></li>
 </ul>
 </dd>
 </dl>
@@ -388,45 +287,41 @@
 <code class="descname">arc_curvature</code><span class="sig-paren">(</span><em>params, ydata, weights, true_anomaly, vearth_ra, vearth_dec</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models the arc curvature and returns the residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing current best-fit values for the distance to the pulsar (‘d’), the fractional screen distance (‘s’), and optionally the ISM velocity in RA and dec (‘vism_ra’, ‘vism_dec’).</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - arc curvature data.</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
-<li><strong>true_anomaly</strong> (<cite>numpy 1D array</cite>) - true anolmalies corresponding to the data.</li>
-<li><strong>vearth_ra</strong> (<cite>numpy 1D array</cite>) - Earth velocity in RA corresponding to the data.</li>
-<li><strong>vearth_dec</strong> (<cite>numpy 1D array</cite>) - Earth velocity in dec corresponding to the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing current best-fit values for the distance to the pulsar (‘d’), the fractional screen distance (‘s’), and optionally the ISM velocity in RA and dec (‘vism_ra’, ‘vism_dec’).</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - arc curvature data.</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
+<li><p><strong>true_anomaly</strong> (<cite>numpy 1D array</cite>) - true anolmalies corresponding to the data.</p></li>
+<li><p><strong>vearth_ra</strong> (<cite>numpy 1D array</cite>) - Earth velocity in RA corresponding to the data.</p></li>
+<li><p><strong>vearth_dec</strong> (<cite>numpy 1D array</cite>) - Earth velocity in dec corresponding to the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
-</div>
-<div class="section" id="velocity-models">
-<h2>Velocity models<a class="headerlink" href="#velocity-models" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="velocity-models">
+<h2>Velocity models<a class="headerlink" href="#velocity-models" title="Link to this heading"></a></h2>
 <code class="descname">effective_velocity_annual</code><span class="sig-paren">(</span><em>params, true_anomaly, vearth_ra, vearth_dec</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models the arc curvature and returns the residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the pulsar’s projected semi-major axis in lt-s (‘A1’), orbital period in days (‘PB’), orbital eccentricity (‘ECC’), longitude of periastron in degrees (‘OM’), inclination in degrees (‘KIN’), longitude of ascending node in degrees (‘KOM’), and optionally the proper motion in RA and dec (‘PMRA’, ‘PMDEC’), as well as the distance to the pulsar (‘d’) and the fractional screen distance (‘s’).</li>
-<li><strong>true_anomaly</strong> (<cite>numpy 1D array</cite>) - true anolmalies to compute over.</li>
-<li><strong>vearth_ra</strong> (<cite>numpy 1D array</cite>) - Earth velocity in RA to compute over.</li>
-<li><strong>vearth_dec</strong> (<cite>numpy 1D array</cite>) - Earth velocity in dec to compute over.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object containing the pulsar’s projected semi-major axis in lt-s (‘A1’), orbital period in days (‘PB’), orbital eccentricity (‘ECC’), longitude of periastron in degrees (‘OM’), inclination in degrees (‘KIN’), longitude of ascending node in degrees (‘KOM’), and optionally the proper motion in RA and dec (‘PMRA’, ‘PMDEC’), as well as the distance to the pulsar (‘d’) and the fractional screen distance (‘s’).</p></li>
+<li><p><strong>true_anomaly</strong> (<cite>numpy 1D array</cite>) - true anolmalies to compute over.</p></li>
+<li><p><strong>vearth_ra</strong> (<cite>numpy 1D array</cite>) - Earth velocity in RA to compute over.</p></li>
+<li><p><strong>vearth_dec</strong> (<cite>numpy 1D array</cite>) - Earth velocity in dec to compute over.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Effective velocity in RA</li>
-<li>Effective velocity in dec</li>
-<li>Pulsar velocity in RA</li>
-<li>Pulsar velocity in dec</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Effective velocity in RA</p></li>
+<li><p>Effective velocity in dec</p></li>
+<li><p>Pulsar velocity in RA</p></li>
+<li><p>Pulsar velocity in dec</p></li>
 </ul>
 </dd>
 </dl>
@@ -434,79 +329,52 @@
 <code class="descname">thin_screen</code><span class="sig-paren">(</span><em>params, xdata, ydata, weights</em><span class="sig-paren">)</span><p></p>
 <blockquote>
 <div><p>Models the thin screen effective velocity and returns the residuals.</p>
-<dl class="docutils">
-<dt><strong>Parameters:</strong></dt>
-<dd><ul class="first last simple">
-<li><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object.</li>
-<li><strong>xdata</strong> (<cite>numpy 1D array</cite>) -</li>
-<li><strong>ydata</strong> (<cite>numpy 1D array</cite>) - screen effective velocity data</li>
-<li><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</li>
+<dl class="simple">
+<dt><strong>Parameters:</strong></dt><dd><ul class="simple">
+<li><p><strong>params</strong> (<cite>lmfit Parameters() object</cite>) - <code class="docutils literal notranslate"><span class="pre">lmfit</span></code> <code class="docutils literal notranslate"><span class="pre">Parameters()</span></code> object.</p></li>
+<li><p><strong>xdata</strong> (<cite>numpy 1D array</cite>) -</p></li>
+<li><p><strong>ydata</strong> (<cite>numpy 1D array</cite>) - screen effective velocity data</p></li>
+<li><p><strong>weights</strong> (<cite>numpy 1D array</cite>) - weights of the data.</p></li>
 </ul>
 </dd>
-<dt><strong>Returns:</strong></dt>
-<dd><ul class="first last simple">
-<li>Weighted residual of model and data</li>
+<dt><strong>Returns:</strong></dt><dd><ul class="simple">
+<li><p>Weighted residual of model and data</p></li>
 </ul>
 </dd>
 </dl>
 </div></blockquote>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="scint_utils.html" class="btn btn-neutral float-right" title="scint_utils module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="acf.html" class="btn btn-neutral float-left" title="ACF class" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="acf.html" class="btn btn-neutral float-left" title="ACF class" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="scint_utils.html" class="btn btn-neutral float-right" title="scint_utils module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        
-        &copy; Copyright 2019, Daniel J. Reardon
-
-    </p>
+    <p>&#169; Copyright 2019, Daniel J. Reardon.</p>
   </div>
-    
-    
-    
-    Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a
-    
-    <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a>
-    
-    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>
