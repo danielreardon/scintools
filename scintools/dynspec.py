@@ -1063,7 +1063,6 @@ class Dynspec:
         if not hasattr(self, 'tdel'):
             self.calc_sspec()
         delmax = np.max(self.tdel) if delmax is None else delmax
-        delmax = delmax*(ref_freq/self.freq)**2  # adjust for frequency
 
         if lamsteps:
             if velocity:
@@ -1954,7 +1953,7 @@ class Dynspec:
             Mark the location of the curvature fit (normalized fdop = 1). The
             default is True.
         ref_freq : float, optional
-            Reference frequency. The default is 1400.
+            Reference frequency in MHz. The default is 1400.
         velocity : bool, optional
             Scale the dynamic spectrum using the velocity. The default is True.
         numsteps : int, optional
@@ -1992,8 +1991,7 @@ class Dynspec:
         """
 
         # Maximum value delay axis (us @ ref_freq)
-        delmax = np.max(self.tdel) if delmax is None else \
-            delmax*(ref_freq/self.freq)**2
+        delmax = np.max(self.tdel) if delmax is None else delmax
 
         # Set up data based on whether we're in lamsteps or not
         if lamsteps:
