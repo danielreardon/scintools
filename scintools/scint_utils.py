@@ -6,9 +6,6 @@ scint_utils.py
 Useful functions for scintools
 """
 
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-
 import numpy as np
 import os
 import sys
@@ -66,7 +63,27 @@ def clean_archive(archive, template=None, bandwagon=0.99, channel_threshold=5,
 
 def autocorr(arr):
     """
-    Do a slow calculation of the 2d autocorrelation of an input masked array
+    Compute the 2D autocorrelation of a masked array.
+
+    Uses a slow direct calculation that properly handles masked (missing) data.
+
+    Parameters
+    ----------
+    arr : numpy.ma.MaskedArray
+        2D masked array to autocorrelate, shape (nr, nc).
+
+    Returns
+    -------
+    autocorr : numpy.ndarray
+        Normalised 2D autocorrelation of shape (2*nr, 2*nc). The zero-lag
+        peak is located at index (nr, nc) and the array is normalised so
+        that its maximum value is 1.
+
+    Notes
+    -----
+    This is a direct O(n^4) implementation intended for small arrays where
+    masked pixels must be excluded from each lag sum individually. For large
+    unmasked arrays, FFT-based methods are much faster.
     """
     mean = np.ma.mean(arr)
     std = np.ma.std(arr)
@@ -86,14 +103,42 @@ def autocorr(arr):
 
 def is_valid(array):
     """
-    Returns boolean array of values that are finite an not nan
+    Return a boolean array of elements that are finite and not NaN.
+
+    Parameters
+    ----------
+    array : array_like
+        Input array to test.
+
+    Returns
+    -------
+    mask : numpy.ndarray of bool
+        Boolean array of the same shape as ``array``, where ``True`` indicates
+        that the corresponding element is both finite (not inf) and not NaN.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from scintools.scint_utils import is_valid
+    >>> is_valid(np.array([1.0, np.nan, np.inf, -np.inf, 2.0]))
+    array([ True, False, False, False,  True])
     """
     return np.isfinite(array)*(~np.isnan(array))
 
 
 def read_dynlist(file_path):
     """
-    Reads list of dynamic spectra filenames from path
+    Read a list of dynamic spectrum filenames from a plain-text file.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the text file containing one filename per line.
+
+    Returns
+    -------
+    dynfiles : list of str
+        List of filenames read from ``file_path``.
     """
     with open(file_path) as file:
         dynfiles = file.read().splitlines()
@@ -102,7 +147,21 @@ def read_dynlist(file_path):
 
 def write_results(filename, dyn=None):
     """
-    Appends dynamic spectrum information and parameters of interest to file
+    Append dynamic spectrum parameters to a CSV results file.
+
+    Writes a header line on the first call (when the file is empty), then
+    appends one data row per call. The set of columns grows dynamically
+    depending on which optional attributes exist on ``dyn``.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the output CSV file. Created if it does not exist.
+    dyn : Dynspec, optional
+        Dynamic spectrum object whose attributes are written. Expected to
+        have at minimum: ``name``, ``mjd``, ``freq``, ``bw``, ``tobs``,
+        ``dt``, ``df``. Optional attributes (``tau``, ``dnu``, ``eta``, …)
+        are included when present.
     """
 
     header = "name,mjd,freq,bw,tobs,dt,df"
@@ -204,7 +263,19 @@ def write_results(filename, dyn=None):
 
 def read_results(filename):
     """
-    Reads a CSV results file written by write_results()
+    Read a CSV results file written by :func:`write_results`.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the CSV file to read.
+
+    Returns
+    -------
+    param_dict : dict
+        Dictionary mapping each column header to a list of string values.
+        Use :func:`float_array_from_dict` to convert individual columns to
+        numeric arrays.
     """
 
     csv_data = open(filename, 'r')
@@ -233,7 +304,18 @@ def search_and_replace(filename, search, replace):
 
 def cov_to_corr(cov):
     """
-    Calculate correlation matrix from covariance
+    Convert a covariance matrix to a correlation matrix.
+
+    Parameters
+    ----------
+    cov : numpy.ndarray, shape (n, n)
+        Symmetric positive-semidefinite covariance matrix.
+
+    Returns
+    -------
+    corr : numpy.ndarray, shape (n, n)
+        Correlation matrix derived from ``cov``. Elements where the
+        corresponding covariance is zero are set to zero.
     """
     std = np.sqrt(np.diag(cov))
     outer_std = np.outer(std, std)
@@ -244,7 +326,24 @@ def cov_to_corr(cov):
 
 def float_array_from_dict(dictionary, key):
     """
-    Convert an array stored in dictionary to a numpy array
+    Extract a numeric array from a string-valued results dictionary.
+
+    Replaces ``'None'`` string entries with ``'nan'`` before converting, so
+    that missing values become ``numpy.nan`` rather than raising an error.
+
+    Parameters
+    ----------
+    dictionary : dict
+        Dictionary as returned by :func:`read_results`, where values are
+        lists of strings.
+    key : str
+        Column name to extract and convert.
+
+    Returns
+    -------
+    arr : numpy.ndarray of float
+        1-D float array of the requested column, squeezed to remove
+        length-1 dimensions.
     """
     ind = np.argwhere(np.array(dictionary[key]) == 'None').ravel()
 
@@ -269,8 +368,22 @@ def save_fits(filename, dyn):
 
 def difference(x):
     """
-    unlike np.diff, computes differences between centres of elements in x,
-        returns numpy array same size as x
+    Compute centre-to-centre differences for an array, returning the same size.
+
+    Unlike :func:`numpy.diff`, this function returns an array of the same
+    length as the input by using one-sided differences at the boundaries.
+
+    Parameters
+    ----------
+    x : array_like
+        1-D input array of values.
+
+    Returns
+    -------
+    dx : numpy.ndarray
+        Array of differences the same length as ``x``. Interior elements
+        are ``(x[i+1] - x[i-1]) / 2``; boundary elements use the adjacent
+        pair only.
     """
     dx = []
     for i in range(0, len(x)):
@@ -285,8 +398,27 @@ def difference(x):
 
 def get_ssb_delay(mjds, raj, decj, message=True):
     """
-    Get Romer delay to Solar System Barycentre (SSB) for correction of site
-    arrival times to barycentric.
+    Compute the Solar System Barycentre (SSB) Römer delay for each epoch.
+
+    Calculates the light-travel-time delay between a ground-based observatory
+    and the SSB along the line of sight to the pulsar.
+
+    Parameters
+    ----------
+    mjds : array_like
+        Modified Julian Dates (MJD) of the observations (barycentric).
+    raj : str
+        Right ascension in ``HH:MM:SS.S`` format.
+    decj : str
+        Declination in ``±DD:MM:SS.S`` format.
+    message : bool, optional
+        If ``True`` (default), print a reminder that the returned delays
+        should be *added* to site arrival times.
+
+    Returns
+    -------
+    delays : numpy.ndarray
+        Römer delays in seconds, one per entry in ``mjds``.
     """
 
     from astropy.constants import au, c
@@ -348,8 +480,32 @@ def make_lsr(d, raj, decj, pmra, pmdec, vr=0):
 
 def get_earth_velocity(mjds, raj, decj, radial=False):
     """
-    Calculates the component of Earth's velocity transverse to the line of
-    sight, in RA and DEC. Optionally returns the radial velocity
+    Compute the transverse Earth velocity projected onto the sky.
+
+    Returns the component of Earth's barycentric velocity projected onto the
+    RA and Dec axes (and optionally the radial component) at each epoch.
+
+    Parameters
+    ----------
+    mjds : array_like
+        Modified Julian Dates (MJD) at which to evaluate the velocity.
+    raj : str
+        Right ascension in ``HH:MM:SS.S`` format.
+    decj : str
+        Declination in ``±DD:MM:SS.S`` format.
+    radial : bool, optional
+        If ``True``, also return the velocity component along the line of
+        sight. Default is ``False``.
+
+    Returns
+    -------
+    vearth_ra : numpy.ndarray
+        Earth velocity component in the RA direction (km/s).
+    vearth_dec : numpy.ndarray
+        Earth velocity component in the Dec direction (km/s).
+    vearth_radial : numpy.ndarray
+        Earth velocity along the line of sight (km/s). Only returned when
+        ``radial=True``.
     """
 
     from astropy.time import Time
@@ -397,7 +553,21 @@ def get_earth_velocity(mjds, raj, decj, radial=False):
 
 def read_par(parfile):
     """
-    Reads a par file and return a dictionary of parameter names and values
+    Read a TEMPO/TEMPO2 ``.par`` file and return a parameter dictionary.
+
+    Parameters
+    ----------
+    parfile : str
+        Path to the pulsar parameter file.
+
+    Returns
+    -------
+    par : dict
+        Dictionary of parameter names to values. Numeric parameters are
+        stored as ``int`` or ``float``; string parameters remain as ``str``.
+        Fit errors are stored under ``<param>_ERR`` and the numeric type
+        under ``<param>_TYPE`` (``'d'`` for int, ``'f'`` or ``'e'`` for
+        float, ``'s'`` for string).
     """
 
     par = {}
@@ -452,7 +622,17 @@ def read_par(parfile):
 
 def mjd_to_year(mjd):
     """
-    converts mjd to year
+    Convert a Modified Julian Date (MJD) to a Besselian year.
+
+    Parameters
+    ----------
+    mjd : float or array_like
+        Modified Julian Date(s) to convert.
+
+    Returns
+    -------
+    year : float or numpy.ndarray
+        Besselian year(s) corresponding to ``mjd``.
     """
     t = Time(mjd, format='mjd')
     yrs = t.byear  # observation year
@@ -461,7 +641,20 @@ def mjd_to_year(mjd):
 
 def find_nearest(arr, val):
     """
-    Returns the index of an array (arr) that is nearest to value (val)
+    Return the index of the element in ``arr`` closest to ``val``.
+
+    Parameters
+    ----------
+    arr : array_like
+        1-D array to search.
+    val : float
+        Target value.
+
+    Returns
+    -------
+    ind : int
+        Index of the element in ``arr`` with the smallest absolute difference
+        from ``val``.
     """
     arr = np.asarray(arr)
     ind = np.argmin(np.abs(arr - val))
@@ -479,10 +672,30 @@ def longest_run_of_zeros(arr):
 
 def pars_to_params(pars, params=None):
     """
-    Converts a dictionary of par file parameters from read_par() to an
-    lmfit Parameters() class to use in models
+    Convert a par-file dictionary to an :class:`lmfit.Parameters` object.
 
-    By default, parameters are not varied
+    Numeric parameters are added with ``vary=False``. String parameters and
+    the special ``RAJ``/``RA`` and ``DECJ`` entries are handled separately.
+
+    Parameters
+    ----------
+    pars : dict
+        Parameter dictionary as returned by :func:`read_par`.
+    params : lmfit.Parameters, optional
+        Existing :class:`lmfit.Parameters` instance to append to. If
+        ``None`` (default), a new instance is created.
+
+    Returns
+    -------
+    params : lmfit.Parameters
+        Updated (or newly created) :class:`lmfit.Parameters` object
+        containing all numeric parameters from ``pars``.
+
+    Notes
+    -----
+    By default, all parameters are fixed (``vary=False``). Enable fitting
+    by setting individual parameter ``vary`` attributes after calling this
+    function.
     """
 
     from lmfit import Parameters
@@ -508,8 +721,24 @@ def pars_to_params(pars, params=None):
 
 def get_true_anomaly(mjds, pars):
     """
-    Calculates true anomalies for an array of barycentric MJDs and a parameter
-    dictionary
+    Calculate orbital true anomalies from barycentric MJDs.
+
+    Solves Kepler's equation to obtain the eccentric anomaly and converts to
+    true anomaly. Supports both T0/ECC and TASC/EPS1/EPS2 parameterisations.
+
+    Parameters
+    ----------
+    mjds : array_like
+        Barycentric Modified Julian Dates at which to evaluate the anomaly.
+    pars : dict
+        Pulsar timing parameter dictionary (from :func:`read_par`) containing
+        at minimum ``PB`` and either ``T0``+``ECC`` or ``TASC``+``EPS1``+
+        ``EPS2``. Optional keys: ``PBDOT``.
+
+    Returns
+    -------
+    U : numpy.ndarray
+        True anomaly in radians, in the range ``[0, 2π)``.
     """
 
     if 'TASC' in pars.keys():
@@ -556,8 +785,24 @@ def get_true_anomaly(mjds, pars):
 
 def get_binphase(mjds, pars):
     """
-    Calculates binary phase for an array of barycentric MJDs and a parameter
-    dictionary
+    Calculate the orbital binary phase from barycentric MJDs.
+
+    The binary phase is defined as the true anomaly plus the argument of
+    periastron, ``U + OM``.
+
+    Parameters
+    ----------
+    mjds : array_like
+        Barycentric Modified Julian Dates.
+    pars : dict
+        Pulsar timing parameter dictionary (from :func:`read_par`). If
+        ``TASC`` is present the orbit is assumed circular (``OM = 0``);
+        otherwise ``OM`` (and optionally ``OMDOT``) are used.
+
+    Returns
+    -------
+    phase : numpy.ndarray
+        Binary phase in radians.
     """
     U = get_true_anomaly(mjds, pars)
 

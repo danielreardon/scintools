@@ -6,9 +6,6 @@ dynspec.py
 Dynamic spectrum class
 """
 
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-
 import time
 import os
 from os.path import split

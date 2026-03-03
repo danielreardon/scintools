@@ -6,9 +6,6 @@ scintsim.py
 Simulate scintillation. Based on original MATLAB code by Coles et al. (2010)
 """
 
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
-
 import numpy as np
 from numpy import random
 from numpy.random import randn
@@ -28,20 +25,97 @@ class Simulation():
                  verbose=False, freq=1400, dt=30, mjd=60000, nsub=None,
                  efield=False, noise=None):
         """
-        Electromagnetic simulator based on original code by Coles et al. (2010)
+        Electromagnetic simulator based on original code by Coles et al. (2010).
 
-        mb2: Max Born parameter for strength of scattering
-        rf: Fresnel scale
-        ds (or dx,dy): Spatial step sizes with respect to rf
-        alpha: Structure function exponent (Kolmogorov = 5/3)
-        ar: Anisotropy axial ratio
-        psi: Anisotropy orientation
-        inner: Inner scale w.r.t rf - should generally be smaller than ds
-        ns (or nx,ny): Number of spatial steps
-        nf: Number of frequency steps.
-        dlam: Fractional bandwidth relative to centre frequency
-        lamsteps: Boolean to choose whether steps in lambda or freq
-        seed: Seed number, or use "-1" to shuffle
+        Generates a simulated dynamic spectrum by propagating a plane wave
+        through a thin, phase-modulating scattering screen described by a
+        power-law structure function.
+
+        Parameters
+        ----------
+        mb2 : float, optional
+            Maximum Born parameter, controlling the strength of scattering.
+            Default is 2.
+        rf : float, optional
+            Fresnel scale (in arbitrary spatial units). Default is 1.
+        ds : float, optional
+            Spatial step size relative to ``rf``. Used for both axes unless
+            ``dx`` / ``dy`` are set separately. Default is 0.01.
+        alpha : float, optional
+            Structure function exponent. Kolmogorov turbulence gives
+            ``alpha = 5/3``. Default is ``5/3``.
+        ar : float, optional
+            Anisotropy axial ratio of the scattering screen. Default is 1
+            (isotropic).
+        psi : float, optional
+            Orientation angle of the anisotropy (degrees). Default is 0.
+        inner : float, optional
+            Inner scale of the turbulence relative to ``rf``. Should be
+            smaller than ``ds``. Default is 0.001.
+        ns : int, optional
+            Number of spatial steps along each axis (used when ``nx`` /
+            ``ny`` are not set separately). Default is 256.
+        nf : int, optional
+            Number of frequency steps in the dynamic spectrum. Default is
+            256.
+        dlam : float, optional
+            Fractional bandwidth relative to the centre frequency. Default
+            is 0.25.
+        lamsteps : bool, optional
+            If ``True``, use equal steps in wavelength rather than
+            frequency. Default is ``False``.
+        seed : int or None, optional
+            Random-number seed for the screen realisation. Use ``-1`` to
+            shuffle (random seed). Default is ``None``.
+        nx : int or None, optional
+            Number of spatial steps in the x-direction. Overrides ``ns``
+            when set. Default is ``None``.
+        ny : int or None, optional
+            Number of spatial steps in the y-direction. Overrides ``ns``
+            when set. Default is ``None``.
+        dx : float or None, optional
+            Spatial step size in x relative to ``rf``. Overrides ``ds``
+            when set. Default is ``None``.
+        dy : float or None, optional
+            Spatial step size in y relative to ``rf``. Overrides ``ds``
+            when set. Default is ``None``.
+        plot : bool, optional
+            Plot all intermediate results after the simulation. Default is
+            ``False``.
+        verbose : bool, optional
+            Print progress messages during the simulation. Default is
+            ``False``.
+        freq : float, optional
+            Centre frequency of the observation in MHz. Default is 1400.
+        dt : float, optional
+            Time step between sub-integrations in seconds. Default is 30.
+        mjd : float, optional
+            Reference Modified Julian Date of the observation. Default is
+            60000.
+        nsub : int or None, optional
+            Number of sub-integrations to keep. If ``None`` (default) all
+            available sub-integrations are used.
+        efield : bool, optional
+            If ``True``, use the real part of the electric field for the
+            dynamic spectrum instead of the intensity. Default is ``False``.
+        noise : float or None, optional
+            RMS noise level to add to the simulated intensity. If ``None``
+            (default) no noise is added.
+
+        Notes
+        -----
+        After initialisation the object exposes the following key attributes:
+
+        - ``dyn`` : 2-D intensity array of shape ``(nchan, nsub)``.
+        - ``freqs`` : Centre frequencies of each channel (MHz).
+        - ``times`` : Sub-integration mid-times (seconds from start).
+        - ``eta`` : Theoretical arc curvature in physical units (s³).
+        - ``betaeta`` : Theoretical arc curvature for wavelength-scaled
+          secondary spectrum.
+
+        References
+        ----------
+        Coles, W. A., et al. (2010), ApJ, 717, 1206.
         """
 
         self.mb2 = mb2

@@ -19,8 +19,6 @@ A library of scintillation models to use with lmfit, emcee, or bilby
     Some functions use additional inputs
 """
 
-from __future__ import (absolute_import, division,
-                        print_function, unicode_literals)
 import numpy as np
 from scintools.scint_sim import ACF
 from lmfit import Minimizer
@@ -29,6 +27,53 @@ from lmfit import Minimizer
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
            steps=1000, burn=0.2, progress=True, workers=1,
            nan_policy='raise', max_nfev=None, thin=10, is_weighted=True):
+    """
+    Fit a model to data using least-squares or MCMC via :mod:`lmfit`.
+
+    Parameters
+    ----------
+    model : callable
+        Residual function with signature ``model(params, *args)`` that
+        returns an array of weighted residuals ``(ydata - model) * weights``.
+    params : lmfit.Parameters
+        Initial parameter values and bounds.
+    args : tuple
+        Extra positional arguments passed to ``model`` after ``params``.
+    mcmc : bool, optional
+        If ``True``, run MCMC sampling with ``emcee`` instead of
+        least-squares. Default is ``False``.
+    pos : array_like or None, optional
+        Initial positions of the MCMC walkers. Passed to
+        :meth:`lmfit.Minimizer.emcee`. Default is ``None``.
+    nwalkers : int, optional
+        Number of MCMC ensemble walkers. Default is ``100``.
+    steps : int, optional
+        Total number of MCMC steps per walker. Default is ``1000``.
+    burn : float, optional
+        Fraction of steps to discard as burn-in (between 0 and 1).
+        Default is ``0.2``.
+    progress : bool, optional
+        Show a progress bar during MCMC sampling. Default is ``True``.
+    workers : int, optional
+        Number of parallel workers for MCMC. Default is ``1``.
+    nan_policy : str, optional
+        How to handle NaN residuals in least-squares mode. Passed to
+        :class:`lmfit.Minimizer`. Default is ``'raise'``.
+    max_nfev : int or None, optional
+        Maximum number of function evaluations for least-squares. Default
+        is ``None`` (no limit).
+    thin : int, optional
+        Thinning factor for MCMC chains. Default is ``10``.
+    is_weighted : bool, optional
+        Whether the residuals are weighted. Passed to
+        :meth:`lmfit.Minimizer.emcee`. Default is ``True``.
+
+    Returns
+    -------
+    results : lmfit.MinimizerResult
+        Fit results including best-fit parameter values, uncertainties, and
+        (for MCMC) the sampler flatchain.
+    """
 
     # Do fit
     if mcmc:
@@ -47,6 +92,24 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
 
 
 def powerspectrum_model(params, xdata, ydata):
+    """
+    Power-law model for the power spectrum with a white-noise floor.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        Must contain ``amp`` (power-law amplitude), ``wn`` (white-noise
+        level), and ``alpha`` (spectral index).
+    xdata : array_like
+        Frequency (or wavenumber) values.
+    ydata : array_like
+        Observed power spectrum values.
+
+    Returns
+    -------
+    residuals : numpy.ndarray
+        Array ``ydata - model``, where ``model = wn + amp * xdata**alpha``.
+    """
 
     parvals = params.valuesdict()
 
@@ -351,9 +414,50 @@ def arc_curvature(params, ydata, weights, true_anomaly,
                   vearth_ra, vearth_dec, mjd=None, model_only=False,
                   return_veff=False):
     """
-    arc curvature model
+    Thin-screen arc curvature model for scintillation arcs.
 
-        ydata: arc curvature
+    Computes the expected parabolic arc curvature :math:`\\eta` from the
+    effective velocity at the scattering screen, optionally returning
+    weighted residuals for use with a least-squares fitter.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters or dict
+        Must contain ``d`` (pulsar distance in kpc) and ``s`` (fractional
+        screen distance). May also contain ``zeta`` / ``vism_zeta`` (for
+        anisotropic screens) or ``vism_ra`` / ``vism_dec`` (ISM velocity
+        components in km/s).
+    ydata : array_like
+        Observed arc curvature values (1/(m·mHz²)).
+    weights : array_like or None
+        Weights for the residuals. Pass ``None`` for uniform weighting.
+    true_anomaly : array_like
+        Orbital true anomaly in radians at each epoch.
+    vearth_ra : array_like
+        Earth velocity in the RA direction (km/s) at each epoch.
+    vearth_dec : array_like
+        Earth velocity in the Dec direction (km/s) at each epoch.
+    mjd : array_like or None, optional
+        Barycentric MJD at each epoch. Required when ``OMDOT`` is in
+        ``params``. Default is ``None``.
+    model_only : bool, optional
+        If ``True``, return only the model curvature array rather than
+        weighted residuals. Default is ``False``.
+    return_veff : bool, optional
+        If ``True`` and ``model_only`` is ``True``, also return the RA and
+        Dec components of the effective velocity. Default is ``False``.
+
+    Returns
+    -------
+    residuals : numpy.ndarray
+        Weighted residuals ``(ydata - model) * weights``. Returned when
+        ``model_only=False``.
+    model : numpy.ndarray
+        Arc curvature model values. Returned when ``model_only=True`` and
+        ``return_veff=False``.
+    model, veff_ra, veff_dec : tuple
+        Arc curvature model and effective velocity components. Returned when
+        ``model_only=True`` and ``return_veff=True``.
     """
 
     # ensure dimensionality of arrays makes sense
@@ -504,8 +608,54 @@ Below: Models that do not return residuals for a fitter
 def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
                               mjd=None):
     """
-    Effective velocity with annual and pulsar terms
-        Note: Does NOT include IISM velocity, but returns veff in IISM frame
+    Compute the annual and orbital effective velocity at the scattering screen.
+
+    Accounts for Earth's orbital motion, the pulsar's proper motion, and (if
+    Keplerian parameters are present) the pulsar's orbital motion.  The ISM
+    velocity is *not* included here; it must be subtracted by the calling
+    function.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters or dict
+        May contain Keplerian orbital parameters (``A1``, ``PB``, ``ECC``,
+        ``OM``, ``KOM``, ``KIN``/``COSI``/``SINI``) and proper-motion
+        parameters (``PMRA``, ``PMDEC``). Must also contain ``s``
+        (fractional screen distance, 0–1) and ``d`` (pulsar distance in
+        kpc).
+    true_anomaly : array_like
+        Orbital true anomaly in radians at each epoch.
+    vearth_ra : array_like
+        Earth velocity in the RA direction (km/s) at each epoch.
+    vearth_dec : array_like
+        Earth velocity in the Dec direction (km/s) at each epoch.
+    mjd : array_like or None, optional
+        Barycentric MJD at each epoch. Required when ``OMDOT`` is in
+        ``params``. Default is ``None``.
+
+    Returns
+    -------
+    veff_ra : numpy.ndarray
+        Effective velocity in the RA direction (km/s).
+    veff_dec : numpy.ndarray
+        Effective velocity in the Dec direction (km/s).
+    vp_ra : numpy.ndarray
+        Pulsar orbital velocity in the RA direction (km/s).
+    vp_dec : numpy.ndarray
+        Pulsar orbital velocity in the Dec direction (km/s).
+
+    Notes
+    -----
+    The effective velocity is defined as:
+
+    .. math::
+
+        \\mathbf{v}_{\\mathrm{eff}} = s\\,\\mathbf{v}_{\\oplus}
+        + (1-s)\\,(\\mathbf{v}_{p} + \\boldsymbol{\\mu}_p)
+
+    where :math:`s` is the fractional screen distance, :math:`\\mathbf{v}_{\\oplus}`
+    is Earth's velocity, and :math:`\\mathbf{v}_p + \\boldsymbol{\\mu}_p` is the
+    pulsar's velocity (orbital + proper motion).
     """
     # Define some constants
     v_c = 299792.458  # km/s

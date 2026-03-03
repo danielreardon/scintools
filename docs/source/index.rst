@@ -11,6 +11,8 @@ Welcome to the documentation for Scintools!
    :caption: Contents:
    
    dynspec
+
+   examples
    
    simulation
    
