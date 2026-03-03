@@ -21,7 +21,7 @@ provides methods to:
   timescales and bandwidths.
 - Visualise all intermediate and final data products.
 
-See :doc:`examples` for complete, runnable worked examples.
+See :doc:`examples` for runnable worked examples.
 
 Importing dynamic spectra
 -------------------------
@@ -60,7 +60,7 @@ several ways::
     dyn.zap()                 # interactive RFI flagging
     dyn.refill()              # interpolate over flagged data
     dyn.crop_dyn(tmin, tmax, fmin, fmax)  # crop in time and/or frequency
-    dyn.scale_dyn()           # normalise each sub-integration
+    dyn.scale_dyn()           # resample the dynamic spectrum to a new scale
 
 Secondary spectra
 -----------------
