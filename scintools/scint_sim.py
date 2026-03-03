@@ -34,7 +34,7 @@ class Simulation():
         Parameters
         ----------
         mb2 : float, optional
-            Maximum Born parameter, controlling the strength of scattering.
+            Max Born parameter, controlling the strength of scattering.
             Default is 2.
         rf : float, optional
             Fresnel scale (in arbitrary spatial units). Default is 1.
