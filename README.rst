@@ -22,9 +22,9 @@ Below is a list of some works that have used Scintools.
 
 * Reardon et al. (2020): `"Precision orbital dynamics from interstellar scintillation arcs for PSR J0437-4715", <https://ui.adsabs.harvard.edu/abs/2020ApJ...904..104R>`_
 * Rickett et al. (2021): `"Scintillation Arcs in Pulsar B0450-18", <https://ui.adsabs.harvard.edu/abs/2021ApJ...907...49R>`_
-* Wang et al. (2021): `"ASKAP observations of multiple rapid scintillators reveal a degrees-long plasma filament", <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp..186W>`_
+* Wang, Y. et al. (2021): `"ASKAP observations of multiple rapid scintillators reveal a degrees-long plasma filament", <https://ui.adsabs.harvard.edu/abs/2021MNRAS.tmp..186W>`_
 * Johnston et al. (2021): `"A supernova remnant association for the fast-moving pulsar PSR J0908-4913", <https://ui.adsabs.harvard.edu/abs/2021MNRAS.507L..41J>`_
-* Abdul Hamid (2021): `"A Study of Birefringent Scintillation Towards the Millisecond Pulsar J0437-4715", <http://hdl.handle.net/10292/14786>`_
+* Hamid (2021): `"A Study of Birefringent Scintillation Towards the Millisecond Pulsar J0437-4715", <http://hdl.handle.net/10292/14786>`_
 * McKee et al. (2021): `"Probing the local interstellar medium with scintillometry of the bright pulsar B1133+16", <https://ui.adsabs.harvard.edu/abs/2022ApJ...927...99M>`_
 * Baker et al. (2022): `"Interstellar interferometry: precise curvature measurement from pulsar secondary spectra", <https://ui.adsabs.harvard.edu/abs/2022MNRAS.510.4573B>`_
 * Mall et al. (2022): `"Modelling annual scintillation arc variations in PSR J1643-1224 using the Large European Array for Pulsars", <https://ui.adsabs.harvard.edu/abs/2022MNRAS.511.1104M>`_
@@ -41,13 +41,13 @@ Below is a list of some works that have used Scintools.
 * Ocker et al. (2024): `"Pulsar Scintillation through Thick and Thin: Bow Shocks, Bubbles, and the Broader Interstellar Medium", <https://ui.adsabs.harvard.edu/abs/2024MNRAS.527.7568O>`_
 * Wu et al. (2024): `"Scintillation Arc from FRB 20220912A", <https://ui.adsabs.harvard.edu/abs/2024SCPMA..6719512W>`_
 * Turner et al. (2024): `"A Simultaneous Dual-Frequency Scintillation Arc Survey of Six Bright Canonical Pulsars Using the Upgraded Giant Metrewave Radio Telescope", <https://ui.adsabs.harvard.edu/abs/2024ApJ...961..101T>`_
-* Wang et al. (2024): `"Probing the Interstellar Medium from Scintillation of the Swooshing Pulsar B0919+06", <https://ui.adsabs.harvard.edu/abs/2024ApJ...968..109W>`_
+* Wang, Z. et al. (2024): `"Probing the Interstellar Medium from Scintillation of the Swooshing Pulsar B0919+06", <https://ui.adsabs.harvard.edu/abs/2024ApJ...968..109W>`_
 * Jang et al. (2024): `"Timing and scintillation studies of PSR J1439−5501", <https://ui.adsabs.harvard.edu/abs/2024A%26A...689A.296J>`_
 * Baoda et al. (2024): `"Timing and Scintillation Studies of Pulsars in Globular Cluster M3 (NGC 5272) with FAST", <https://ui.adsabs.harvard.edu/abs/2024ApJ...972...43L>`_
 * Turner et al. (2024): `"The Pulsar Science Collaboratory: Multiepoch Scintillation Studies of Pulsars", <https://ui.adsabs.harvard.edu/abs/2024ApJ...977..205T>`_
-* Wang et al. (2025): `"Is the Gum Nebula an important interstellar scattering disk of background pulsars?", <https://ui.adsabs.harvard.edu/abs/2025SCPMA..6839512W>`_
-* Wang et al. (2025): `"The Discovery of a 41 s Radio Pulsar PSR J0311+1402 with ASKAP", <https://ui.adsabs.harvard.edu/abs/2025ApJ...982L..53W>`_
-* Wang et al. (2025): `"Frequency-dependent Emission of the Millisecond Pulsar B1937+21 with the Parkes Ultrawideband Receiver", <https://ui.adsabs.harvard.edu/abs/2025ApJ...987...43W>`_
+* Wang, R. et al. (2025): `"Is the Gum Nebula an important interstellar scattering disk of background pulsars?", <https://ui.adsabs.harvard.edu/abs/2025SCPMA..6839512W>`_
+* Wang, Y. et al. (2025): `"The Discovery of a 41 s Radio Pulsar PSR J0311+1402 with ASKAP", <https://ui.adsabs.harvard.edu/abs/2025ApJ...982L..53W>`_
+* Wang, Z. et al. (2025): `"Frequency-dependent Emission of the Millisecond Pulsar B1937+21 with the Parkes Ultrawideband Receiver", <https://ui.adsabs.harvard.edu/abs/2025ApJ...987...43W>`_
 * Reardon et al. (2025): `"Bow shock and Local Bubble plasma unveiled by the scintillating millisecond pulsar J0437‒4715", <https://ui.adsabs.harvard.edu/abs/2025NatAs...9.1053R>`_
 
 
