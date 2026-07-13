@@ -23,6 +23,28 @@ breakages**, most of them triggered by ordinary default usage or by the move to 
 
 Counts: **10 confirmed bugs**, **5 plausible/suspected issues**.
 
+## Resolution status
+
+All 10 confirmed bugs have been fixed, plus 4 of the 5 plausible issues and the
+`plt.colorbar` no-op:
+
+- **Fixed** — Bugs 1-10 (see each entry below), plus the plausible issues
+  `effective_velocity_annual` INC-before-assignment (now raises `KeyError`),
+  `norm_sspec` logsteps mask (`mask` -> `masklin`), in-place mutation of caller
+  weights in `tau_acf_model`/`dnu_acf_model` (now copied), `np.float128` ->
+  `np.longdouble` portability, and the `plt.colorbar` missing-parentheses no-op.
+  A latent follow-on bug exposed by the `BasicDyn` fix (`self.tobs` used the
+  raw `dt` arg instead of `self.dt`) was also fixed.
+- **Deliberately NOT changed** — the `scint_velocity` error-propagation term
+  (`scint_utils.py`). This is a scientific formula whose dimensional intent
+  (`coeff_err` as variance vs. standard error) needs domain confirmation;
+  changing it blindly could silently corrupt published results. Flagged for the
+  maintainer's review.
+- Refactoring opportunities below were **not** applied (out of scope for a
+  bug-fix pass).
+
+Regression tests covering the fixes were added under `tests/`.
+
 ## Bugs (most severe first)
 
 ### 1. `np.complex_` removed in NumPy 2.0 — `ACF` class unusable

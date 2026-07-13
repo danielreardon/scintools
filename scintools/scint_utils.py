@@ -895,7 +895,7 @@ def get_true_anomaly(mjds, pars):
         E = []
         for m in M:
             E.append(fsolve(lambda E: E - ECC*np.sin(E) - m, m))
-        E = np.asarray(E, dtype=np.float128)
+        E = np.asarray(E, dtype=np.longdouble)
 
     # true anomaly
     U = 2*np.arctan2(np.sqrt(1 + ECC) * np.sin(E/2),

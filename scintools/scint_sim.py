@@ -653,7 +653,7 @@ class Simulation():
                        (np.arange(0, 3*self.nf/2, 1) - self.nf/2) /
                        (2*self.dlam*Freq),
                        lpw[int(self.nf/2):, :], vmin=vmin, vmax=vmax)
-        plt.colorbar
+        plt.colorbar()
         plt.ylabel('Delay (ns)')
         plt.xlabel('$x/r_f$')
         plt.plot(np.linspace(0, self.dx*self.nx, self.nx),
@@ -911,7 +911,8 @@ class ACF():
             tn = np.linspace(0, (spmax), int(np.ceil(self.nt/2)))
             snx = Vx*tn
             sny = Vy*tn
-            gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
+            gammitv = np.zeros((int(len(snx)), int(ndnun)),
+                               dtype=np.complex128)
             # compute dnun=0 first
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
                                          (sny*sqrtar)**2)**alph2)
@@ -956,7 +957,8 @@ class ACF():
             snx = np.cos(xi*np.pi/180)*tn
             sny = np.sin(xi*np.pi/180)*tn
             # compute dnun=0 first
-            gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
+            gammitv = np.zeros((int(len(snx)), int(ndnun)),
+                               dtype=np.complex128)
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
                                          (sny*sqrtar)**2)**alph2)
             gammitv[np.argwhere(snx == 0), 0] += wn/amp

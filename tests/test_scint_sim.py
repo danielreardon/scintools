@@ -6,7 +6,6 @@ calculations run in well under a second.
 """
 
 import numpy as np
-import pytest
 
 from scintools.scint_sim import Simulation, ACF
 
@@ -48,19 +47,10 @@ def test_simulation_intensity_is_non_negative():
 
 
 # ---------------------------------------------------------------------------
-# ACF - blocked by a real numpy>=2.0 incompatibility, see report
+# ACF - previously blocked by a numpy>=2.0 incompatibility (np.complex_),
+# now fixed (uses np.complex128).
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    reason=(
-        "scintools/scint_sim.py:589 and :634 (ACF.calc_acf) use "
-        "`dtype=np.complex_`, an alias removed in numpy>=2.0 "
-        "(NEP 51 / numpy 2.0 release notes); instantiating ACF() raises "
-        "AttributeError: `np.complex_` was removed in the NumPy 2.0 "
-        "release. Use `np.complex128` instead."
-    ),
-    strict=True,
-)
 def test_acf_small_grid_shape_and_peak():
     acf = ACF(nt=11, nf=11, taumax=2, dnumax=2, amp=1.0, wn=0.0,
               auto_sampling=True)

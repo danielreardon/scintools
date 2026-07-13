@@ -18,7 +18,9 @@ from scintools.scint_models import (
     tau_acf_model,
     dnu_acf_model,
     scint_acf_model,
+    scint_sspec_model,
     arc_power_curve,
+    effective_velocity_annual,
 )
 
 
@@ -111,6 +113,17 @@ def test_tau_acf_model_zero_residual_at_truth():
     assert_allclose(resid, np.zeros_like(xdata), atol=1e-10)
 
 
+def test_tau_acf_model_does_not_mutate_caller_weights():
+    # Regression: the model used to zero weights[0] in place, mutating the
+    # caller's array.
+    params = _tau_params()
+    xdata = np.linspace(0, 10, 11)
+    ydata = np.ones_like(xdata)
+    weights = np.ones_like(xdata)
+    tau_acf_model(params, xdata, ydata, weights)
+    assert weights[0] == 1.0  # untouched
+
+
 def test_dnu_acf_model_zero_residual_at_truth():
     params = _dnu_params()
     xdata = np.linspace(0, 6, 7)
@@ -154,17 +167,51 @@ def test_scint_acf_model_concatenates_both_residuals():
 # arc_power_curve - flagged as broken (see report)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(
-    reason=(
-        "arc_power_curve() in scintools/scint_models.py is an unfinished "
-        "stub: it sets `model = []` unconditionally and then computes "
-        "`(ydata - model) * weights`, which raises a numpy broadcasting "
-        "ValueError for any non-empty ydata instead of returning residuals."
-    ),
-    strict=True,
-)
-def test_arc_power_curve_returns_residuals_not_error():
+# arc_power_curve is an unimplemented template. It now raises an explicit
+# NotImplementedError instead of silently producing a broadcasting error.
+def test_arc_power_curve_raises_not_implemented():
     xdata = np.array([1.0, 2.0, 3.0])
     ydata = np.array([1.0, 2.0, 3.0])
-    resid = arc_power_curve(None, xdata, ydata, None)
-    assert len(resid) == len(ydata)
+    with pytest.raises(NotImplementedError):
+        arc_power_curve(None, xdata, ydata, None)
+
+
+# ---------------------------------------------------------------------------
+# scint_sspec_model - regression: the _sspec_model callees now accept an
+# optional weights argument, so this no longer raises TypeError.
+# ---------------------------------------------------------------------------
+
+def test_scint_sspec_model_runs_with_weights():
+    params = _tau_params()
+    params.add('dnu', value=3.0)
+    xdata_t = np.linspace(0, 10, 11)
+    xdata_f = np.linspace(0, 6, 7)
+    ydata_t = np.ones_like(xdata_t)
+    ydata_f = np.ones_like(xdata_f)
+    weights_t = np.ones_like(xdata_t)
+    weights_f = np.ones_like(xdata_f)
+
+    resid = scint_sspec_model(params,
+                              (xdata_t, xdata_f),
+                              (ydata_t, ydata_f),
+                              (weights_t, weights_f))
+    assert len(resid) == len(xdata_t) + len(xdata_f)
+    assert np.all(np.isfinite(resid))
+
+
+# ---------------------------------------------------------------------------
+# effective_velocity_annual - regression: a missing inclination parameter
+# now raises a clear KeyError instead of a later NameError on INC.
+# ---------------------------------------------------------------------------
+
+def test_effective_velocity_annual_missing_inclination_raises():
+    params = Parameters()
+    params.add('A1', value=1.0)
+    params.add('PB', value=10.0)
+    params.add('ECC', value=0.0)
+    params.add('OM', value=0.0)
+    params.add('KOM', value=0.0)
+    ta = np.array([0.0, 1.0])
+    ve = np.zeros_like(ta)
+    with pytest.raises(KeyError):
+        effective_velocity_annual(params, ta, ve, ve)

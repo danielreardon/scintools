@@ -569,13 +569,11 @@ class Dynspec:
                 dyn = self.dyn
         else:
             dyn = input_dyn
-        medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(
-                                                      is_valid(dyn)) > 0)])
-        minval = np.min(dyn[is_valid(dyn)*np.array(np.abs(
-                                                   is_valid(dyn)) > 0)])
+        finite_nonzero = is_valid(dyn) * (np.abs(dyn) > 0)
+        medval = np.median(dyn[finite_nonzero])
+        minval = np.min(dyn[finite_nonzero])
         # standard deviation
-        std = np.std(dyn[is_valid(dyn)*np.array(np.abs(
-                                                is_valid(dyn)) > 0)])
+        std = np.std(dyn[finite_nonzero])
         vmin = minval + std
         vmax = medval + 4*std
 
@@ -1216,6 +1214,7 @@ class Dynspec:
                 etamax = etamax*beta_to_eta
                 etamin = etamin/(self.freq/ref_freq)**2
                 etamin = etamin*beta_to_eta
+                constraint = np.array(constraint, dtype=float)
                 constraint = constraint/(self.freq/ref_freq)**2
                 constraint = constraint*beta_to_eta
 
@@ -2205,7 +2204,7 @@ class Dynspec:
 
         if logsteps:
             masklin += np.isnan(normSspeclin)
-            normSspeclin = np.ma.array(normSspeclin, mask=mask)
+            normSspeclin = np.ma.array(normSspeclin, mask=masklin)
             mask += np.isnan(normSspec)
             normSspec = np.ma.array(normSspec, mask=mask)
             self.mask = mask
@@ -2854,8 +2853,8 @@ class Dynspec:
                 if ndnu > (self.bw / dnu):
                     if verbose:
                         print('WARNING: nscale exceeds range in frequency lag')
-                    tmin = 0
-                    tmax = nf
+                    fmin = 0
+                    fmax = nf
                 else:
                     fframe = int(round(ndnu * (dnu / self.df)))
                     fmin = int(np.floor(
@@ -3745,7 +3744,7 @@ class Dynspec:
                     self.scale_dyn(scale='velocity')
                 dyn = cp(self.vdyn)
             elif trap:
-                if not hasattr(self, 'trap'):
+                if not hasattr(self, 'trapdyn'):
                     self.scale_dyn(scale='trapezoid')
                 dyn = cp(self.trapdyn)
             else:
@@ -4070,8 +4069,8 @@ class Dynspec:
                 arin2 = cp(self.lamdyn)  # input array
                 nf2, nt2 = np.shape(arin2)
                 arout2 = np.zeros([nf2, nt2])
-            mjd = np.asarray(self.mjd, dtype=np.float128) + \
-                np.asarray(self.times, dtype=np.float128)/86400
+            mjd = np.asarray(self.mjd, dtype=np.longdouble) + \
+                np.asarray(self.times, dtype=np.longdouble)/86400
 
             print('Getting SSB delays')
             ssb_delays = get_ssb_delay(mjd, pars['RAJ'], pars['DECJ'])
@@ -4248,8 +4247,8 @@ class BasicDyn():
     See `BasicDyn.__init__` for the full list of accepted parameters.
     """
 
-    def __init__(self, dyn, name="BasicDyn", header=["BasicDyn"], times=[],
-                 freqs=[], nchan=None, nsub=None, bw=None, df=None,
+    def __init__(self, dyn, name="BasicDyn", header=None, times=None,
+                 freqs=None, nchan=None, nsub=None, bw=None, df=None,
                  freq=None, tobs=None, dt=None, mjd=60000):
         """
         Define a basic dynamic spectrum object from an array of fluxes
@@ -4295,10 +4294,13 @@ class BasicDyn():
         """
 
         # Set parameters from input
-        if times.size == 0 or freqs.size == 0:
+        if times is None or freqs is None or len(times) == 0 \
+                or len(freqs) == 0:
             raise ValueError('must input array of times and frequencies')
+        times = np.asarray(times)
+        freqs = np.asarray(freqs)
         self.name = name
-        self.header = header
+        self.header = header if header is not None else ["BasicDyn"]
         self.times = times  # times should be the start times of each bin
         self.freqs = freqs
         self.nchan = nchan if nchan is not None else len(freqs)
@@ -4307,7 +4309,7 @@ class BasicDyn():
         self.df = df if df is not None else np.mean(np.abs(np.diff(freqs)))
         self.freq = freq if freq is not None else np.mean(np.unique(freqs))
         self.dt = dt if dt is not None else np.mean(np.abs(np.diff(times)))
-        self.tobs = tobs if tobs is not None else np.ptp(times) + dt
+        self.tobs = tobs if tobs is not None else np.ptp(times) + self.dt
         self.mjd = mjd
         self.dyn = dyn
         return
@@ -4342,13 +4344,13 @@ class MatlabDyn():
         self.matfile = loadmat(matfilename)  # reads matfile to a dictionary
         try:
             self.dyn = self.matfile['spi']
-        except NameError:
-            raise NameError('No variable named "spi" found in mat file')
+        except KeyError:
+            raise KeyError('No variable named "spi" found in mat file')
 
         try:
             dlam = float(self.matfile['dlam'])
-        except NameError:
-            raise NameError('No variable named "dlam" found in mat file')
+        except KeyError:
+            raise KeyError('No variable named "dlam" found in mat file')
         # Set parameters from input
         self.name = matfilename.split()[0]
         self.header = [self.matfile['__header__'], ["Dynspec loaded \
@@ -4398,7 +4400,7 @@ class SimDyn():
         if sim.lamsteps:
             self.name += ',lamsteps'
 
-        self.header = self.header
+        self.header = [self.name]
         self.dyn = sim.spi
         dlam = sim.dlam
 

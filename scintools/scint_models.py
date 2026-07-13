@@ -209,6 +209,7 @@ def tau_acf_model(params, xdata, ydata, weights):
     alpha = parvals['alpha']
 
     model = amp*np.exp(-np.divide(xdata, tau)**(alpha))
+    weights = np.array(weights, dtype=float)  # copy so caller is not mutated
     weights[0] = 0  # Not fitting for the white noise spike
     # Multiply by triangle function
     model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
@@ -255,6 +256,7 @@ def dnu_acf_model(params, xdata, ydata, weights):
     dnu = parvals['dnu']
 
     model = amp*np.exp(-np.divide(xdata, dnu/np.log(2)))
+    weights = np.array(weights, dtype=float)  # copy so caller is not mutated
     weights[0] = 0  # Not fitting for the white noise spike
     # Multiply by triangle function
     model = np.multiply(model, 1-np.divide(xdata, max(xdata)))
@@ -453,7 +455,7 @@ def scint_acf_model_2d(params, ydata, weights):
     return (ydata - model) * weights
 
 
-def tau_sspec_model(params, xdata, ydata):
+def tau_sspec_model(params, xdata, ydata, weights=None):
     """
     Model a 1D cut through the center of the ACF along the time axis
     and apply a Fourier transform, returning the residuals against
@@ -496,11 +498,13 @@ def tau_sspec_model(params, xdata, ydata):
     model = np.real(model)
     model = model[0:len(xdata)]
 
-    # Use the model for the weights
-    return (ydata - model) * model
+    # Use the model for the weights unless explicit weights are provided
+    if weights is None:
+        weights = model
+    return (ydata - model) * weights
 
 
-def dnu_sspec_model(params, xdata, ydata):
+def dnu_sspec_model(params, xdata, ydata, weights=None):
     """
     Model a 1D cut through the center of the ACF along the frequency
     axis and apply a Fourier transform, returning the residuals
@@ -544,8 +548,10 @@ def dnu_sspec_model(params, xdata, ydata):
     model = np.real(model)
     model = model[0:len(xdata)]
 
-    # Use the model for the weights
-    return (ydata - model) * model
+    # Use the model for the weights unless explicit weights are provided
+    if weights is None:
+        weights = model
+    return (ydata - model) * weights
 
 
 def scint_sspec_model(params, xdata, ydata, weights):
@@ -570,8 +576,8 @@ def scint_sspec_model(params, xdata, ydata, weights):
         through to `tau_sspec_model` and `dnu_sspec_model`
         respectively.
     weights : sequence
-        Two-element sequence ``(weights_t, weights_f)``, passed as an
-        extra positional argument to `tau_sspec_model` and
+        Two-element sequence ``(weights_t, weights_f)``, passed as the
+        optional ``weights`` argument to `tau_sspec_model` and
         `dnu_sspec_model`.
 
     Returns
@@ -579,14 +585,6 @@ def scint_sspec_model(params, xdata, ydata, weights):
     numpy.ndarray
         Concatenation of the residuals from `tau_sspec_model` and
         `dnu_sspec_model`.
-
-    Raises
-    ------
-    TypeError
-        `tau_sspec_model` and `dnu_sspec_model` only accept
-        ``(params, xdata, ydata)``, so calling them here with an
-        extra `weights` element currently raises a TypeError. This
-        function is not presently called elsewhere in the package.
     """
 
     residuals_t = tau_sspec_model(params, xdata[0], ydata[0], weights[0])
@@ -618,19 +616,18 @@ def arc_power_curve(params, xdata, ydata, weights):
     numpy.ndarray
         Weighted residual of model and data.
 
-    Notes
-    -----
-    The model template is not yet implemented: `model` is currently
-    an empty list, so ``ydata - model`` will raise a
-    ``ValueError`` (mismatched shapes) for any non-empty `ydata`.
-    This function is not presently called elsewhere in the package.
+    Raises
+    ------
+    NotImplementedError
+        The power-curve template has not been implemented yet. This
+        function is not presently called elsewhere in the package;
+        calling it raises `NotImplementedError` rather than silently
+        returning meaningless residuals.
     """
 
-    if weights is None:
-        weights = np.ones(np.shape(ydata))
-
-    model = []
-    return (ydata - model) * weights
+    raise NotImplementedError(
+        'arc_power_curve is not yet implemented: no power-curve template '
+        'has been defined.')
 
 
 def fit_parabola(x, y):
@@ -1045,8 +1042,8 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
         elif 'SINI' in params.keys():
             INC = np.arcsin(params['SINI'])
         else:
-            print('Warning: inclination parameter (KIN, COSI, or SINI) ' +
-                  'not found')
+            raise KeyError('inclination parameter (KIN, COSI, or SINI) '
+                           'not found')
 
         if 'sense' in params.keys():
             sense = params['sense']
