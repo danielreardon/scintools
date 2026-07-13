@@ -214,7 +214,7 @@ class Simulation():
         L = self.rf**2 * k
         # Curvature to use for Dynspec object within scintools
         self.eta = L/(2 * V**2) / 10**6 / np.cos(psi * np.pi/180)**2
-        c = 299792458.0  # m/s
+        c = sc.c  # m/s (speed of light)
         beta_to_eta = c*1e6/((self.freq*10**6)**2)
         # Curvature for wavelength-rescaled dynamic spectrum
         self.betaeta = self.eta / beta_to_eta

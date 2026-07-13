@@ -54,11 +54,16 @@ from matplotlib.colors import LogNorm, SymLogNorm
 from scipy.optimize import curve_fit
 import warnings
 
+from scintools.scint_utils import svd_reconstruct
+
 
 def svd_model(arr, nmodes=1):
     """
     Model a matrix using the first nmodes modes of the singular value
     decomposition
+
+    Thin wrapper around `scintools.scint_utils.svd_reconstruct`, the
+    shared SVD core, so the reconstruction logic lives in one place.
 
     Parameters
     ----------
@@ -67,12 +72,7 @@ def svd_model(arr, nmodes=1):
     nmodes: int, optional
         Number of modes used in the SVD model. Defaults to 1
     """
-    u, s, w = np.linalg.svd(arr)
-    s[nmodes:] = 0
-    S = np.zeros(([len(u), len(w)]), np.complex128)
-    S[: len(s), : len(s)] = np.diag(s)
-    model = np.dot(np.dot(u, S), w)
-    return model
+    return svd_reconstruct(arr, nmodes=nmodes)
 
 
 def chi_par(x, A, x0, C):
@@ -1567,6 +1567,55 @@ def mask_func(w):
     return np.sin((np.pi / 2) * x / w) ** 2
 
 
+def chunk_mask(shape, cf, ct, ncf, nct, cwf, cwt):
+    """
+    Build the overlap-weighting mask for a single mosaic chunk.
+
+    Chunks are weighted higher towards their centre and cross-faded with
+    their neighbours over the overlapping half in each direction, so that
+    stacked chunks add smoothly. This is the shared implementation used by
+    `mosaic`, `rotMos`, `rotInit`, `rotDer`, `fullMos`, `fullMosGrad` and
+    `fullMosHess`.
+
+    Parameters
+    ----------
+    shape : tuple of int
+        Shape of the chunk (freq within chunk, time within chunk).
+    cf, ct : int
+        Frequency and time index of the chunk being weighted.
+    ncf, nct : int
+        Total number of chunks in frequency and time.
+    cwf, cwt : int
+        Chunk width in frequency and time.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighting mask with the same shape as the chunk.
+    """
+    mask = np.ones(shape)
+
+    # Determine Mask for new chunk (chunks will have higher weights
+    #     towards their centre)
+    if cf > 0:
+        # All chunks but the first in frequency overlap for the first
+        #     half in frequency
+        mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+    if cf < ncf - 1:
+        # All chunks but the last in frequency overlap for the second
+        #     half in frequency
+        mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+    if ct > 0:
+        # All chunks but the first in time overlap for the first half
+        #     in time
+        mask[:, : cwt // 2] *= mask_func(cwt // 2)
+    if ct < nct - 1:
+        # All chunks but the last in time overlap for the second half
+        #     in time
+        mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+    return mask
+
+
 def mosaic(chunks):
     """Combine recovered wavefield chunks into a single composite wavefield by
     correcting for random phase rotation and stacking
@@ -1600,26 +1649,7 @@ def mosaic(chunks):
                 cf * cwf // 2: cf * cwf // 2 + cwf,
                 ct * cwt // 2: ct * cwt // 2 + cwt,
             ]
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             # Average phase difference between new chunk and existing wavefield
             rot = np.angle((chunk_old * np.conjugate(chunk_new) * mask).mean())
             # Add masked and roated new chunk to wavefield
@@ -1815,26 +1845,7 @@ def rotMos(chunks, x):
             chunk_new = np.copy(chunks[cf, ct, :, :])
 
             # Find overlap with current wavefield
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             rot = 0
             if cf > 0 or ct > 0:
                 rot = x[nct * cf + ct - 1]
@@ -1900,26 +1911,7 @@ def rotInit(chunks):
                 cf * cwf // 2: cf * cwf // 2 + cwf,
                 ct * cwt // 2: ct * cwt // 2 + cwt,
             ]
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             # Average phase difference between new chunk and existing wavefield
             rot = np.angle((chunk_old * np.conjugate(chunk_new) * mask).mean())
             # Add masked and roated new chunk to wavefield
@@ -1966,28 +1958,7 @@ def rotDer(x, chunks):
                         ct * cwt // 2: ct * cwt // 2 + cwt,
                     ]
                 )
-                mask = np.ones(y.shape)
-
-                # Determine Mask for new chunk (chunks will have higher weights
-                #     towards their centre)
-                if cf > 0:
-                    # All chunks but the first in frequency overlap for the
-                    #     first half in frequency
-                    mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-                if cf < ncf - 1:
-                    # All chunks but the last in frequency overlap for the
-                    #     second half in frequency
-                    mask[cwf // 2:, :] *= (
-                        1 - mask_func(cwf // 2)[:, np.newaxis]
-                    )
-                if ct > 0:
-                    # All chunks but the first in time overlap for the first
-                    #     half in time
-                    mask[:, : cwt // 2] *= mask_func(cwt // 2)
-                if ct < nct - 1:
-                    # All chunks but the last in time overlap for the second
-                    #     half in time
-                    mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+                mask = chunk_mask(y.shape, cf, ct, ncf, nct, cwf, cwt)
                 y *= mask
                 rot = x[nct * cf + ct - 1]
                 xx -= y * np.exp(1j * rot)
@@ -2030,26 +2001,7 @@ def fullMos(chunks, p):
             chunk_new = np.copy(chunks[cf, ct, :, :])
 
             # Find overlap with current wavefield
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             if idx > 0:
                 phi = p[idx - 1]
             else:
@@ -2133,26 +2085,7 @@ def fullMosGrad(p, chunks, dspec, N):
                 cf * cwf // 2: cf * cwf // 2 + cwf,
                 ct * cwt // 2: ct * cwt // 2 + cwt,
             ]
-            mask = np.ones(y.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(y.shape, cf, ct, ncf, nct, cwf, cwt)
             y *= mask
             if idx > 0:
                 phi = p[idx - 1]
@@ -2221,26 +2154,7 @@ def fullMosHess(p, chunks, dspec, N):
                 cfN * cwf // 2: cfN * cwf // 2 + cwf,
                 ctN * cwt // 2: ctN * cwt // 2 + cwt,
             ]
-            mask = np.ones(yN.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cfN > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cfN < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ctN > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ctN < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(yN.shape, cfN, ctN, ncf, nct, cwf, cwt)
             yN *= mask
             idpN = idxN - 1
             if idpN > -1:
@@ -2291,30 +2205,8 @@ def fullMosHess(p, chunks, dspec, N):
                     if -1 < cfM < ncf and -1 < ctM < nct:
                         idxM = cfM * nct + ctM
                         yM = np.copy(chunks[cfM, ctM, :, :])
-                        mask = np.ones(yN.shape)
-
-                        # Determine Mask for new chunk (chunks will have higher
-                        #     weights towards their centre)
-                        if cfM > 0:
-                            # All chunks but the first in frequency overlap for
-                            #     the first half in frequency
-                            mask[: cwf // 2, :] *= mask_func(cwf // 2)[
-                                :, np.newaxis
-                            ]
-                        if cfM < ncf - 1:
-                            # All chunks but the last in frequency overlap for
-                            #     the second half in frequency
-                            mask[cwf // 2:, :] *= (
-                                1 - mask_func(cwf // 2)[:, np.newaxis]
-                            )
-                        if ctM > 0:
-                            # All chunks but the first in time overlap for the
-                            #     first half in time
-                            mask[:, : cwt // 2] *= mask_func(cwt // 2)
-                        if ctM < nct - 1:
-                            # All chunks but the last in time overlap for the
-                            #     second half in time
-                            mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+                        mask = chunk_mask(yN.shape, cfM, ctM, ncf, nct,
+                                          cwf, cwt)
                         yM *= mask
                         idpM = idxM - 1
                         if idpM > -1:

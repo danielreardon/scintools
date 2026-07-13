@@ -337,6 +337,10 @@ class Dynspec:
         bandwagon_frac : float in [0,1], optional
             Set entire edge to zero if more than this fraction of the edge
             pixels is zero or NaN. The default is 0.5.
+        remove_short_sub : bool, optional
+            Currently unused and reserved for future use; short
+            sub-integrations are removed at load time by
+            `remove_short_subs`, not here. The default is True.
 
         """
 
@@ -971,7 +975,7 @@ class Dynspec:
 
         """
 
-        c = 299792458.0  # m/s
+        c = sc.c  # m/s (speed of light)
         if input_scattered_image is None:
             if not hasattr(self, 'scattered_image'):
                 self.calc_scattered_image(lamsteps=lamsteps, trap=trap,
@@ -1208,7 +1212,7 @@ class Dynspec:
                 etamax = etamax_array.squeeze()[iarc]
 
             if not lamsteps:
-                c = 299792458.0  # m/s
+                c = sc.c  # m/s (speed of light)
                 beta_to_eta = c*1e6/((ref_freq*10**6)**2)
                 etamax = etamax/(self.freq/ref_freq)**2  # correct for freq
                 etamax = etamax*beta_to_eta
@@ -2120,7 +2124,7 @@ class Dynspec:
                 eta = self.eta
         else:  # convert to beta
             if not lamsteps:
-                c = 299792458.0  # m/s
+                c = sc.c  # m/s (speed of light)
                 beta_to_eta = c*1e6/((ref_freq*10**6)**2)
                 eta = eta/(self.freq/ref_freq)**2  # correct for frequency
                 eta = eta*beta_to_eta
@@ -2999,39 +3003,8 @@ class Dynspec:
                         results = res
 
         elif method == 'sspec':
-            '''
-            sspec method
-            '''
+            # The secondary-spectrum fitting method is not yet implemented.
             print("This method doesn't work yet, do something else")
-            # fdyn = np.fft.fft2(self.dyn, (2 * nf, 2 * nt))
-            # fdynsq = fdyn * np.conjugate(fdyn)
-
-            # secspec = np.real(fdynsq)
-            # secspec = np.fft.fftshift(fdynsq)
-            # secspec = secspec[nf:2*nf, :]
-            # secspec = np.real(secspec)
-
-            # rowsum = np.sum(secspec[:, :nt], axis=0)
-            # ydata_t = rowsum / (2*nf)
-            # colsum = np.sum(secspec[:nf, :], axis=1)
-            # ydata_f = colsum / (2 * nt)
-
-            # # concatenate x and y arrays
-            # xdata = np.array(np.concatenate((xdata_t, xdata_f)))
-            # ydata = np.concatenate((ydata_t, ydata_f))
-
-            # if verbose:
-            #     print("\nPerforming least-squares fit to secondary spectrum")
-            # chisqr = np.inf
-            # for itr in range(nitr):
-            #     results = fitter(scint_sspec_model, params,
-            #                      (xdata, ydata), nan_policy=nan_policy,
-            #                       mcmc=mcmc, is_weighted=(not lnsigma),
-            #                       burn=burn, nwalkers=nwalkers, steps=steps)
-            #     if results.chisqr < chisqr:
-            #         chisqr = results.chisqr
-            #         params = results.params
-            #         res = results
 
         if results.params['tau'].stderr is None or \
            results.params['dnu'].stderr is None:
@@ -3587,7 +3560,7 @@ class Dynspec:
                 self.fit_arc(lamsteps=lamsteps,
                              log_parabola=True, plot=plot_fit)
             if lamsteps:
-                c = 299792458.0  # m/s
+                c = sc.c  # m/s (speed of light)
                 beta_to_eta = c * 1e6 / ((ref_freq * 1e6)**2)
                 # correct for freq
                 eta = self.betaeta / (self.freq / ref_freq)**2
@@ -4175,24 +4148,8 @@ class Dynspec:
             nt = np.shape(dyn)[1]
             if window is not None:
                 # Window the dynamic spectrum
-                if window == 'hanning':
-                    cw = np.hanning(np.floor(window_frac*nt))
-                    sw = np.hanning(np.floor(window_frac*nf))
-                elif window == 'hamming':
-                    cw = np.hamming(np.floor(window_frac*nt))
-                    sw = np.hamming(np.floor(window_frac*nf))
-                elif window == 'blackman':
-                    cw = np.blackman(np.floor(window_frac*nt))
-                    sw = np.blackman(np.floor(window_frac*nf))
-                elif window == 'bartlett':
-                    cw = np.bartlett(np.floor(window_frac*nt))
-                    sw = np.bartlett(np.floor(window_frac*nf))
-                else:
-                    print('Window unknown.. Please add it!')
-                chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
-                                        np.ones([nt-len(cw)]))
-                subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
-                                          np.ones([nf-len(sw)]))
+                chan_window, subint_window = get_window(nt, nf, window=window,
+                                                        frac=window_frac)
                 dyn = np.multiply(chan_window, dyn)
                 dyn = np.transpose(np.multiply(subint_window,
                                                np.transpose(dyn)))

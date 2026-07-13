@@ -21,12 +21,13 @@ breakages**, most of them triggered by ordinary default usage or by the move to 
 5. Broad code duplication (SVD models, the chunk-mask block repeated ~6× in `ththmod.py`, window
    construction, NaN interpolation) and several 300–500 line functions make maintenance risky.
 
-Counts: **10 confirmed bugs**, **5 plausible/suspected issues**.
+Counts: **10 confirmed bugs**, **5 plausible/suspected issues**, plus **1
+additional bug found during the fix pass** (`slow_FT`, below).
 
 ## Resolution status
 
-All 10 confirmed bugs have been fixed, plus 4 of the 5 plausible issues and the
-`plt.colorbar` no-op:
+All 10 confirmed bugs have been fixed, plus 4 of the 5 plausible issues, the
+`plt.colorbar` no-op, and every applicable refactoring opportunity:
 
 - **Fixed** — Bugs 1-10 (see each entry below), plus the plausible issues
   `effective_velocity_annual` INC-before-assignment (now raises `KeyError`),
@@ -35,15 +36,35 @@ All 10 confirmed bugs have been fixed, plus 4 of the 5 plausible issues and the
   `np.longdouble` portability, and the `plt.colorbar` missing-parentheses no-op.
   A latent follow-on bug exposed by the `BasicDyn` fix (`self.tobs` used the
   raw `dt` arg instead of `self.dt`) was also fixed.
-- **Deliberately NOT changed** — the `scint_velocity` error-propagation term
-  (`scint_utils.py`). This is a scientific formula whose dimensional intent
-  (`coeff_err` as variance vs. standard error) needs domain confirmation;
-  changing it blindly could silently corrupt published results. Flagged for the
-  maintainer's review.
-- Refactoring opportunities below were **not** applied (out of scope for a
-  bug-fix pass).
+- **New bug found & fixed** — `slow_FT` (`scint_utils.py`) called
+  `np.fft.fftshift(SS, axis=0)`; numpy's kwarg is `axes`, so the function
+  raised `TypeError` on every call (it had never worked). Fixed to `axes=0`,
+  and the hard-coded mid-band reference frequency was made an optional `fref`
+  parameter (default preserves the previous mid-band behavior).
+- **Refactors applied** — consolidated the duplicated `svd_model` onto a shared
+  `scint_utils.svd_reconstruct` core; extracted the ~6x-repeated mosaic mask
+  block in `ththmod.py` into a single `chunk_mask` helper (verified bit-for-bit
+  identical output on all 9 affected functions); replaced the inline window
+  construction in `scale_dyn` with `get_window`; centralized the
+  `c = 299792458.0` literal onto `scipy.constants.c`; and removed the large
+  commented-out `sspec`-method implementation block.
+- **Deliberately NOT changed** —
+  - the `scint_velocity` error-propagation term (`scint_utils.py`): a scientific
+    formula whose dimensional intent needs domain confirmation; changing it
+    blindly could silently corrupt published results.
+  - `calc_scattered_image`'s inline griddata fill was **not** merged into
+    `interp_nan_2d`: it masks `array < 1e-22` whereas `interp_nan_2d` masks
+    NaN/inf, so consolidating would change the masking semantics.
+  - the long functions (`get_scint_params`, `fit_arc`, `norm_sspec`,
+    `ACF.calc_acf`) were **not** decomposed: they are the untested scientific
+    core, and splitting them without characterization tests risks silently
+    altering results. Recommended as future work once such tests exist.
+  - `trim_edges`'s unused `remove_short_sub` parameter was documented as
+    reserved/currently-unused rather than dropped, to avoid a public-API break.
+  - `make_dynspec` (documented placeholder) and single-use astronomical
+    constants were left as-is.
 
-Regression tests covering the fixes were added under `tests/`.
+Regression tests covering the fixes and refactors were added under `tests/`.
 
 ## Bugs (most severe first)
 

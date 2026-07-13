@@ -1025,13 +1025,11 @@ def differential_velocity(params, sun_velocity=220, screen_velocity=220,
     return diff_vel * np.sin(angle), diff_vel * np.cos(angle)
 
 
-def slow_FT(dynspec, freqs):
+def slow_FT(dynspec, freqs, fref=None):
     """
     Slow FT of dynamic spectrum along points of
     t*(f / fref), account for phase scaling of f_D.
     Given a uniform t axis, this reduces to a regular FT
-
-    Reference freq is currently hardcoded to the middle of the band
 
     Parameters
     ----------
@@ -1039,6 +1037,9 @@ def slow_FT(dynspec, freqs):
         Dynamic spectrum to be Fourier Transformed.
     freqs : array_like
         Frequencies of the channels in `dynspec`.
+    fref : float, optional
+        Reference frequency used to scale the time axis. If None
+        (default), the middle of the band is used.
 
     Returns
     -------
@@ -1058,9 +1059,10 @@ def slow_FT(dynspec, freqs):
     # declare the empty result array:
     SS = np.empty((ntime, nfreq), dtype=np.complex128)
 
-    # Reference freq. to middle of band, should change this
-    midf = len(freqs)//2
-    fref = freqs[midf]
+    # Reference freq. defaults to the middle of the band
+    if fref is None:
+        midf = len(freqs)//2
+        fref = freqs[midf]
     fscale = freqs / fref
     fscale = fscale.astype('float64')
 
@@ -1071,7 +1073,7 @@ def slow_FT(dynspec, freqs):
     FTphase = -2j*np.pi*tscale[:, np.newaxis, :] * \
         ft[np.newaxis, :, np.newaxis]
     SS = np.sum(dynspec[:, np.newaxis, :]*np.exp(FTphase), axis=0)
-    SS = np.fft.fftshift(SS, axis=0)
+    SS = np.fft.fftshift(SS, axes=0)
 
     # Still need to FFT y axis, should change to pyfftw for memory and
     #   speed improvement
@@ -1079,6 +1081,37 @@ def slow_FT(dynspec, freqs):
     SS = np.fft.fftshift(SS, axes=1)
 
     return SS
+
+
+def svd_reconstruct(arr, nmodes=1):
+    """
+    Reconstruct a matrix from the leading `nmodes` modes of its
+    singular value decomposition.
+
+    This is the shared SVD core used by `svd_model` (here) and by
+    ``ththmod.svd_model``.
+
+    Parameters
+    ----------
+    arr : array_like
+        Matrix to model with the SVD.
+    nmodes : int, optional
+        Number of leading singular values (modes) to keep; all
+        higher-order modes are zeroed. The default is 1.
+
+    Returns
+    -------
+    model : numpy.ndarray
+        Reconstruction of `arr` using only the leading `nmodes`
+        singular values.
+    """
+
+    u, s, w = np.linalg.svd(arr)
+    s[nmodes:] = 0.0
+    S = np.zeros([len(u), len(w)], np.complex128)
+    S[:len(s), :len(s)] = np.diag(s)
+
+    return np.dot(np.dot(u, S), w)
 
 
 def svd_model(arr, nmodes=1):
@@ -1103,12 +1136,7 @@ def svd_model(arr, nmodes=1):
         singular values.
     """
 
-    u, s, w = np.linalg.svd(arr)
-    s[nmodes:] = 0.0
-    S = np.zeros([len(u), len(w)], np.complex128)
-    S[:len(s), :len(s)] = np.diag(s)
-
-    model = np.dot(np.dot(u, S), w)
+    model = svd_reconstruct(arr, nmodes=nmodes)
     arr = arr / np.abs(model)
 
     return arr, model

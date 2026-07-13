@@ -21,11 +21,13 @@ from scintools.scint_utils import (
     centres_to_edges,
     interp_nan_2d,
     svd_model,
+    svd_reconstruct,
     get_window,
     scint_velocity,
     read_par,
     write_results,
     read_results,
+    slow_FT,
 )
 
 
@@ -347,3 +349,43 @@ def test_write_and_read_results_roundtrip(tmp_path):
     lines = outfile.read_text().splitlines()
     assert lines[0] == "name,mjd,freq,bw,tobs,dt,df,tau,tauerr"
     assert len(lines) == 3
+
+
+# ---------------------------------------------------------------------------
+# svd_reconstruct / svd_model (shared SVD core)
+# ---------------------------------------------------------------------------
+
+def test_svd_reconstruct_matches_svd_model_core():
+    rng = np.random.default_rng(7)
+    arr = rng.standard_normal((6, 5)) + 1j * rng.standard_normal((6, 5))
+    _, model = svd_model(arr.copy(), nmodes=2)
+    assert np.array_equal(model, svd_reconstruct(arr.copy(), nmodes=2))
+
+
+def test_svd_model_normalises_by_abs_model():
+    rng = np.random.default_rng(8)
+    arr = rng.standard_normal((5, 4)) + 1j * rng.standard_normal((5, 4))
+    normed, model = svd_model(arr.copy(), nmodes=1)
+    assert_allclose(normed, arr / np.abs(model))
+
+
+# ---------------------------------------------------------------------------
+# slow_FT - regression: previously raised TypeError (fftshift axis kwarg)
+# ---------------------------------------------------------------------------
+
+def test_slow_ft_runs_and_has_expected_shape():
+    rng = np.random.default_rng(9)
+    dynspec = rng.standard_normal((8, 6))
+    freqs = np.linspace(1400.0, 1410.0, 6)
+    ss = slow_FT(dynspec, freqs)
+    assert ss.shape == dynspec.shape
+    assert ss.dtype == np.complex128
+
+
+def test_slow_ft_default_fref_is_midband():
+    rng = np.random.default_rng(10)
+    dynspec = rng.standard_normal((8, 6))
+    freqs = np.linspace(1400.0, 1410.0, 6)
+    ss_default = slow_FT(dynspec, freqs)
+    ss_explicit = slow_FT(dynspec, freqs, fref=freqs[len(freqs) // 2])
+    assert np.array_equal(ss_default, ss_explicit)

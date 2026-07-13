@@ -21,7 +21,10 @@ from scintools.ththmod import (
     unit_checks,
     arc_edges,
     min_edges,
+    chunk_mask,
+    mask_func,
 )
+from scintools.scint_utils import svd_reconstruct
 
 
 # ---------------------------------------------------------------------------
@@ -37,6 +40,47 @@ def test_svd_model_reconstructs_rank1_matrix():
 
     assert model.shape == mat.shape
     assert_allclose(model, mat, atol=1e-8)
+
+
+def test_svd_model_delegates_to_shared_core():
+    # Regression: ththmod.svd_model and scint_utils.svd_reconstruct share
+    # one implementation and must agree exactly.
+    rng = np.random.default_rng(3)
+    mat = rng.standard_normal((6, 5)) + 1j * rng.standard_normal((6, 5))
+    assert np.array_equal(svd_model(mat, nmodes=2),
+                          svd_reconstruct(mat, nmodes=2))
+
+
+# ---------------------------------------------------------------------------
+# chunk_mask (shared mosaic weighting mask)
+# ---------------------------------------------------------------------------
+
+def test_chunk_mask_matches_inline_logic():
+    # Reference implementation matching the pre-refactor inline block.
+    def ref(shape, cf, ct, ncf, nct, cwf, cwt):
+        mask = np.ones(shape)
+        if cf > 0:
+            mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+        if cf < ncf - 1:
+            mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+        if ct > 0:
+            mask[:, : cwt // 2] *= mask_func(cwt // 2)
+        if ct < nct - 1:
+            mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+        return mask
+
+    ncf, nct, cwf, cwt = 3, 3, 4, 6
+    for cf in range(ncf):
+        for ct in range(nct):
+            got = chunk_mask((cwf, cwt), cf, ct, ncf, nct, cwf, cwt)
+            assert np.array_equal(got, ref((cwf, cwt), cf, ct, ncf, nct,
+                                           cwf, cwt))
+
+
+def test_chunk_mask_single_chunk_is_all_ones():
+    # A lone chunk (ncf=nct=1) has no neighbours to cross-fade with.
+    mask = chunk_mask((4, 4), 0, 0, 1, 1, 4, 4)
+    assert np.array_equal(mask, np.ones((4, 4)))
 
 
 def test_svd_model_zero_modes_gives_zero_matrix():
