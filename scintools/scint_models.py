@@ -1,22 +1,40 @@
 #!/usr/bin/env python
 
 """
-models.py
+scint_models.py
 ----------------------------------
-Scintillation models
+Scintillation models.
 
-A library of scintillation models to use with lmfit, emcee, or bilby
+A library of scintillation models to use with ``lmfit``, ``emcee``, or
+``bilby`` for modelling and fitting pulsar scintillation data. This
+includes:
 
-    Each model has at least inputs:
+* 1D and 2D autocorrelation function (ACF) models for measuring the
+  scintillation timescale and decorrelation bandwidth.
+* Secondary spectrum models, including power-law noise spectra and
+  scintillation arc power/curvature.
+* Effective velocity models (annual and orbital terms, and the "thin
+  screen" relation between arc curvature and effective velocity) used
+  to infer pulsar distances, orbital inclinations, and other binary
+  parameters from scintillation arcs.
+
+Most fitting-model functions share a common calling convention:
+
+    Inputs (at least):
         params
         xdata
         ydata
         weights
 
-    And output:
+    Output:
         residuals = (ydata - model) * weights
 
-    Some functions use additional inputs
+Some functions use additional inputs, and a few (documented below,
+e.g. ``effective_velocity_annual``, ``arc_weak``, ``arc_weak_2d``) do
+not return residuals for a fitter but instead return the model values
+directly. The :func:`fitter` function is the common entry point used
+to drive these models with ``lmfit``'s ``Minimizer`` (least-squares or
+``emcee``/MCMC).
 """
 
 from __future__ import (absolute_import, division,
@@ -29,6 +47,75 @@ from lmfit import Minimizer
 def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
            steps=1000, burn=0.2, progress=True, workers=1,
            nan_policy='raise', max_nfev=None, thin=10, is_weighted=True):
+    """
+    Common entry point for fitting one of the residual-returning
+    models in this module using ``lmfit``.
+
+    Wraps the model function and starting parameters in an ``lmfit``
+    ``Minimizer`` and either performs a least-squares minimisation, or
+    (if ``mcmc=True``) runs the ``emcee`` MCMC sampler via
+    ``Minimizer.emcee``.
+
+    Parameters
+    ----------
+    model : callable
+        A model function from this module (e.g. `tau_acf_model`,
+        `scint_acf_model`, `scint_acf_model_2d_approx`,
+        `powerspectrum_model`) that takes ``params`` followed by the
+        contents of `args` and returns the (weighted) residuals
+        between data and model.
+    params : lmfit.Parameters
+        Initial/starting parameters for the fit.
+    args : tuple
+        Extra positional arguments passed to `model` after `params`
+        (typically some combination of ``xdata``, ``ydata``, and
+        ``weights``).
+    mcmc : bool, optional
+        If True, sample the posterior with ``emcee`` instead of doing
+        a least-squares fit. Default is False.
+    pos : array_like, optional
+        Initial walker positions passed to ``Minimizer.emcee`` (only
+        used if `mcmc` is True). Default is None (let ``emcee``
+        initialise the walkers).
+    nwalkers : int, optional
+        Number of ``emcee`` walkers (only used if `mcmc` is True).
+        Default is 100.
+    steps : int, optional
+        Number of ``emcee`` steps to run (only used if `mcmc` is
+        True). Default is 1000.
+    burn : float, optional
+        Fraction of `steps` to discard as burn-in (only used if `mcmc`
+        is True); converted internally to an integer number of steps
+        via ``int(burn * steps)``. Default is 0.2.
+    progress : bool, optional
+        Whether ``emcee`` prints a progress bar (only used if `mcmc`
+        is True). Default is True.
+    workers : int, optional
+        Number of parallel workers for ``emcee`` (only used if `mcmc`
+        is True). Default is 1.
+    nan_policy : str, optional
+        How ``lmfit`` should handle NaNs in the residuals for the
+        least-squares fit (only used if `mcmc` is False). Default is
+        'raise'.
+    max_nfev : int, optional
+        Maximum number of function evaluations for the least-squares
+        fit (only used if `mcmc` is False). Default is None (use the
+        ``lmfit`` default).
+    thin : int, optional
+        Only accept every `thin`-th ``emcee`` sample (only used if
+        `mcmc` is True). Default is 10.
+    is_weighted : bool, optional
+        Whether the residuals returned by `model` are already
+        weighted, passed through to ``Minimizer.emcee`` (only used if
+        `mcmc` is True). Default is True.
+
+    Returns
+    -------
+    results : lmfit.minimizer.MinimizerResult
+        The fit result object returned by ``Minimizer.minimize()``
+        (least-squares) or ``Minimizer.emcee()`` (MCMC), containing
+        the best-fit (or posterior) parameters and fit statistics.
+    """
 
     # Do fit
     if mcmc:
@@ -47,6 +134,31 @@ def fitter(model, params, args, mcmc=False, pos=None, nwalkers=100,
 
 
 def powerspectrum_model(params, xdata, ydata):
+    """
+    Model a red-noise power spectrum (e.g. of the frequency-averaged
+    secondary spectrum / cross-power vs sqrt(delay)) as a power law
+    plus a white-noise floor, and return the residuals.
+
+    model = wn + amp * xdata**alpha
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the white-noise
+        level ('wn'), power-law amplitude ('amp'), and power-law index
+        ('alpha').
+    xdata : numpy.ndarray
+        Independent variable (e.g. sqrt of delay/tdel).
+    ydata : numpy.ndarray
+        Power spectrum values corresponding to `xdata`.
+
+    Returns
+    -------
+    numpy.ndarray
+        Residual of model and data (``ydata - model``). Unlike most
+        other model functions in this module, this residual is not
+        multiplied by weights.
+    """
 
     parvals = params.valuesdict()
 
@@ -61,11 +173,30 @@ def powerspectrum_model(params, xdata, ydata):
 
 def tau_acf_model(params, xdata, ydata, weights):
     """
-    Fit 1D function to cut through ACF for scintillation timescale.
-    Exponent is 5/3 for Kolmogorov turbulence.
-        amp = Amplitude
-        tau = timescale at 1/e
-        alpha = index of exponential function. 2 is Gaussian, 5/3 is Kolmogorov
+    Model a 1D cut through the center of the ACF along the time axis
+    and return the residuals.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit amplitude ('amp'), timescale at 1/e width ('tau'),
+        and index of the exponential function ('alpha'; 2 is
+        Gaussian, 5/3 is Kolmogorov).
+    xdata : numpy.ndarray
+        Time of sub-integrations from the center of the ACF to the
+        maximum time.
+    ydata : numpy.ndarray
+        ACF pixel values corresponding to `xdata` and running through
+        the center of the ACF.
+    weights : numpy.ndarray or None
+        Weights of the data. If None, uniform weights of ones are
+        used, with the white-noise spike (first element) excluded.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighted residual of model and data.
     """
 
     if weights is None:
@@ -87,10 +218,32 @@ def tau_acf_model(params, xdata, ydata, weights):
 
 def dnu_acf_model(params, xdata, ydata, weights):
     """
-    Fit 1D function to cut through ACF for decorrelation bandwidth.
-    Default function has is exponential with dnu measured at half power
-        amp = Amplitude
-        dnu = bandwidth at 1/2 power
+    Model a 1D cut through the center of the ACF along the frequency
+    axis and return the residuals.
+
+    Default function is exponential with `dnu` measured at half
+    power.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit amplitude ('amp') and decorrelation bandwidth at
+        half power ('dnu').
+    xdata : numpy.ndarray
+        Frequency of the channels from the center of the ACF to the
+        maximum frequency.
+    ydata : numpy.ndarray
+        ACF pixel values corresponding to `xdata` and running through
+        the center of the ACF.
+    weights : numpy.ndarray or None
+        Weights of the data. If None, uniform weights of ones are
+        used, with the white-noise spike (first element) excluded.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighted residual of model and data.
     """
 
     if weights is None:
@@ -111,7 +264,33 @@ def dnu_acf_model(params, xdata, ydata, weights):
 
 def scint_acf_model(params, xdata, ydata, weights):
     """
-    Fit both tau (tau_acf_model) and dnu (dnu_acf_model) simultaneously
+    Apply `tau_acf_model` and `dnu_acf_model` simultaneously and
+    return the concatenated residuals.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit amplitude ('amp'), timescale at 1/e width ('tau'),
+        decorrelation bandwidth at half power ('dnu'), and index of
+        the exponential function ('alpha').
+    xdata : tuple of numpy.ndarray
+        Two-element sequence ``(xdata_t, xdata_f)`` with the time and
+        frequency axes, passed through to `tau_acf_model` and
+        `dnu_acf_model` respectively.
+    ydata : tuple of numpy.ndarray
+        Two-element sequence ``(ydata_t, ydata_f)`` with the ACF cuts
+        along time and frequency, passed through to `tau_acf_model`
+        and `dnu_acf_model` respectively.
+    weights : tuple of numpy.ndarray
+        Two-element sequence ``(weights_t, weights_f)`` with the
+        weights for the time and frequency cuts respectively.
+
+    Returns
+    -------
+    numpy.ndarray
+        Concatenation of the weighted residuals from `tau_acf_model`
+        and `dnu_acf_model`.
     """
 
     residuals_t = tau_acf_model(params, xdata[0], ydata[0], weights[0])
@@ -122,7 +301,36 @@ def scint_acf_model(params, xdata, ydata, weights):
 
 def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
     """
-    Fit an approximate 2D ACF function
+    Model an approximate 2D ACF that incorporates a phase gradient,
+    and return the residuals.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit amplitude ('amp'), timescale at 1/e width ('tau'),
+        decorrelation bandwidth at half power ('dnu'), index of the
+        exponential function ('alpha'), and phase gradient
+        ('phasegrad'), as well as the total observation time
+        ('tobs') and total bandwidth ('bw').
+    tdata : numpy.ndarray
+        Times of sub-integrations along the desired range, centered
+        on the sub-integration next to that of the white-noise spike.
+    fdata : numpy.ndarray
+        Frequencies of channels along the desired range, centered on
+        the channel next to that of the white-noise spike.
+    ydata : numpy.ndarray
+        ACF cropped to the range of times and frequencies matching
+        `tdata` and `fdata`.
+    weights : numpy.ndarray or None
+        Weights of the data, in FFT (fftshift) ordering. If None,
+        uniform weights of ones are used. The white-noise spike is
+        excluded from the fit.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighted residual of model and data.
     """
 
     parvals = params.valuesdict()
@@ -163,7 +371,37 @@ def scint_acf_model_2d_approx(params, tdata, fdata, ydata, weights):
 
 def scint_acf_model_2d(params, ydata, weights):
     """
-    Fit an analytical 2D ACF function
+    Model an analytical 2D ACF using the `scintools.scint_sim.ACF`
+    class, and return the residuals.
+
+    This method is significantly slower than
+    `scint_acf_model_2d_approx`.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit timescale at 1/e width ('tau'), decorrelation
+        bandwidth at half power ('dnu'), index of the exponential
+        function ('alpha'), axial ratio of anisotropy ('ar'),
+        orientation of anisotropy ('psi'), phase gradient
+        ('phasegrad'), rotation of the phase gradient ('theta'), and
+        amplitude ('amp'), as well as the total observation time
+        ('tobs'), total bandwidth ('bw'), and number of
+        sub-integrations and channels used to build the model ACF
+        ('nt', 'nf').
+    ydata : numpy.ndarray
+        2D ACF cropped symmetrically around its center to a desired
+        range, with shape ``(nf_crop, nt_crop)``.
+    weights : numpy.ndarray or None
+        Weights of the data, in FFT (fftshift) ordering. If None,
+        uniform weights of ones are used. The white-noise spike is
+        excluded from the fit.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighted residual of model and data.
     """
 
     parvals = params.valuesdict()
@@ -217,11 +455,28 @@ def scint_acf_model_2d(params, ydata, weights):
 
 def tau_sspec_model(params, xdata, ydata):
     """
-    Fit 1D function to cut through ACF for scintillation timescale.
-    Exponent is 5/3 for Kolmogorov turbulence.
-        amp = Amplitude
-        tau = timescale at 1/e
-        alpha = index of exponential function. 2 is Gaussian, 5/3 is Kolmogorov
+    Model a 1D cut through the center of the ACF along the time axis
+    and apply a Fourier transform, returning the residuals against
+    the secondary-spectrum profile.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters or dict-like
+        Object containing the current best-fit amplitude ('amp'),
+        timescale at 1/e width ('tau'), and index of the exponential
+        function ('alpha'; 2 is Gaussian, 5/3 is Kolmogorov).
+    xdata : numpy.ndarray
+        Time of sub-integrations from the center of the ACF to the
+        maximum time.
+    ydata : numpy.ndarray
+        Profile from the secondary spectrum corresponding to the ACF
+        to model, summed along all columns (all f_t).
+
+    Returns
+    -------
+    numpy.ndarray
+        Residual of model and data, weighted by the model itself
+        (used as an approximation of the noise).
     """
 
     amp = params['amp']
@@ -247,10 +502,30 @@ def tau_sspec_model(params, xdata, ydata):
 
 def dnu_sspec_model(params, xdata, ydata):
     """
-    Fit 1D function to cut through ACF for decorrelation bandwidth.
-    Default function has is exponential with dnu measured at half power
-        amp = Amplitude
-        dnu = bandwidth at 1/2 power
+    Model a 1D cut through the center of the ACF along the frequency
+    axis and apply a Fourier transform, returning the residuals
+    against the secondary-spectrum profile.
+
+    Default function is exponential with `dnu` measured at half
+    power.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters or dict-like
+        Object containing the current best-fit amplitude ('amp') and
+        decorrelation bandwidth at half power ('dnu').
+    xdata : numpy.ndarray
+        Frequency of the channels from the center of the ACF to the
+        maximum frequency.
+    ydata : numpy.ndarray
+        Profile from the secondary spectrum corresponding to the ACF
+        to model, summed along all rows (all f_tau or f_lambda).
+
+    Returns
+    -------
+    numpy.ndarray
+        Residual of model and data, weighted by the model itself
+        (used as an approximation of the noise).
     """
 
     amp = params['amp']
@@ -275,7 +550,43 @@ def dnu_sspec_model(params, xdata, ydata):
 
 def scint_sspec_model(params, xdata, ydata, weights):
     """
-    Fit both tau (tau_sspec_model) and dnu (dnu_sspec_model) simultaneously
+    Apply `tau_sspec_model` and `dnu_sspec_model` simultaneously and
+    return the concatenated residuals.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters or dict-like
+        Object containing the current best-fit amplitude ('amp'),
+        timescale at 1/e width ('tau'), decorrelation bandwidth at
+        half power ('dnu'), and index of the exponential function
+        ('alpha').
+    xdata : tuple of numpy.ndarray
+        Two-element sequence ``(xdata_t, xdata_f)`` with the time and
+        frequency axes, passed through to `tau_sspec_model` and
+        `dnu_sspec_model` respectively.
+    ydata : tuple of numpy.ndarray
+        Two-element sequence ``(ydata_t, ydata_f)`` with the
+        secondary-spectrum profiles along time and frequency, passed
+        through to `tau_sspec_model` and `dnu_sspec_model`
+        respectively.
+    weights : sequence
+        Two-element sequence ``(weights_t, weights_f)``, passed as an
+        extra positional argument to `tau_sspec_model` and
+        `dnu_sspec_model`.
+
+    Returns
+    -------
+    numpy.ndarray
+        Concatenation of the residuals from `tau_sspec_model` and
+        `dnu_sspec_model`.
+
+    Raises
+    ------
+    TypeError
+        `tau_sspec_model` and `dnu_sspec_model` only accept
+        ``(params, xdata, ydata)``, so calling them here with an
+        extra `weights` element currently raises a TypeError. This
+        function is not presently called elsewhere in the package.
     """
 
     residuals_t = tau_sspec_model(params, xdata[0], ydata[0], weights[0])
@@ -286,8 +597,33 @@ def scint_sspec_model(params, xdata, ydata, weights):
 
 def arc_power_curve(params, xdata, ydata, weights):
     """
-    Returns a template for the power curve in secondary spectrum vs
-    sqrt(curvature) or normalised fdop
+    Return a template for the power curve in the secondary spectrum
+    against sqrt(curvature) or normalised f_t.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object (currently unused by the
+        model itself).
+    xdata : numpy.ndarray
+        Square-root arc curvatures.
+    ydata : numpy.ndarray
+        Secondary-spectrum power profile.
+    weights : numpy.ndarray or None
+        Weights of the data. If None, uniform weights of ones are
+        used.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighted residual of model and data.
+
+    Notes
+    -----
+    The model template is not yet implemented: `model` is currently
+    an empty list, so ``ydata - model`` will raise a
+    ``ValueError`` (mismatched shapes) for any non-empty `ydata`.
+    This function is not presently called elsewhere in the package.
     """
 
     if weights is None:
@@ -299,7 +635,24 @@ def arc_power_curve(params, xdata, ydata, weights):
 
 def fit_parabola(x, y):
     """
-    Fit a parabola and return the value and error for the peak
+    Fit a parabola and return the value and error for the peak.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        x values of the peak profile.
+    y : numpy.ndarray
+        y values of the peak profile.
+
+    Returns
+    -------
+    yfit : numpy.ndarray
+        y values of the fit, evaluated at `x`.
+    peak : float
+        Fit peak value (x position of the parabola's turning point).
+    peak_error : float
+        Uncertainty on `peak`, propagated from the covariance of the
+        fitted parabola coefficients.
     """
 
     # increase range to help fitter
@@ -328,7 +681,28 @@ def fit_parabola(x, y):
 
 def fit_log_parabola(x, y):
     """
-    Fit a log-parabola and return the value and error for the peak
+    Fit a log-parabola and return the value and error for the peak.
+
+    Takes the natural log of `x`, fits a parabola in log-x space via
+    `fit_parabola`, and converts the resulting peak position and
+    error back to linear `x` units.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        x values of the peak profile (must be positive, since the
+        log is taken).
+    y : numpy.ndarray
+        y values of the peak profile.
+
+    Returns
+    -------
+    yfit : numpy.ndarray
+        y values of the fit, evaluated at (rescaled) log(`x`).
+    peak : float
+        Fit peak value, in linear `x` units.
+    peak_error : float
+        Uncertainty on `peak`, in linear `x` units.
     """
 
     # Take the log of x
@@ -351,9 +725,63 @@ def arc_curvature(params, ydata, weights, true_anomaly,
                   vearth_ra, vearth_dec, mjd=None, model_only=False,
                   return_veff=False):
     """
-    arc curvature model
+    Model the arc curvature and return the residuals (or, optionally,
+    the model curvature and effective velocity components directly).
 
-        ydata: arc curvature
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit distance to the pulsar in kpc ('d') and fractional
+        screen distance ('s'), plus the parameters required by
+        `effective_velocity_annual`. Optionally also: an anisotropy
+        model flag ('nmodel'), anisotropy angle ('zeta', required if
+        anisotropic), ISM velocity in RA/Dec ('vism_ra', 'vism_dec')
+        or, for the anisotropic case, ISM velocity along `zeta`
+        ('vism_zeta'). The deprecated parameter names 'psi' and
+        'vism_psi' are no longer supported (use 'zeta' and
+        'vism_zeta' instead).
+    ydata : numpy.ndarray
+        Arc curvature data.
+    weights : numpy.ndarray or None
+        Weights of the data. If None (and `model_only` is False),
+        uniform weights of ones are used.
+    true_anomaly : numpy.ndarray
+        True anomalies corresponding to the data.
+    vearth_ra : numpy.ndarray
+        Earth velocity in RA corresponding to the data.
+    vearth_dec : numpy.ndarray
+        Earth velocity in Dec corresponding to the data.
+    mjd : numpy.ndarray or float, optional
+        MJDs corresponding to the data, used for the 'OMDOT'
+        correction in `effective_velocity_annual`. Default is None.
+    model_only : bool, optional
+        If True, return the model curvature (and, if `return_veff` is
+        also True, the effective velocity components) instead of the
+        residuals. Default is False.
+    return_veff : bool, optional
+        If True (and `model_only` is also True), also return the
+        ISM-subtracted effective velocity components in RA and Dec.
+        Default is False.
+
+    Returns
+    -------
+    numpy.ndarray
+        If `model_only` is False: the weighted residual of model and
+        data, ``(ydata - model) * weights``.
+    model : numpy.ndarray
+        If `model_only` is True: the model arc curvature, in units of
+        1/(m mHz**2).
+    veff_ra, veff_dec : numpy.ndarray
+        If `model_only` and `return_veff` are both True: the
+        ISM-subtracted effective velocity in RA and Dec, returned in
+        addition to `model`.
+
+    Raises
+    ------
+    KeyError
+        If the deprecated parameter 'psi' or 'vism_psi' is present in
+        `params`.
     """
 
     # ensure dimensionality of arrays makes sense
@@ -428,10 +856,43 @@ def arc_curvature(params, ydata, weights, true_anomaly,
 def veff_thin_screen(params, ydata, weights, true_anomaly,
                      vearth_ra, vearth_dec, mjd=None):
     """
-    Effective velocity thin screen model.
-    Uses Eq. 4 from Rickett et al. (2014) for anisotropy coefficients.
+    Model the effective velocity implied by a thin-screen scattering
+    geometry and return the residuals.
 
-        ydata: arc curvature
+    Uses Eq. 4 from Rickett et al. (2014) for the anisotropy
+    coefficients.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing the current
+        best-fit fractional screen distance ('s') and pulsar distance
+        in kpc ('d'), plus the parameters required by
+        `effective_velocity_annual`. Optionally also: a scaling
+        factor ('kappa', default 1), an anisotropy model flag
+        ('nmodel'), and for the anisotropic case an axial ratio
+        parameter ('R') and anisotropy angle in degrees ('psi'). ISM
+        velocity in RA/Dec ('vism_ra', 'vism_dec') may also be given
+        and is subtracted from the effective velocity.
+    ydata : numpy.ndarray
+        Measured effective velocity (or, equivalently, quantity
+        proportional to it via the arc curvature) data.
+    weights : numpy.ndarray
+        Weights of the data.
+    true_anomaly : numpy.ndarray
+        True anomalies corresponding to the data.
+    vearth_ra : numpy.ndarray
+        Earth velocity in RA corresponding to the data.
+    vearth_dec : numpy.ndarray
+        Earth velocity in Dec corresponding to the data.
+    mjd : numpy.ndarray or float, optional
+        MJDs corresponding to the data, used for the 'OMDOT'
+        correction in `effective_velocity_annual`. Default is None.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighted residual of model and data.
     """
 
     # ensure dimensionality of arrays makes sense
@@ -504,8 +965,56 @@ Below: Models that do not return residuals for a fitter
 def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
                               mjd=None):
     """
-    Effective velocity with annual and pulsar terms
-        Note: Does NOT include IISM velocity, but returns veff in IISM frame
+    Compute the effective velocity including annual (Earth orbital
+    and proper motion) and pulsar orbital terms.
+
+    Note: this does NOT include the interstellar medium (IISM)
+    velocity, but the returned effective velocity is expressed in the
+    IISM frame.
+
+    Parameters
+    ----------
+    params : lmfit.Parameters
+        ``lmfit`` ``Parameters()`` object containing, if the pulsar is
+        in a binary: the projected semi-major axis in lt-s ('A1'),
+        orbital period in days ('PB'), orbital eccentricity ('ECC'),
+        longitude of periastron in degrees ('OM'), inclination via
+        one of 'KIN' (degrees), 'COSI', or 'SINI', and optionally an
+        inclination-sense flag ('sense') and periastron-advance rate
+        in deg/yr ('OMDOT', requires 'T0' and `mjd`). Also,
+        optionally, the proper motion in RA and Dec ('PMRA', 'PMDEC',
+        mas/yr), and always the longitude of the ascending node in
+        degrees ('KOM'), the fractional screen distance ('s'), and
+        pulsar distance in kpc ('d'). Note that 'KOM' is required even
+        for non-binary pulsars, since it is used unconditionally to
+        rotate the pulsar/proper-motion velocity into RA/Dec.
+    true_anomaly : numpy.ndarray
+        True anomalies to compute over (radians). Ignored if the
+        binary parameters are absent from `params`.
+    vearth_ra : numpy.ndarray
+        Earth velocity in RA to compute over (km/s).
+    vearth_dec : numpy.ndarray
+        Earth velocity in Dec to compute over (km/s).
+    mjd : numpy.ndarray or float, optional
+        MJDs corresponding to `true_anomaly`, used to evaluate the
+        'OMDOT' correction to the longitude of periastron. Default is
+        None; if 'OMDOT' is present in `params` and `mjd` is None, a
+        warning is printed and the uncorrected 'OM' is used.
+
+    Returns
+    -------
+    veff_ra : numpy.ndarray
+        Total effective velocity in RA (km/s), combining the Earth
+        and pulsar/proper-motion contributions weighted by the
+        fractional screen distance.
+    veff_dec : numpy.ndarray
+        Total effective velocity in Dec (km/s).
+    vp_ra : numpy.ndarray or float
+        Pulsar orbital velocity in RA (km/s); 0 if no binary
+        parameters are present.
+    vp_dec : numpy.ndarray or float
+        Pulsar orbital velocity in Dec (km/s); 0 if no binary
+        parameters are present.
     """
     # Define some constants
     v_c = 299792.458  # km/s
@@ -589,21 +1098,28 @@ def effective_velocity_annual(params, true_anomaly, vearth_ra, vearth_dec,
 
 def arc_weak(ftn, ar=1, psi=0, alpha=11/3):
     """
+    Model the 1D weak-scattering scintillation arc Doppler profile
+    (power vs normalised Doppler frequency), for a possibly
+    anisotropic scattering screen.
+
     Parameters
     ----------
-    ftn : Array 1D
-        The normalised Doppler frequency (x-axis), where ftn=1 is the arc
-
+    ftn : array_like, 1D
+        The normalised Doppler frequency (x-axis), where ``ftn = 1``
+        is the arc.
     ar : float, optional
-        Anisotropy axial ratio. The default is 1.
+        Anisotropy axial ratio. The default is 1 (isotropic).
     psi : float, optional
-        DESCRIPTION. The default is 0.
+        Orientation angle of the anisotropy, in degrees. The default
+        is 0.
+    alpha : float, optional
+        Index of the turbulence spectrum. The default is 11/3
+        (Kolmogorov).
 
     Returns
     -------
-    p : Array 1D
-        The model poppler profile
-
+    p : array_like, 1D
+        The model Doppler profile.
     """
 
     # Begin model
@@ -620,27 +1136,35 @@ def arc_weak(ftn, ar=1, psi=0, alpha=11/3):
 
 def arc_weak_2d(fdop, tdel, eta=1, ar=1, psi=0, alpha=11/3):
     """
+    Model the 2D weak-scattering secondary spectrum along a
+    scintillation arc, for a possibly anisotropic scattering screen.
+
     Parameters
     ----------
-    fdop : Array 1D
-        The Doppler frequency (x-axis) coordinates of the model secondary
+    fdop : array_like, 1D
+        The Doppler frequency (x-axis) coordinates of the model
+        secondary spectrum.
+    tdel : array_like, 1D
+        The delay (y-axis) coordinates of the model secondary
         spectrum.
-    tdel : Array 1D
-        The wavenumber (y-axis) coordinates of the model secondary spectrum.
-    eta : floar, optional
+    eta : float, optional
         Arc curvature. The default is 1.
     ar : float, optional
-        Anisotropy axial ratio. The default is 1.
+        Anisotropy axial ratio. The default is 1 (isotropic).
     psi : float, optional
-        DESCRIPTION. The default is 0.
+        Orientation angle of the anisotropy, in degrees. The default
+        is 0.
     alpha : float, optional
-        DESCRIPTION. The default is 11/3.
+        Index of the turbulence spectrum. The default is 11/3
+        (Kolmogorov). Note that, unlike in `arc_weak`, this parameter
+        is currently unused by the model, which always uses a fixed
+        exponent of -11/6 (appropriate for Kolmogorov turbulence).
 
     Returns
     -------
-    sspec : Array 2D
-        The model secondary spectrum.
-
+    sspec : array_like, 2D
+        The model secondary spectrum, with shape
+        ``(len(tdel), len(fdop))``.
     """
 
     # Begin model

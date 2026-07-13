@@ -1,5 +1,8 @@
 .DS_Store
 scintools/.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
 scintools/*.pyc
 scintools/__pycache__/*
 scintools/__pycache__

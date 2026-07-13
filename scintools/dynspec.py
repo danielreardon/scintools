@@ -4,6 +4,27 @@
 dynspec.py
 ----------------------------------
 Dynamic spectrum class
+
+This module defines the :class:`Dynspec` class, the central object of
+``scintools`` for loading, processing, and analysing pulsar dynamic spectra
+(intensity as a function of time and radio frequency). A :class:`Dynspec`
+object can be created directly from a psrflux-format ASCII file, or wrapped
+around raw arrays / other in-memory formats using one of the lightweight
+helper classes defined at the end of this module:
+
+- :class:`BasicDyn` - wraps a bare 2D flux array plus time/frequency axes.
+- :class:`MatlabDyn` - imports simulated dynamic spectra produced by the
+  Matlab code of Coles et al. (2010).
+- :class:`SimDyn` - imports a :class:`scintools.scint_sim.Simulation` object.
+- :class:`HoloDyn` - imports a model dynamic spectrum produced by the
+  holography code of Walker et al. (2008).
+
+Once loaded, :class:`Dynspec` provides methods for basic processing (e.g.
+trimming, cropping, refilling, and correcting the dynamic spectrum), for
+computing and plotting derived data products (autocorrelation function,
+secondary spectrum, scattered image), and for measuring scintillation
+parameters including arc curvature via ``fit_arc`` and the theta-theta
+technique.
 """
 
 from __future__ import (absolute_import, division,
@@ -39,6 +60,57 @@ import astropy.constants as const
 
 
 class Dynspec:
+    """
+    A pulsar dynamic spectrum: intensity as a function of observing
+    frequency (rows, ``self.freqs``) and time (columns, ``self.times``).
+
+    A ``Dynspec`` is constructed either from a psrflux-format file
+    (``filename=``) or from an in-memory object such as a
+    :class:`BasicDyn`, :class:`MatlabDyn`, :class:`SimDyn`, or
+    :class:`HoloDyn` (``dyn=``); see :meth:`__init__` for details. After
+    loading, the raw dynamic spectrum is available as ``self.dyn`` (a 2D
+    array of shape ``(nchan, nsub)``), with axes ``self.freqs`` (MHz) and
+    ``self.times`` (seconds since the start of the observation).
+
+    Typical usage processes the dynamic spectrum (`trim_edges`, `refill`,
+    `correct_dyn`, `scale_dyn`), then computes and plots derived products
+    such as the autocorrelation function (`calc_acf`/`plot_acf`) and
+    secondary spectrum (`calc_sspec`/`plot_sspec`), and/or fits for the
+    scintillation arc curvature (`fit_arc`) and other scintillation
+    parameters (`get_scint_params`).
+
+    Attributes
+    ----------
+    dyn : ndarray
+        The dynamic spectrum, shape (nchan, nsub).
+    times : ndarray
+        Time axis, seconds since the start of the observation.
+    freqs : ndarray
+        Frequency axis, in MHz.
+    name : str
+        Name of the dynamic spectrum (usually derived from the filename).
+    header : list of str
+        Header lines read from the input file, if any.
+    mjd : float
+        MJD of the start of the observation.
+    nchan : int
+        Number of frequency channels.
+    nsub : int
+        Number of sub-integrations (time steps).
+    freq : float
+        Centre observing frequency, in MHz.
+    bw : float
+        Observation bandwidth, in MHz.
+    df : float
+        Channel bandwidth, in MHz.
+    dt : float
+        Sub-integration duration, in seconds.
+    tobs : float
+        Total observation duration, in seconds.
+    lamsteps : bool
+        Whether the dynamic spectrum has been resampled to equal steps in
+        wavelength rather than frequency.
+    """
 
     def __init__(self, filename=None, dyn=None, verbose=True, process=False,
                  lamsteps=False, remove_short_subs=True, subint_thresh=2.33,
@@ -1890,6 +1962,25 @@ class Dynspec:
                 np.exp(1j*np.angle(self.wavefield[posdspec]))
 
     def calc_asymmetry(self, verbose=False, pool=None):
+        """
+        Compute the theta-theta asymmetry parameter for each fitting chunk,
+        which quantifies the left-right (forward-backward) asymmetry of the
+        scintillation arc power and can indicate the presence of anisotropic
+        or bimodal scattering.
+
+        Runs `fit_thetatheta` first if it has not already been called.
+        Populates `self.asymmetry`, a complex array of shape
+        (`self.ncf_fit`, `self.nct_fit`).
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Option to print progress information. Defaults to False
+        pool : ThreadPool, optional
+            Pool of workers for parallel processing. Currently supports Pool
+            from multiprocessing and MPIPool from mpipool. Defaults
+            to None and runs chunks in series.
+        """
         if not hasattr(self, "ththeta"):
             self.fit_thetatheta(verbose=verbose, pool=pool)
         self.asymmetry = np.zeros((self.ncf_fit, self.nct_fit), dtype=complex)
@@ -4144,6 +4235,18 @@ class Dynspec:
 
 
 class BasicDyn():
+    """
+    Lightweight container for a dynamic spectrum built directly from arrays.
+
+    Wraps a 2D flux array together with its time/frequency axes and
+    observation metadata so that it can be passed to the `Dynspec` class,
+    which reads these attributes on construction::
+
+        basic = BasicDyn(dyn, times=times, freqs=freqs)
+        dynspec = Dynspec(dyn=basic)
+
+    See `BasicDyn.__init__` for the full list of accepted parameters.
+    """
 
     def __init__(self, dyn, name="BasicDyn", header=["BasicDyn"], times=[],
                  freqs=[], nchan=None, nsub=None, bw=None, df=None,
@@ -4211,6 +4314,13 @@ class BasicDyn():
 
 
 class MatlabDyn():
+    """
+    Loader for simulated dynamic spectra stored in MATLAB ``.mat`` files.
+
+    Reads a dynamic spectrum produced by the original MATLAB simulation
+    code of Coles et al. (2010) and exposes it with the attributes expected
+    by the `Dynspec` class. See `MatlabDyn.__init__` for details.
+    """
 
     def __init__(self, matfilename):
         """
@@ -4262,6 +4372,14 @@ class MatlabDyn():
 
 
 class SimDyn():
+    """
+    Adapter that exposes a `scint_sim.Simulation` object to the `Dynspec`
+    class.
+
+    Copies the simulated dynamic spectrum and its derived time/frequency
+    axes and metadata into the attribute layout expected by `Dynspec`. See
+    `SimDyn.__init__` for details.
+    """
 
     def __init__(self, sim):
         """
@@ -4302,6 +4420,15 @@ class SimDyn():
 
 
 class HoloDyn():
+    """
+    Loader for model dynamic spectra from the holography code of Walker et
+    al. (2008).
+
+    Reads the real (and optional imaginary) components of a model dynamic
+    spectrum from FITS files, combines them into a complex field, and
+    exposes the amplitude with the attributes expected by the `Dynspec`
+    class. See `HoloDyn.__init__` for details.
+    """
 
     def __init__(self, holofile, imholofile=None, df=1, dt=1, fmin=0, mjd=0):
         """
