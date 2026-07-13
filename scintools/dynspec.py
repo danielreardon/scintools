@@ -4,6 +4,27 @@
 dynspec.py
 ----------------------------------
 Dynamic spectrum class
+
+This module defines the :class:`Dynspec` class, the central object of
+``scintools`` for loading, processing, and analysing pulsar dynamic spectra
+(intensity as a function of time and radio frequency). A :class:`Dynspec`
+object can be created directly from a psrflux-format ASCII file, or wrapped
+around raw arrays / other in-memory formats using one of the lightweight
+helper classes defined at the end of this module:
+
+- :class:`BasicDyn` - wraps a bare 2D flux array plus time/frequency axes.
+- :class:`MatlabDyn` - imports simulated dynamic spectra produced by the
+  Matlab code of Coles et al. (2010).
+- :class:`SimDyn` - imports a :class:`scintools.scint_sim.Simulation` object.
+- :class:`HoloDyn` - imports a model dynamic spectrum produced by the
+  holography code of Walker et al. (2008).
+
+Once loaded, :class:`Dynspec` provides methods for basic processing (e.g.
+trimming, cropping, refilling, and correcting the dynamic spectrum), for
+computing and plotting derived data products (autocorrelation function,
+secondary spectrum, scattered image), and for measuring scintillation
+parameters including arc curvature via ``fit_arc`` and the theta-theta
+technique.
 """
 
 from __future__ import (absolute_import, division,
@@ -39,6 +60,57 @@ import astropy.constants as const
 
 
 class Dynspec:
+    """
+    A pulsar dynamic spectrum: intensity as a function of observing
+    frequency (rows, ``self.freqs``) and time (columns, ``self.times``).
+
+    A ``Dynspec`` is constructed either from a psrflux-format file
+    (``filename=``) or from an in-memory object such as a
+    :class:`BasicDyn`, :class:`MatlabDyn`, :class:`SimDyn`, or
+    :class:`HoloDyn` (``dyn=``); see :meth:`__init__` for details. After
+    loading, the raw dynamic spectrum is available as ``self.dyn`` (a 2D
+    array of shape ``(nchan, nsub)``), with axes ``self.freqs`` (MHz) and
+    ``self.times`` (seconds since the start of the observation).
+
+    Typical usage processes the dynamic spectrum (`trim_edges`, `refill`,
+    `correct_dyn`, `scale_dyn`), then computes and plots derived products
+    such as the autocorrelation function (`calc_acf`/`plot_acf`) and
+    secondary spectrum (`calc_sspec`/`plot_sspec`), and/or fits for the
+    scintillation arc curvature (`fit_arc`) and other scintillation
+    parameters (`get_scint_params`).
+
+    Attributes
+    ----------
+    dyn : ndarray
+        The dynamic spectrum, shape (nchan, nsub).
+    times : ndarray
+        Time axis, seconds since the start of the observation.
+    freqs : ndarray
+        Frequency axis, in MHz.
+    name : str
+        Name of the dynamic spectrum (usually derived from the filename).
+    header : list of str
+        Header lines read from the input file, if any.
+    mjd : float
+        MJD of the start of the observation.
+    nchan : int
+        Number of frequency channels.
+    nsub : int
+        Number of sub-integrations (time steps).
+    freq : float
+        Centre observing frequency, in MHz.
+    bw : float
+        Observation bandwidth, in MHz.
+    df : float
+        Channel bandwidth, in MHz.
+    dt : float
+        Sub-integration duration, in seconds.
+    tobs : float
+        Total observation duration, in seconds.
+    lamsteps : bool
+        Whether the dynamic spectrum has been resampled to equal steps in
+        wavelength rather than frequency.
+    """
 
     def __init__(self, filename=None, dyn=None, verbose=True, process=False,
                  lamsteps=False, remove_short_subs=True, subint_thresh=2.33,
@@ -265,6 +337,10 @@ class Dynspec:
         bandwagon_frac : float in [0,1], optional
             Set entire edge to zero if more than this fraction of the edge
             pixels is zero or NaN. The default is 0.5.
+        remove_short_sub : bool, optional
+            Currently unused and reserved for future use; short
+            sub-integrations are removed at load time by
+            `remove_short_subs`, not here. The default is True.
 
         """
 
@@ -497,13 +573,11 @@ class Dynspec:
                 dyn = self.dyn
         else:
             dyn = input_dyn
-        medval = np.median(dyn[is_valid(dyn)*np.array(np.abs(
-                                                      is_valid(dyn)) > 0)])
-        minval = np.min(dyn[is_valid(dyn)*np.array(np.abs(
-                                                   is_valid(dyn)) > 0)])
+        finite_nonzero = is_valid(dyn) * (np.abs(dyn) > 0)
+        medval = np.median(dyn[finite_nonzero])
+        minval = np.min(dyn[finite_nonzero])
         # standard deviation
-        std = np.std(dyn[is_valid(dyn)*np.array(np.abs(
-                                                is_valid(dyn)) > 0)])
+        std = np.std(dyn[finite_nonzero])
         vmin = minval + std
         vmax = medval + 4*std
 
@@ -901,7 +975,7 @@ class Dynspec:
 
         """
 
-        c = 299792458.0  # m/s
+        c = sc.c  # m/s (speed of light)
         if input_scattered_image is None:
             if not hasattr(self, 'scattered_image'):
                 self.calc_scattered_image(lamsteps=lamsteps, trap=trap,
@@ -1138,12 +1212,13 @@ class Dynspec:
                 etamax = etamax_array.squeeze()[iarc]
 
             if not lamsteps:
-                c = 299792458.0  # m/s
+                c = sc.c  # m/s (speed of light)
                 beta_to_eta = c*1e6/((ref_freq*10**6)**2)
                 etamax = etamax/(self.freq/ref_freq)**2  # correct for freq
                 etamax = etamax*beta_to_eta
                 etamin = etamin/(self.freq/ref_freq)**2
                 etamin = etamin*beta_to_eta
+                constraint = np.array(constraint, dtype=float)
                 constraint = constraint/(self.freq/ref_freq)**2
                 constraint = constraint*beta_to_eta
 
@@ -1890,6 +1965,25 @@ class Dynspec:
                 np.exp(1j*np.angle(self.wavefield[posdspec]))
 
     def calc_asymmetry(self, verbose=False, pool=None):
+        """
+        Compute the theta-theta asymmetry parameter for each fitting chunk,
+        which quantifies the left-right (forward-backward) asymmetry of the
+        scintillation arc power and can indicate the presence of anisotropic
+        or bimodal scattering.
+
+        Runs `fit_thetatheta` first if it has not already been called.
+        Populates `self.asymmetry`, a complex array of shape
+        (`self.ncf_fit`, `self.nct_fit`).
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            Option to print progress information. Defaults to False
+        pool : ThreadPool, optional
+            Pool of workers for parallel processing. Currently supports Pool
+            from multiprocessing and MPIPool from mpipool. Defaults
+            to None and runs chunks in series.
+        """
         if not hasattr(self, "ththeta"):
             self.fit_thetatheta(verbose=verbose, pool=pool)
         self.asymmetry = np.zeros((self.ncf_fit, self.nct_fit), dtype=complex)
@@ -2030,7 +2124,7 @@ class Dynspec:
                 eta = self.eta
         else:  # convert to beta
             if not lamsteps:
-                c = 299792458.0  # m/s
+                c = sc.c  # m/s (speed of light)
                 beta_to_eta = c*1e6/((ref_freq*10**6)**2)
                 eta = eta/(self.freq/ref_freq)**2  # correct for frequency
                 eta = eta*beta_to_eta
@@ -2114,7 +2208,7 @@ class Dynspec:
 
         if logsteps:
             masklin += np.isnan(normSspeclin)
-            normSspeclin = np.ma.array(normSspeclin, mask=mask)
+            normSspeclin = np.ma.array(normSspeclin, mask=masklin)
             mask += np.isnan(normSspec)
             normSspec = np.ma.array(normSspec, mask=mask)
             self.mask = mask
@@ -2763,8 +2857,8 @@ class Dynspec:
                 if ndnu > (self.bw / dnu):
                     if verbose:
                         print('WARNING: nscale exceeds range in frequency lag')
-                    tmin = 0
-                    tmax = nf
+                    fmin = 0
+                    fmax = nf
                 else:
                     fframe = int(round(ndnu * (dnu / self.df)))
                     fmin = int(np.floor(
@@ -2909,39 +3003,8 @@ class Dynspec:
                         results = res
 
         elif method == 'sspec':
-            '''
-            sspec method
-            '''
+            # The secondary-spectrum fitting method is not yet implemented.
             print("This method doesn't work yet, do something else")
-            # fdyn = np.fft.fft2(self.dyn, (2 * nf, 2 * nt))
-            # fdynsq = fdyn * np.conjugate(fdyn)
-
-            # secspec = np.real(fdynsq)
-            # secspec = np.fft.fftshift(fdynsq)
-            # secspec = secspec[nf:2*nf, :]
-            # secspec = np.real(secspec)
-
-            # rowsum = np.sum(secspec[:, :nt], axis=0)
-            # ydata_t = rowsum / (2*nf)
-            # colsum = np.sum(secspec[:nf, :], axis=1)
-            # ydata_f = colsum / (2 * nt)
-
-            # # concatenate x and y arrays
-            # xdata = np.array(np.concatenate((xdata_t, xdata_f)))
-            # ydata = np.concatenate((ydata_t, ydata_f))
-
-            # if verbose:
-            #     print("\nPerforming least-squares fit to secondary spectrum")
-            # chisqr = np.inf
-            # for itr in range(nitr):
-            #     results = fitter(scint_sspec_model, params,
-            #                      (xdata, ydata), nan_policy=nan_policy,
-            #                       mcmc=mcmc, is_weighted=(not lnsigma),
-            #                       burn=burn, nwalkers=nwalkers, steps=steps)
-            #     if results.chisqr < chisqr:
-            #         chisqr = results.chisqr
-            #         params = results.params
-            #         res = results
 
         if results.params['tau'].stderr is None or \
            results.params['dnu'].stderr is None:
@@ -3497,7 +3560,7 @@ class Dynspec:
                 self.fit_arc(lamsteps=lamsteps,
                              log_parabola=True, plot=plot_fit)
             if lamsteps:
-                c = 299792458.0  # m/s
+                c = sc.c  # m/s (speed of light)
                 beta_to_eta = c * 1e6 / ((ref_freq * 1e6)**2)
                 # correct for freq
                 eta = self.betaeta / (self.freq / ref_freq)**2
@@ -3654,7 +3717,7 @@ class Dynspec:
                     self.scale_dyn(scale='velocity')
                 dyn = cp(self.vdyn)
             elif trap:
-                if not hasattr(self, 'trap'):
+                if not hasattr(self, 'trapdyn'):
                     self.scale_dyn(scale='trapezoid')
                 dyn = cp(self.trapdyn)
             else:
@@ -3979,8 +4042,8 @@ class Dynspec:
                 arin2 = cp(self.lamdyn)  # input array
                 nf2, nt2 = np.shape(arin2)
                 arout2 = np.zeros([nf2, nt2])
-            mjd = np.asarray(self.mjd, dtype=np.float128) + \
-                np.asarray(self.times, dtype=np.float128)/86400
+            mjd = np.asarray(self.mjd, dtype=np.longdouble) + \
+                np.asarray(self.times, dtype=np.longdouble)/86400
 
             print('Getting SSB delays')
             ssb_delays = get_ssb_delay(mjd, pars['RAJ'], pars['DECJ'])
@@ -4085,24 +4148,8 @@ class Dynspec:
             nt = np.shape(dyn)[1]
             if window is not None:
                 # Window the dynamic spectrum
-                if window == 'hanning':
-                    cw = np.hanning(np.floor(window_frac*nt))
-                    sw = np.hanning(np.floor(window_frac*nf))
-                elif window == 'hamming':
-                    cw = np.hamming(np.floor(window_frac*nt))
-                    sw = np.hamming(np.floor(window_frac*nf))
-                elif window == 'blackman':
-                    cw = np.blackman(np.floor(window_frac*nt))
-                    sw = np.blackman(np.floor(window_frac*nf))
-                elif window == 'bartlett':
-                    cw = np.bartlett(np.floor(window_frac*nt))
-                    sw = np.bartlett(np.floor(window_frac*nf))
-                else:
-                    print('Window unknown.. Please add it!')
-                chan_window = np.insert(cw, int(np.ceil(len(cw)/2)),
-                                        np.ones([nt-len(cw)]))
-                subint_window = np.insert(sw, int(np.ceil(len(sw)/2)),
-                                          np.ones([nf-len(sw)]))
+                chan_window, subint_window = get_window(nt, nf, window=window,
+                                                        frac=window_frac)
                 dyn = np.multiply(chan_window, dyn)
                 dyn = np.transpose(np.multiply(subint_window,
                                                np.transpose(dyn)))
@@ -4144,9 +4191,21 @@ class Dynspec:
 
 
 class BasicDyn():
+    """
+    Lightweight container for a dynamic spectrum built directly from arrays.
 
-    def __init__(self, dyn, name="BasicDyn", header=["BasicDyn"], times=[],
-                 freqs=[], nchan=None, nsub=None, bw=None, df=None,
+    Wraps a 2D flux array together with its time/frequency axes and
+    observation metadata so that it can be passed to the `Dynspec` class,
+    which reads these attributes on construction::
+
+        basic = BasicDyn(dyn, times=times, freqs=freqs)
+        dynspec = Dynspec(dyn=basic)
+
+    See `BasicDyn.__init__` for the full list of accepted parameters.
+    """
+
+    def __init__(self, dyn, name="BasicDyn", header=None, times=None,
+                 freqs=None, nchan=None, nsub=None, bw=None, df=None,
                  freq=None, tobs=None, dt=None, mjd=60000):
         """
         Define a basic dynamic spectrum object from an array of fluxes
@@ -4192,10 +4251,13 @@ class BasicDyn():
         """
 
         # Set parameters from input
-        if times.size == 0 or freqs.size == 0:
+        if times is None or freqs is None or len(times) == 0 \
+                or len(freqs) == 0:
             raise ValueError('must input array of times and frequencies')
+        times = np.asarray(times)
+        freqs = np.asarray(freqs)
         self.name = name
-        self.header = header
+        self.header = header if header is not None else ["BasicDyn"]
         self.times = times  # times should be the start times of each bin
         self.freqs = freqs
         self.nchan = nchan if nchan is not None else len(freqs)
@@ -4204,13 +4266,20 @@ class BasicDyn():
         self.df = df if df is not None else np.mean(np.abs(np.diff(freqs)))
         self.freq = freq if freq is not None else np.mean(np.unique(freqs))
         self.dt = dt if dt is not None else np.mean(np.abs(np.diff(times)))
-        self.tobs = tobs if tobs is not None else np.ptp(times) + dt
+        self.tobs = tobs if tobs is not None else np.ptp(times) + self.dt
         self.mjd = mjd
         self.dyn = dyn
         return
 
 
 class MatlabDyn():
+    """
+    Loader for simulated dynamic spectra stored in MATLAB ``.mat`` files.
+
+    Reads a dynamic spectrum produced by the original MATLAB simulation
+    code of Coles et al. (2010) and exposes it with the attributes expected
+    by the `Dynspec` class. See `MatlabDyn.__init__` for details.
+    """
 
     def __init__(self, matfilename):
         """
@@ -4232,13 +4301,13 @@ class MatlabDyn():
         self.matfile = loadmat(matfilename)  # reads matfile to a dictionary
         try:
             self.dyn = self.matfile['spi']
-        except NameError:
-            raise NameError('No variable named "spi" found in mat file')
+        except KeyError:
+            raise KeyError('No variable named "spi" found in mat file')
 
         try:
             dlam = float(self.matfile['dlam'])
-        except NameError:
-            raise NameError('No variable named "dlam" found in mat file')
+        except KeyError:
+            raise KeyError('No variable named "dlam" found in mat file')
         # Set parameters from input
         self.name = matfilename.split()[0]
         self.header = [self.matfile['__header__'], ["Dynspec loaded \
@@ -4262,6 +4331,14 @@ class MatlabDyn():
 
 
 class SimDyn():
+    """
+    Adapter that exposes a `scint_sim.Simulation` object to the `Dynspec`
+    class.
+
+    Copies the simulated dynamic spectrum and its derived time/frequency
+    axes and metadata into the attribute layout expected by `Dynspec`. See
+    `SimDyn.__init__` for details.
+    """
 
     def __init__(self, sim):
         """
@@ -4280,7 +4357,7 @@ class SimDyn():
         if sim.lamsteps:
             self.name += ',lamsteps'
 
-        self.header = self.header
+        self.header = [self.name]
         self.dyn = sim.spi
         dlam = sim.dlam
 
@@ -4302,6 +4379,15 @@ class SimDyn():
 
 
 class HoloDyn():
+    """
+    Loader for model dynamic spectra from the holography code of Walker et
+    al. (2008).
+
+    Reads the real (and optional imaginary) components of a model dynamic
+    spectrum from FITS files, combines them into a complex field, and
+    exposes the amplitude with the attributes expected by the `Dynspec`
+    class. See `HoloDyn.__init__` for details.
+    """
 
     def __init__(self, holofile, imholofile=None, df=1, dt=1, fmin=0, mjd=0):
         """

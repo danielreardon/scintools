@@ -3,6 +3,46 @@
 """
 ththmod.py
 ----------------------------------
+Tools for the Theta-Theta ("theta-theta") transform used to measure
+scintillation arc curvatures and to perform phase retrieval on pulsar
+dynamic spectra.
+
+For a one dimensional line of scattered images at a fixed distance, the
+conjugate wavefield forms a parabola in Doppler shift/time delay
+(``fD``/``tau``) space, and the conjugate (secondary) spectrum -- the
+self-convolution of that wavefield -- shows the familiar scintillation
+arcs and inverted arclets. Reparameterizing each point of the conjugate
+spectrum by the Doppler shifts (``theta1``, ``theta2``) of the pair of
+images that interfere to produce it maps the arcs and arclets onto
+straight lines in "theta-theta" space; when the assumed arc curvature
+(``eta``) matches the data these lines become parallel to the axes,
+which enables both curvature measurement (by eigenvalue/singular-value
+or chi-squared search) and phase retrieval (by eigen-decomposition of
+the theta-theta matrix). See Sprenger et al. 2021, MNRAS, 500, 1114 and
+docs/source/thetatheta.rst for the scientific background.
+
+Core building blocks
+---------------------
+`fft_axis` : Build the Fourier-conjugate axis (e.g. Doppler frequency
+    from time, or time delay from frequency) for a data axis carrying
+    astropy units.
+`thth_map`, `thth_redmap` : Map a conjugate/secondary spectrum into
+    theta-theta space for a given arc curvature and set of bin edges
+    (``thth_redmap`` returns the largest sub-square fully covered by the
+    data).
+`rev_map` : Inverse-map a theta-theta array back into conjugate
+    spectrum space.
+`min_edges`, `arc_edges` : Compute theta-theta bin edges.
+`modeler`, `chisq_calc`, `Eval_calc`, `singularvalue_calc` : Build
+    models and search statistics used to find the best-fit curvature.
+`single_search`, `single_search_thin`, `calc_asymmetry`,
+`VLBI_chunk_retrieval`, `single_chunk_retrieval` : Higher level drivers
+    for curvature searches and phase retrieval on chunks of data,
+    designed for use with MPI4py-style parallel processing.
+`mosaic`, `rotMos`, `rotInit`, `rotFit`, `rotDer`, `fullMos*` : Combine
+    (mosaic) phase-retrieved wavefield chunks into a single composite
+    wavefield.
+
 Code for handling theta-theta transformation by Daniel Baker
 """
 
@@ -14,11 +54,16 @@ from matplotlib.colors import LogNorm, SymLogNorm
 from scipy.optimize import curve_fit
 import warnings
 
+from scintools.scint_utils import svd_reconstruct
+
 
 def svd_model(arr, nmodes=1):
     """
     Model a matrix using the first nmodes modes of the singular value
     decomposition
+
+    Thin wrapper around `scintools.scint_utils.svd_reconstruct`, the
+    shared SVD core, so the reconstruction logic lives in one place.
 
     Parameters
     ----------
@@ -27,12 +72,7 @@ def svd_model(arr, nmodes=1):
     nmodes: int, optional
         Number of modes used in the SVD model. Defaults to 1
     """
-    u, s, w = np.linalg.svd(arr)
-    s[nmodes:] = 0
-    S = np.zeros(([len(u), len(w)]), np.complex128)
-    S[: len(s), : len(s)] = np.diag(s)
-    model = np.dot(np.dot(u, S), w)
-    return model
+    return svd_reconstruct(arr, nmodes=nmodes)
 
 
 def chi_par(x, A, x0, C):
@@ -496,6 +536,44 @@ def fft_axis(x, unit, pad=0):
 def singularvalue_calc(
     CS, tau, fd, eta, edges, etaArclet, edgesArclet, centerCut
 ):
+    """
+    Calculate the largest singular value of the theta-theta matrix built
+    from a Conjugate/Secondary Spectrum using two possibly different
+    curvatures for the two theta axes (main arc for theta1, inverted
+    arclets for theta2), after zeroing out a central strip in theta1.
+
+    This is an alternative to `Eval_calc` for curvature searches: instead
+    of the largest eigenvalue of a Hermitian theta-theta matrix it uses
+    the largest singular value of `two_curve_map`'s (generally
+    non-Hermitian) result, which also allows arclets with a different
+    curvature than the main arc to be excised via `centerCut`.
+
+    Parameters
+    ----------
+    CS : `~numpy.ndarray`
+        Conjugate Spectrum (or its power, e.g. the secondary spectrum).
+    tau : `~astropy.units.Quantity`
+        Time delay coordinates for the CS (us).
+    fd : `~astropy.units.Quantity`
+        Doppler shift coordinates for the CS (mHz).
+    eta : `~astropy.units.Quantity`
+        Arc curvature used for theta1, the main arc (s**3).
+    edges : `~astropy.units.Quantity`
+        Bin edges in theta1 for theta-theta mapping (mHz).
+    etaArclet : `~astropy.units.Quantity`
+        Arc curvature used for theta2, the inverted arclets (s**3).
+    edgesArclet : `~astropy.units.Quantity`
+        Bin edges in theta2 for theta-theta mapping (mHz).
+    centerCut : `~astropy.units.Quantity`
+        Points with ``|theta1| < centerCut`` are set to zero before the
+        singular value decomposition, to remove contamination from
+        (e.g.) the zero-delay/zero-Doppler feature (mHz).
+
+    Returns
+    -------
+    S0 : float
+        The largest singular value of the masked theta-theta matrix.
+    """
     tau = unit_checks(tau, "tau", u.us)
     fd = unit_checks(fd, "fd", u.mHz)
     eta = unit_checks(eta, "eta", u.s**3)
@@ -1489,6 +1567,55 @@ def mask_func(w):
     return np.sin((np.pi / 2) * x / w) ** 2
 
 
+def chunk_mask(shape, cf, ct, ncf, nct, cwf, cwt):
+    """
+    Build the overlap-weighting mask for a single mosaic chunk.
+
+    Chunks are weighted higher towards their centre and cross-faded with
+    their neighbours over the overlapping half in each direction, so that
+    stacked chunks add smoothly. This is the shared implementation used by
+    `mosaic`, `rotMos`, `rotInit`, `rotDer`, `fullMos`, `fullMosGrad` and
+    `fullMosHess`.
+
+    Parameters
+    ----------
+    shape : tuple of int
+        Shape of the chunk (freq within chunk, time within chunk).
+    cf, ct : int
+        Frequency and time index of the chunk being weighted.
+    ncf, nct : int
+        Total number of chunks in frequency and time.
+    cwf, cwt : int
+        Chunk width in frequency and time.
+
+    Returns
+    -------
+    numpy.ndarray
+        Weighting mask with the same shape as the chunk.
+    """
+    mask = np.ones(shape)
+
+    # Determine Mask for new chunk (chunks will have higher weights
+    #     towards their centre)
+    if cf > 0:
+        # All chunks but the first in frequency overlap for the first
+        #     half in frequency
+        mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
+    if cf < ncf - 1:
+        # All chunks but the last in frequency overlap for the second
+        #     half in frequency
+        mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
+    if ct > 0:
+        # All chunks but the first in time overlap for the first half
+        #     in time
+        mask[:, : cwt // 2] *= mask_func(cwt // 2)
+    if ct < nct - 1:
+        # All chunks but the last in time overlap for the second half
+        #     in time
+        mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+    return mask
+
+
 def mosaic(chunks):
     """Combine recovered wavefield chunks into a single composite wavefield by
     correcting for random phase rotation and stacking
@@ -1522,26 +1649,7 @@ def mosaic(chunks):
                 cf * cwf // 2: cf * cwf // 2 + cwf,
                 ct * cwt // 2: ct * cwt // 2 + cwt,
             ]
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             # Average phase difference between new chunk and existing wavefield
             rot = np.angle((chunk_old * np.conjugate(chunk_new) * mask).mean())
             # Add masked and roated new chunk to wavefield
@@ -1737,26 +1845,7 @@ def rotMos(chunks, x):
             chunk_new = np.copy(chunks[cf, ct, :, :])
 
             # Find overlap with current wavefield
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             rot = 0
             if cf > 0 or ct > 0:
                 rot = x[nct * cf + ct - 1]
@@ -1822,26 +1911,7 @@ def rotInit(chunks):
                 cf * cwf // 2: cf * cwf // 2 + cwf,
                 ct * cwt // 2: ct * cwt // 2 + cwt,
             ]
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             # Average phase difference between new chunk and existing wavefield
             rot = np.angle((chunk_old * np.conjugate(chunk_new) * mask).mean())
             # Add masked and roated new chunk to wavefield
@@ -1888,28 +1958,7 @@ def rotDer(x, chunks):
                         ct * cwt // 2: ct * cwt // 2 + cwt,
                     ]
                 )
-                mask = np.ones(y.shape)
-
-                # Determine Mask for new chunk (chunks will have higher weights
-                #     towards their centre)
-                if cf > 0:
-                    # All chunks but the first in frequency overlap for the
-                    #     first half in frequency
-                    mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-                if cf < ncf - 1:
-                    # All chunks but the last in frequency overlap for the
-                    #     second half in frequency
-                    mask[cwf // 2:, :] *= (
-                        1 - mask_func(cwf // 2)[:, np.newaxis]
-                    )
-                if ct > 0:
-                    # All chunks but the first in time overlap for the first
-                    #     half in time
-                    mask[:, : cwt // 2] *= mask_func(cwt // 2)
-                if ct < nct - 1:
-                    # All chunks but the last in time overlap for the second
-                    #     half in time
-                    mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+                mask = chunk_mask(y.shape, cf, ct, ncf, nct, cwf, cwt)
                 y *= mask
                 rot = x[nct * cf + ct - 1]
                 xx -= y * np.exp(1j * rot)
@@ -1952,26 +2001,7 @@ def fullMos(chunks, p):
             chunk_new = np.copy(chunks[cf, ct, :, :])
 
             # Find overlap with current wavefield
-            mask = np.ones(chunk_new.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(chunk_new.shape, cf, ct, ncf, nct, cwf, cwt)
             if idx > 0:
                 phi = p[idx - 1]
             else:
@@ -2055,26 +2085,7 @@ def fullMosGrad(p, chunks, dspec, N):
                 cf * cwf // 2: cf * cwf // 2 + cwf,
                 ct * cwt // 2: ct * cwt // 2 + cwt,
             ]
-            mask = np.ones(y.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cf > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cf < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ct > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ct < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(y.shape, cf, ct, ncf, nct, cwf, cwt)
             y *= mask
             if idx > 0:
                 phi = p[idx - 1]
@@ -2143,26 +2154,7 @@ def fullMosHess(p, chunks, dspec, N):
                 cfN * cwf // 2: cfN * cwf // 2 + cwf,
                 ctN * cwt // 2: ctN * cwt // 2 + cwt,
             ]
-            mask = np.ones(yN.shape)
-
-            # Determine Mask for new chunk (chunks will have higher weights
-            #     towards their centre)
-            if cfN > 0:
-                # All chunks but the first in frequency overlap for the first
-                #     half in frequency
-                mask[: cwf // 2, :] *= mask_func(cwf // 2)[:, np.newaxis]
-            if cfN < ncf - 1:
-                # All chunks but the last in frequency overlap for the second
-                #     half in frequency
-                mask[cwf // 2:, :] *= 1 - mask_func(cwf // 2)[:, np.newaxis]
-            if ctN > 0:
-                # All chunks but the first in time overlap for the first half
-                #     in time
-                mask[:, : cwt // 2] *= mask_func(cwt // 2)
-            if ctN < nct - 1:
-                # All chunks but the last in time overlap for the second half
-                #     in time
-                mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+            mask = chunk_mask(yN.shape, cfN, ctN, ncf, nct, cwf, cwt)
             yN *= mask
             idpN = idxN - 1
             if idpN > -1:
@@ -2213,30 +2205,8 @@ def fullMosHess(p, chunks, dspec, N):
                     if -1 < cfM < ncf and -1 < ctM < nct:
                         idxM = cfM * nct + ctM
                         yM = np.copy(chunks[cfM, ctM, :, :])
-                        mask = np.ones(yN.shape)
-
-                        # Determine Mask for new chunk (chunks will have higher
-                        #     weights towards their centre)
-                        if cfM > 0:
-                            # All chunks but the first in frequency overlap for
-                            #     the first half in frequency
-                            mask[: cwf // 2, :] *= mask_func(cwf // 2)[
-                                :, np.newaxis
-                            ]
-                        if cfM < ncf - 1:
-                            # All chunks but the last in frequency overlap for
-                            #     the second half in frequency
-                            mask[cwf // 2:, :] *= (
-                                1 - mask_func(cwf // 2)[:, np.newaxis]
-                            )
-                        if ctM > 0:
-                            # All chunks but the first in time overlap for the
-                            #     first half in time
-                            mask[:, : cwt // 2] *= mask_func(cwt // 2)
-                        if ctM < nct - 1:
-                            # All chunks but the last in time overlap for the
-                            #     second half in time
-                            mask[:, cwt // 2:] *= 1 - mask_func(cwt // 2)
+                        mask = chunk_mask(yN.shape, cfM, ctM, ncf, nct,
+                                          cwf, cwt)
                         yM *= mask
                         idpM = idxM - 1
                         if idpM > -1:
@@ -2366,6 +2336,31 @@ def errString(fit, sig):
 
 
 def errCalc(etas, eigs, fitPars):
+    """
+    Estimate the standard error on the fitted curvature (the vertex, x0,
+    of a parabola fit to an eigenvalue- or chi-squared-vs-curvature
+    curve), propagated from the scatter of the data about the best-fit
+    parabola `chi_par`. This provides an alternative to the uncertainty
+    obtained from the covariance matrix returned by
+    `~scipy.optimize.curve_fit`.
+
+    Parameters
+    ----------
+    etas : `~numpy.ndarray` or `~astropy.units.Quantity`
+        Curvatures at which `eigs` was measured (the independent
+        variable of the `chi_par` fit).
+    eigs : `~numpy.ndarray`
+        Measured values (e.g. largest eigenvalue or chi-squared) at each
+        curvature in `etas`.
+    fitPars : tuple or `~numpy.ndarray`
+        Best-fit parameters ``(A, x0, C)`` of `chi_par` fit to
+        ``(etas, eigs)``.
+
+    Returns
+    -------
+    x0Err : float
+        Estimated standard error on the fitted curvature x0.
+    """
     M = chi_par(etas.value, *fitPars)
     sigEstimate = np.std(eigs - M)
     x0Err = (

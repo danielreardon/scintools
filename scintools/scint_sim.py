@@ -1,9 +1,25 @@
 #!/usr/bin/env python
 
 """
-scintsim.py
+scint_sim.py
 ----------------------------------
-Simulate scintillation. Based on original MATLAB code by Coles et al. (2010)
+Simulation tools for pulsar scintillation.
+
+This module provides three classes:
+
+* `Simulation` - a wave-optics simulator of a thin scattering screen that
+  produces a simulated dynamic spectrum (and related products such as the
+  phase screen, electric field, and scatter-broadened pulse shape). Based on
+  original MATLAB code by Coles et al. (2010), "Scattering of pulsar radio
+  emission by the interstellar plasma".
+* `ACF` - computes the theoretical autocorrelation function (ACF) and
+  secondary spectrum of intensity for strong scintillation, following the
+  analytic treatment in Appendix A of Rickett, Coles et al. (2014), ApJ 787,
+  161.
+* `Brightness` - computes the angular brightness distribution, delay-Doppler
+  (secondary) spectrum, and ACF of a scattered wave from the angular
+  spectrum, based on Yao et al. (2020) with corrections to the phase
+  gradient terms.
 """
 
 from __future__ import (absolute_import, division,
@@ -21,6 +37,16 @@ from scintools.scint_utils import is_valid, get_window
 
 
 class Simulation():
+    """
+    Wave-optics simulator of a thin scattering screen.
+
+    Generates a random phase screen with a given power-law structure
+    function and anisotropy, propagates it through the Fresnel diffraction
+    integral to obtain the electric field and intensity as a function of
+    observer position and frequency, and packages the result as a simulated
+    dynamic spectrum (with physical time/frequency axes) for use elsewhere
+    in scintools. Based on original MATLAB code by Coles et al. (2010).
+    """
 
     def __init__(self, mb2=2, rf=1, ds=0.01, alpha=5/3, ar=1, psi=0,
                  inner=0.001, ns=256, nf=256, dlam=0.25, lamsteps=False,
@@ -28,20 +54,81 @@ class Simulation():
                  verbose=False, freq=1400, dt=30, mjd=60000, nsub=None,
                  efield=False, noise=None):
         """
-        Electromagnetic simulator based on original code by Coles et al. (2010)
+        Electromagnetic simulator based on original code by Coles et al.
+        (2010).
 
-        mb2: Max Born parameter for strength of scattering
-        rf: Fresnel scale
-        ds (or dx,dy): Spatial step sizes with respect to rf
-        alpha: Structure function exponent (Kolmogorov = 5/3)
-        ar: Anisotropy axial ratio
-        psi: Anisotropy orientation
-        inner: Inner scale w.r.t rf - should generally be smaller than ds
-        ns (or nx,ny): Number of spatial steps
-        nf: Number of frequency steps.
-        dlam: Fractional bandwidth relative to centre frequency
-        lamsteps: Boolean to choose whether steps in lambda or freq
-        seed: Seed number, or use "-1" to shuffle
+        On construction, this generates the phase screen, propagates it to
+        get the electric field and intensity, computes the dynamic spectrum
+        (if ``nf > 1``), and computes the scatter-broadened pulse response.
+        The result is stored as ``self.dyn`` with physical axes
+        (``self.freqs``, ``self.times``) so that a `Simulation` instance can
+        be passed directly to scintools' `Dynspec` class.
+
+        Parameters
+        ----------
+        mb2 : float, optional
+            Max Born parameter, sets the strength of scattering.
+        rf : float, optional
+            Fresnel scale, used as the length unit for the simulation.
+        ds : float, optional
+            Spatial step size (in units of `rf`), used for both x and y
+            unless overridden by `dx`/`dy`.
+        alpha : float, optional
+            Structure function exponent (Kolmogorov turbulence = 5/3).
+        ar : float, optional
+            Axial ratio of the anisotropy of the scattering screen.
+        psi : float, optional
+            Orientation angle (degrees) of the anisotropy.
+        inner : float, optional
+            Inner scale of turbulence, in units of `rf`. Should generally be
+            smaller than `ds`.
+        ns : int, optional
+            Number of spatial steps in x and y, used unless overridden by
+            `nx`/`ny`.
+        nf : int, optional
+            Number of frequency steps across the fractional bandwidth
+            `dlam`.
+        dlam : float, optional
+            Fractional bandwidth relative to the centre frequency.
+        lamsteps : bool, optional
+            If True, take equally-spaced steps in wavelength rather than in
+            frequency.
+        seed : int or None, optional
+            Seed for the random phase screen, for reproducible simulations.
+            Use -1 to reshuffle (i.e. use a fresh, unseeded draw). Default
+            of None uses NumPy's global random state.
+        nx : int or None, optional
+            Number of spatial steps in x. Overrides `ns` when set.
+        ny : int or None, optional
+            Number of spatial steps in y. Overrides `ns` when set.
+        dx : float or None, optional
+            Spatial step size in x (in units of `rf`). Overrides `ds` when
+            set.
+        dy : float or None, optional
+            Spatial step size in y (in units of `rf`). Overrides `ds` when
+            set.
+        plot : bool, optional
+            If True, plot the screen, intensity, and dynamic spectrum after
+            the simulation is computed (calls `plot_all`).
+        verbose : bool, optional
+            If True, print progress messages while the simulation runs.
+        freq : float, optional
+            Centre observing frequency, in MHz, used to set the physical
+            frequency axis of the simulated dynamic spectrum.
+        dt : float, optional
+            Subintegration time, in seconds, used to set the physical time
+            axis of the simulated dynamic spectrum.
+        mjd : float, optional
+            MJD of the start of the observation, recorded in the header.
+        nsub : int or None, optional
+            Number of subintegrations (spatial steps in x) to keep in the
+            output dynamic spectrum. If None, all `nx` steps are kept.
+        efield : bool, optional
+            If True, store the (real part of the) electric field instead of
+            the intensity in ``self.dyn``.
+        noise : float or None, optional
+            Noise level parameter, accepted for interface compatibility.
+            Currently unused within this method.
         """
 
         self.mb2 = mb2
@@ -127,7 +214,7 @@ class Simulation():
         L = self.rf**2 * k
         # Curvature to use for Dynspec object within scintools
         self.eta = L/(2 * V**2) / 10**6 / np.cos(psi * np.pi/180)**2
-        c = 299792458.0  # m/s
+        c = sc.c  # m/s (speed of light)
         beta_to_eta = c*1e6/((self.freq*10**6)**2)
         # Curvature for wavelength-rescaled dynamic spectrum
         self.betaeta = self.eta / beta_to_eta
@@ -135,7 +222,16 @@ class Simulation():
         return
 
     def set_constants(self):
+        """
+        Precompute constants used by the simulation.
 
+        Derives the Fresnel-filter constants (`ffconx`, `ffcony`), the
+        spatial coherence scale (`s0`), the normalization of the phase
+        power spectrum (`consp`), the FFT normalization (`scnorm`), and the
+        reference scale (`sref`) from the current values of `nx`, `ny`,
+        `dx`, `dy`, `alpha`, `mb2`, and `rf`. Sets these as attributes on
+        the instance; does not return a value.
+        """
         ns = 1
         lenx = self.nx*self.dx
         leny = self.ny*self.dy
@@ -207,6 +303,29 @@ class Simulation():
         return
 
     def get_intensity(self, verbose=True):
+        """
+        Propagate the phase screen to the observer plane at each frequency.
+
+        For each of the `nf` frequency channels, applies the appropriate
+        Fresnel scaling to the phase screen, propagates it via the Fresnel
+        filter (`frfilt3`), and takes a 1D cut through the resulting
+        electric field (through the centre row in y) as a function of x.
+        Requires `get_screen` to have been run first (i.e. `self.xyp` to
+        exist).
+
+        Parameters
+        ----------
+        verbose : bool, optional
+            If True, print progress as a percentage while looping over
+            frequency channels.
+
+        Returns
+        -------
+        None
+            Sets ``self.xyi`` (intensity of the last-computed frequency's
+            2D field) and ``self.spe`` (complex electric field as a
+            function of x and frequency) as attributes.
+        """
         spe = np.zeros([self.nx, self.nf],
                        dtype=np.dtype(np.csingle)) + \
             1j*np.zeros([self.nx, self.nf],
@@ -236,6 +355,21 @@ class Simulation():
         return
 
     def get_dynspec(self):
+        """
+        Compute the dynamic spectrum (intensity) from the electric field.
+
+        Requires `get_intensity` to have been run first (i.e. `self.spe`
+        to exist). Also computes the spatial x-axis (`self.x`) and the
+        normalized wavelength (`self.lams`) and frequency (`self.freqs`)
+        axes across the fractional bandwidth.
+
+        Returns
+        -------
+        None
+            Sets ``self.spi`` (dynamic spectrum, intensity vs x and
+            frequency), ``self.x``, ``self.lams``, and ``self.freqs`` as
+            attributes.
+        """
         if self.nf == 1:
             print('no spectrum because nf=1')
 
@@ -274,6 +408,27 @@ class Simulation():
         self.dm = self.xyp[:, int(self.ny/2)]*self.dlam/np.pi
 
     def swdsp(self, kx=0, ky=0):
+        """
+        Amplitude of the phase-screen power spectrum at given wavenumbers.
+
+        Evaluates the square root of the (anisotropic, power-law) phase
+        power spectral density, including the isotropic inner-scale
+        cutoff, at the wavenumber(s) `(kx, ky)`. Used by `get_screen` to
+        build the phase screen from a complex Gaussian random field.
+
+        Parameters
+        ----------
+        kx : float or numpy.ndarray, optional
+            Wavenumber(s) in the x direction.
+        ky : float or numpy.ndarray, optional
+            Wavenumber(s) in the y direction.
+
+        Returns
+        -------
+        float or numpy.ndarray
+            Amplitude weighting to apply at `(kx, ky)`, same shape as the
+            broadcast of `kx` and `ky`.
+        """
         cs = np.cos(self.psi*np.pi/180)
         sn = np.sin(self.psi*np.pi/180)
         r = self.ar
@@ -292,6 +447,29 @@ class Simulation():
         return out
 
     def frfilt3(self, xye, scale):
+        """
+        Apply the Fresnel-propagation filter to a 2D field, in place.
+
+        Multiplies the four quadrants of the 2D Fourier-domain field `xye`
+        by the appropriate Fresnel phase factor (a function of wavenumber
+        and `scale`), using the Fresnel-filter constants (`ffconx`,
+        `ffcony`) computed by `set_constants`.
+
+        Parameters
+        ----------
+        xye : numpy.ndarray
+            2D complex array (Fourier transform of the field) to filter,
+            of shape ``(nx, ny)``. Modified in place.
+        scale : float
+            Fresnel scaling factor for the current frequency channel
+            (relative wavelength/frequency scale).
+
+        Returns
+        -------
+        numpy.ndarray
+            The filtered array (the same object as `xye`, modified in
+            place).
+        """
         nx2 = int(self.nx / 2) + 1
         ny2 = int(self.ny / 2) + 1
         filt = np.zeros([nx2, ny2], dtype=np.dtype(np.csingle))
@@ -311,6 +489,19 @@ class Simulation():
         return xye
 
     def plot_screen(self, subplot=False):
+        """
+        Plot the simulated phase screen in x and y.
+
+        Computes the screen first via `get_screen` if it has not already
+        been computed.
+
+        Parameters
+        ----------
+        subplot : bool, optional
+            If True, draw onto the current axes without calling
+            ``plt.show()`` (for use as part of a larger figure, e.g. by
+            `plot_all`). If False, show the figure immediately.
+        """
         if not hasattr(self, 'xyp'):
             self.get_screen()
         x_steps = np.linspace(0, self.dx*self.nx, self.nx)
@@ -324,7 +515,20 @@ class Simulation():
         return
 
     def plot_intensity(self, subplot=False):
-        # routine to plot intensity
+        """
+        Plot the observer-side intensity fluctuations in space, at the
+        centre frequency.
+
+        Computes the intensity first via `get_intensity` if it has not
+        already been computed.
+
+        Parameters
+        ----------
+        subplot : bool, optional
+            If True, draw onto the current axes without calling
+            ``plt.show()`` (for use as part of a larger figure, e.g. by
+            `plot_all`). If False, show the figure immediately.
+        """
         if not hasattr(self, 'xyi'):
             self.get_intensity()
         x_steps = np.linspace(0, self.dx*(self.nx), (self.nx))
@@ -338,6 +542,20 @@ class Simulation():
         return
 
     def plot_dynspec(self, subplot=False):
+        """
+        Plot the simulated dynamic spectrum (intensity vs x and
+        frequency/wavelength).
+
+        Computes the dynamic spectrum first via `get_dynspec` if it has
+        not already been computed.
+
+        Parameters
+        ----------
+        subplot : bool, optional
+            If True, draw onto the current axes without calling
+            ``plt.show()`` (for use as part of a larger figure, e.g. by
+            `plot_all`). If False, show the figure immediately.
+        """
         if not hasattr(self, 'spi'):
             self.get_dynspec()
 
@@ -354,6 +572,19 @@ class Simulation():
         return
 
     def plot_efield(self, subplot=False):
+        """
+        Plot the real part of the simulated electric field vs x and
+        frequency/wavelength.
+
+        Computes the electric field first via `get_intensity` if it has
+        not already been computed.
+
+        Parameters
+        ----------
+        subplot : bool, optional
+            If True, draw onto the current axes without calling
+            ``plt.show()``. If False, show the figure immediately.
+        """
         if not hasattr(self, 'spe'):
             self.get_intensity()
 
@@ -372,6 +603,19 @@ class Simulation():
         return
 
     def plot_delay(self, subplot=False):
+        """
+        Plot the dispersive group delay vs x (at the centre frequency) and
+        the pulse-averaged impulse response function vs delay.
+
+        Requires `get_pulse` to have been run first (i.e. `self.dm` and
+        `self.pulsewin` to exist).
+
+        Parameters
+        ----------
+        subplot : bool, optional
+            Accepted for interface consistency with the other ``plot_*``
+            methods; currently unused (the figure is always shown).
+        """
         # get frequency to set the scale, enter in GHz
         Freq = self.freq/1000
         plt.subplot(2, 1, 1)
@@ -387,6 +631,19 @@ class Simulation():
         return
 
     def plot_pulse(self, subplot=False):
+        """
+        Plot the (log) intensity of the scatter-broadened pulse vs x and
+        delay, overlaid with the group delay from the phase screen.
+
+        Requires `get_pulse` to have been run first (i.e. `self.dm` and
+        `self.pulsewin` to exist).
+
+        Parameters
+        ----------
+        subplot : bool, optional
+            Accepted for interface consistency with the other ``plot_*``
+            methods; currently unused (the figure is always shown).
+        """
         # get frequency to set the scale, enter in GHz
         Freq = self.freq/1000
         lpw = np.log10(self.pulsewin)
@@ -396,7 +653,7 @@ class Simulation():
                        (np.arange(0, 3*self.nf/2, 1) - self.nf/2) /
                        (2*self.dlam*Freq),
                        lpw[int(self.nf/2):, :], vmin=vmin, vmax=vmax)
-        plt.colorbar
+        plt.colorbar()
         plt.ylabel('Delay (ns)')
         plt.xlabel('$x/r_f$')
         plt.plot(np.linspace(0, self.dx*self.nx, self.nx),
@@ -404,6 +661,10 @@ class Simulation():
         plt.show()
 
     def plot_all(self):
+        """
+        Plot the phase screen, intensity, and dynamic spectrum together as
+        subplots in a single figure.
+        """
         plt.figure(2)
         plt.subplot(2, 2, 1)
         self.plot_screen(subplot=True)
@@ -415,37 +676,82 @@ class Simulation():
 
 
 class ACF():
+    """
+    Theoretical autocorrelation function (ACF) of scintillation intensity.
+
+    Computes the 2D ACF of intensity vs time and frequency (and the
+    corresponding secondary spectrum) directly from the theoretical
+    function for strong scintillation given in Appendix A of Rickett,
+    Coles et al. (2014), ApJ 787, 161, including the effects of
+    anisotropy and a phase gradient (e.g. due to a binary companion).
+    The magnitude of the effective velocity is defined to be 1, so time
+    and frequency lags are expressed in units of the (isotropic)
+    scintillation timescale and decorrelation bandwidth respectively.
+    """
 
     def __init__(self, psi=0, phasegrad=0, theta=0, ar=1, alpha=5/3,
                  taumax=4, dnumax=4, nf=51, nt=51, amp=1, wn=0,
                  spatial_factor=2, resolution_factor=1, core_factor=2,
                  auto_sampling=True, plot=False, display=True):
         """
-        Generate an ACF from the theoretical function in:
-            Rickett et al. (2014)
+        Generate an ACF from the theoretical function in Rickett, Coles et
+        al. (2014).
 
-        Magnitude of velocity defined to be 1
+        Magnitude of velocity is defined to be 1. On construction, this
+        computes the ACF via `calc_acf`.
 
-        psi - angle of velocity w.r.t the major axis of (brightness) anisotropy
-        phasegrad - magnitude of phase gradient
-        theta - angle of phase gradient w.r.t velocity vector
-        ar - axial ratio of anisotropy
-        alpha - structure function exponent (Kolmogorov = 5/3)
-        taumax - number of time scales to calculate ACF to
-            (ACF in space goes to taumax*V)
-        dnumax - number of frequency scales to calculate ACF to
-        nf - size of ACF in frequency. If not odd, returns nf+1
-        nt - size of ACF in frequency. If not odd, returns nt+1
-        amp - amplitude of ACF
-        wn - size of white-noise spike at the origin of ACF
-        spatial_factor - multiplier for spmax for calculating ACF e-field
-        resolution_factor - multiplier to default resolution for ACF e-field
-        core_factor - additional resolution multiplier for the first dnu sample
-        auto_sampling - (bool) decide whether to adjust spatial sampling
-            automatically to avoid artefacts.
-            Warning: computation time blows up for large ar
-        plot - (bool) choose whether to plot after computing
-        display - (bool) choose whether to display to screen immediately
+        Parameters
+        ----------
+        psi : float, optional
+            Angle (degrees) of the velocity vector with respect to the
+            major axis of the (brightness) anisotropy.
+        phasegrad : float, optional
+            Magnitude of the phase gradient (e.g. due to a binary
+            companion).
+        theta : float, optional
+            Angle (degrees) of the phase gradient with respect to the
+            velocity vector.
+        ar : float, optional
+            Axial ratio of the anisotropy.
+        alpha : float, optional
+            Structure function exponent (Kolmogorov turbulence = 5/3).
+        taumax : float, optional
+            Number of scintillation timescales to compute the ACF out to
+            (equivalently, the ACF in space goes out to ``taumax*V``).
+        dnumax : float, optional
+            Number of decorrelation bandwidths to compute the ACF out to.
+        nf : int, optional
+            Number of frequency lag samples in the ACF. If not odd, it is
+            incremented by one so the ACF has a well-defined centre.
+        nt : int, optional
+            Number of time lag samples in the ACF. If not odd, it is
+            incremented by one so the ACF has a well-defined centre.
+        amp : float, optional
+            Amplitude to scale the ACF by.
+        wn : float, optional
+            Size of the white-noise spike at the origin of the ACF.
+        spatial_factor : float, optional
+            Multiplier for the spatial extent (`taumax`) used when
+            calculating the ACF of the electric field. Only used if
+            `auto_sampling` is False.
+        resolution_factor : float, optional
+            Multiplier applied to the default spatial resolution used when
+            calculating the ACF of the electric field. Only used if
+            `auto_sampling` is False.
+        core_factor : float, optional
+            Additional resolution multiplier applied near the origin
+            (first frequency-lag sample), where the integrand varies most
+            rapidly. Only used if `auto_sampling` is False.
+        auto_sampling : bool, optional
+            If True, automatically set the spatial sampling factors
+            (`sp_fac`, `res_fac`, `core_fac`) based on `ar` and `taumax`,
+            to avoid sampling artefacts, overriding `spatial_factor`,
+            `resolution_factor`, and `core_factor`. Warning: computation
+            time increases sharply for large `ar`.
+        plot : bool, optional
+            If True, plot the ACF after it is computed.
+        display : bool, optional
+            If True and `plot` is True, show the plot immediately.
         """
 
         self.alpha = alpha
@@ -492,47 +798,66 @@ class ACF():
         return
 
     def calc_acf(self, plot=False):
-        """
-        Computes 2D ACF of intensity vs time and frequency where the
-        sampling in the output ACF can be handled automatically.
+        r"""
+        Compute the 2D ACF of intensity vs time and frequency.
 
-        requires anisotropy and angular displacement due to phase gradient.
-        psi = 0, defines brightness distribution anisotropy aligned with V
-        theta = 0, defines phase gradient aligned with V
-        (Within the code, x-axis (see Vx, and sigxn parameters) is the major
-         axis of ACF-efield anisotropy, which is psi=90)
+        Implements the integrals in Appendix A of Rickett, Coles et al.
+        (2014) (equations A1 and A2) for the ACF of intensity, given the
+        anisotropy and the angular displacement due to any phase gradient.
+        ``psi = 0`` defines the brightness-distribution anisotropy as
+        aligned with the velocity V; ``theta = 0`` defines the phase
+        gradient as aligned with V. (Within the code, the x-axis, see the
+        `Vx` and `sigxn` variables, is the major axis of the ACF-efield
+        anisotropy, which corresponds to ``psi=90``.)
 
-        implements the integrals in Appendix A of Rickett, Coles et al ApJ 2014
-        on the analysis of the double pulsar scintillation equations A1 and A2.
-        A2 has an error. It would be correct if nu were replaced by omega,
-        i.e. had an extra 2*pi
+        Coordinates in the code are with respect to the `ar` major axis,
+        so the structure itself does not need to be rotated; instead V and
+        the phase gradient are rotated into the structure coordinates.
+        The spatial lag ``sn`` is normalized by :math:`s_0` and the
+        frequency lag ``dnun`` by :math:`\nu_{0.5}`, the spatial and
+        frequency scales respectively; the phase gradient is normalized by
+        :math:`1/s_0` (i.e. ``sigxn = gradphix * s0``).
 
-        coordinates in the code are with respect to ar major axis so we don't
-        have to rotate the structure, we put V and phasegrad into the
-        structure coordinates.
+        Parameters
+        ----------
+        plot : bool, optional
+            If True, plot the resulting ACF (via `plot_acf`) after it is
+            computed.
 
-        The distance sn is normalized by So and the frequency dnun by \nu_{0.5}
-        the spatial scale and the frequency scale respectively.
-        the phase gradient is normalized by the 1/s0,
-        i.e. sigxn = gradphix * s0
+        Returns
+        -------
+        None
+            Sets ``self.acf`` (2D ACF of intensity), ``self.tn`` (time-lag
+            axis), ``self.fn`` (frequency-lag axis), ``self.sn``
+            (equivalent to ``self.tn``), ``self.snp`` (spatial-lag axis of
+            the electric-field ACF), and ``self.acf_efield`` (ACF of the
+            electric field) as attributes.
 
-        if there is no phase gradient then the acf is symmetric and only one
-        quadrant needs to be calculated. Otherwise two quadrants are necessary.
+        Notes
+        -----
+        If there is no phase gradient, the ACF is symmetric and only one
+        quadrant needs to be calculated; otherwise two quadrants are
+        necessary.
 
-        the worst case sampling is when dnun is very small. Then the argument
-        of the complex exponential becomes large and aliasing will occur. If
-        dnun=0.01 and dsp=0.1 the alias will peak at snx = 5. Reducing the
-        sampling dsp to 0.05 will push that alias out to snx = 8. However
-        halving dsp will increase the time by a factor of 4. Sampling
-        characteristics can be tuned with spatial_factor, resolution_factor,
-        and core_factor parameters
+        The worst-case sampling is when ``dnun`` is very small: the
+        argument of the complex exponential becomes large and aliasing
+        will occur. If ``dnun=0.01`` and ``dsp=0.1``, the alias will peak
+        at ``snx = 5``; reducing the spatial sampling ``dsp`` to 0.05 will
+        push that alias out to ``snx = 8``, though halving ``dsp``
+        increases the computation time by a factor of 4. Sampling can be
+        tuned via the `spatial_factor`, `resolution_factor`, and
+        `core_factor` parameters of `__init__` (or `auto_sampling`).
 
-        The frequency decorrelation is quite linear near the origin and looks
-        quasi-exponential, the 0.5 width is dnun = 0.15. Sampling of 0.05 is
-        more than adequate in frequency. Sampling of 0.1 in sn is adequate
+        The frequency decorrelation is quite linear near the origin and
+        looks quasi-exponential; the half-power width is ``dnun = 0.15``,
+        so a sampling of 0.05 in frequency is more than adequate, and a
+        sampling of 0.1 in ``sn`` is adequate. ``dnun = 0.0`` is divergent
+        in this integral, but is obtained trivially from the ACF of the
+        electric field directly.
 
-        dnun = 0.0 is divergent with this integral but can be obtained
-        trivially from the ACF of the electric field directly
+        Note also that Rickett, Coles et al. (2014) equation A2 as printed
+        has an error: it would be correct if :math:`\nu` were replaced by
+        :math:`\omega`, i.e. with an extra factor of :math:`2\pi`.
         """
 
         alph2 = self.alpha/2
@@ -586,7 +911,8 @@ class ACF():
             tn = np.linspace(0, (spmax), int(np.ceil(self.nt/2)))
             snx = Vx*tn
             sny = Vy*tn
-            gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
+            gammitv = np.zeros((int(len(snx)), int(ndnun)),
+                               dtype=np.complex128)
             # compute dnun=0 first
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
                                          (sny*sqrtar)**2)**alph2)
@@ -631,7 +957,8 @@ class ACF():
             snx = np.cos(xi*np.pi/180)*tn
             sny = np.sin(xi*np.pi/180)*tn
             # compute dnun=0 first
-            gammitv = np.zeros((int(len(snx)), int(ndnun)), dtype=np.complex_)
+            gammitv = np.zeros((int(len(snx)), int(ndnun)),
+                               dtype=np.complex128)
             gammitv[:, 0] = np.exp(-0.5*((snx/sqrtar)**2 +
                                          (sny*sqrtar)**2)**alph2)
             gammitv[np.argwhere(snx == 0), 0] += wn/amp
@@ -679,7 +1006,23 @@ class ACF():
 
     def plot_acf(self, display=True, contour=True, filled=False):
         """
-        Plots the simulated ACF
+        Plot the theoretical 2D ACF of intensity vs time and frequency
+        lag.
+
+        Requires `calc_acf` to have been run first (i.e. `self.acf`,
+        `self.tn`, `self.fn` to exist).
+
+        Parameters
+        ----------
+        display : bool, optional
+            If True, set the plot title and call ``plt.show()``
+            immediately.
+        contour : bool, optional
+            If True and `filled` is False, overlay black contours at
+            ``amp * [0.2, 0.4, 0.6, 0.8]``.
+        filled : bool, optional
+            If True, plot filled contours (``plt.contourf``) instead of a
+            pcolormesh.
         """
         # for plotting, we need to expand tn and fn,
         #   since they are pixel edges, not centres
@@ -710,7 +1053,15 @@ class ACF():
 
     def plot_acf_efield(self, display=True):
         """
-        Plots the simulated ACF
+        Plot the ACF of the electric field vs spatial lag.
+
+        Requires `calc_acf` to have been run first (i.e. `self.acf_efield`
+        and `self.snp` to exist).
+
+        Parameters
+        ----------
+        display : bool, optional
+            If True, call ``plt.show()`` immediately.
         """
         # for plotting, we need to expand tn and fn,
         #   since they are pixel edges, not centres
@@ -727,7 +1078,26 @@ class ACF():
 
     def calc_sspec(self, window='hanning', window_frac=1):
         """
-        Calculate the secondary spectrum
+        Compute the secondary spectrum from the ACF.
+
+        Applies a 2D window to the ACF (`self.acf`) before taking its 2D
+        Fourier transform, to reduce edge effects/spectral leakage.
+
+        Parameters
+        ----------
+        window : str, optional
+            Name of the window function to apply along each axis before
+            transforming (passed to `scintools.scint_utils.get_window`),
+            e.g. 'hanning', 'blackman'.
+        window_frac : float, optional
+            Fraction of each axis over which the window is applied
+            (passed to `scintools.scint_utils.get_window`).
+
+        Returns
+        -------
+        None
+            Sets ``self.sspec`` (secondary spectrum, in dB) as an
+            attribute.
         """
         nf, nt = np.shape(self.acf)
         chan_window, subint_window = get_window(nt, nf, window=window,
@@ -743,7 +1113,24 @@ class ACF():
 
     def plot_sspec(self, display=True, vmin=None, vmax=None):
         """
-        Plots the simulated ACF
+        Plot the secondary spectrum vs time and frequency lag.
+
+        Computes the secondary spectrum first via `calc_sspec` (with its
+        default window) if it has not already been computed.
+
+        Parameters
+        ----------
+        display : bool, optional
+            If True, set the plot title and call ``plt.show()``
+            immediately.
+        vmin : float or None, optional
+            Minimum of the colour scale, in dB. If None, defaults to 3 dB
+            below the median of the (finite, non-zero) secondary
+            spectrum.
+        vmax : float or None, optional
+            Maximum of the colour scale, in dB. If None, defaults to 3 dB
+            below the maximum of the (finite, non-zero) secondary
+            spectrum.
         """
         if not hasattr(self, 'sspec'):
             self.calc_sspec()
@@ -766,39 +1153,101 @@ class ACF():
 
 
 class Brightness():
+    """
+    Angular brightness distribution and delay-Doppler (secondary) spectrum
+    of a scattered wave interfering with an unscattered wave.
+
+    Based on Yao et al. (2020), modified to correctly account for the
+    phase gradient terms and to remove spurious bright points in the
+    secondary spectrum (caused by a coordinate singularity) that would
+    otherwise create artefacts in the ACF. The angular spectrum is
+    defined by the (phase) structure function exponent. The ACF of the
+    electric field is calculated first and 2D-FFT'ed to get the
+    brightness distribution; the brightness distribution can then be
+    offset by a phase gradient, which causes an angular shift as a
+    fraction of the half-width of the distribution.
+    """
 
     def __init__(self, ar=1.0, psi=0, alpha=1.67, thetagx=0, thetagy=0,
                  thetarx=0, thetary=0, df=0.02, dt=0.08, dx=0.1,
                  nf=10, nt=80, nx=30, ncuts=5, plot=False, contour=True,
                  figsize=(10, 8), calc_sspec=True, calc_acf=True):
         """
-        Simulate Delay-Doppler Spectrum from Scattered angular spectrum from
-        Yao et al. (2020), modified to get the phase gradient terms correctly
-        and to clean up the bright points in the secondary spectrum which cause
-        artifacts in the ACF
+        Simulate the delay-Doppler spectrum from the scattered angular
+        spectrum, following Yao et al. (2020).
 
-        Here we assume that the angular spectrum interferes with an unscattered
-        wave. The angular spectrum is defined by the spectral exponent. First
-        the ACF of the field is calculated, then it is 2D-FFT'ed to get the
-        brightness distribution. The brightness distribution can be offset by a
-        phase gradient which causes an angular shift as a fraction of the half-
-        width of the brightness distribution.
+        Here we assume that the angular spectrum interferes with an
+        unscattered wave. First the ACF of the electric field is
+        calculated (`calc_brightness`), then it is 2D-FFT'ed to get the
+        brightness distribution. The brightness distribution can be
+        offset by a phase gradient which causes an angular shift as a
+        fraction of the half-width of the brightness distribution.
 
-        The unscattered wave can also be offset by the phase gradient (as it
-        would be in weak scattering), or it can be at zero offset (or anywhere
-        else). The default would be to set the phase gradient angle and the
-        reference angle to be equal
+        The unscattered wave can also be offset by the phase gradient (as
+        it would be in weak scattering), or it can be at zero offset (or
+        anywhere else). The default is to set the phase gradient angle
+        and the reference angle to be equal.
 
-        params:
-            ar: axial ratio
-            alpha: exponent of phase structure function
-            thetagx: scattered wave offset by phase gradient
-            thetagy:
-            thetarx: reference angle for unscattered wave (normally thetax)
-            thetary:
-            dx, nx: spatial resolution and size of e-field ACF, relative to
-                spatial scale
-
+        Parameters
+        ----------
+        ar : float, optional
+            Axial ratio of the anisotropy.
+        psi : float, optional
+            Orientation angle (degrees) of the anisotropy.
+        alpha : float, optional
+            Exponent of the phase structure function (Kolmogorov
+            turbulence would be 5/3; note the default here, 1.67, is used
+            as an approximation of 5/3).
+        thetagx : float, optional
+            Offset (in x) of the scattered wave due to the phase
+            gradient.
+        thetagy : float, optional
+            Offset (in y) of the scattered wave due to the phase
+            gradient.
+        thetarx : float, optional
+            Reference angle (in x) for the unscattered wave (normally
+            equal to `thetagx`).
+        thetary : float, optional
+            Reference angle (in y) for the unscattered wave (normally
+            equal to `thetagy`).
+        df : float, optional
+            Step size in Doppler (frequency-lag-like) coordinate `fd`
+            used when computing the secondary spectrum.
+        dt : float, optional
+            Step size in delay (time-lag-like) coordinate `td` used when
+            computing the secondary spectrum.
+        dx : float, optional
+            Spatial step size of the electric-field ACF grid, relative to
+            the spatial scale.
+        nf : float, optional
+            Half-extent of the Doppler axis `fd`, which runs from ``-nf``
+            to ``+nf`` in steps of `df`.
+        nt : float, optional
+            Half-extent of the delay axis `td`, which runs from ``-nt``
+            to ``+nt`` in steps of `dt`.
+        nx : float, optional
+            Half-extent of the electric-field ACF spatial grid, which
+            runs from ``-nx`` to ``+nx`` in steps of `dx`.
+        ncuts : int, optional
+            Number of Doppler cuts (at different delays) to plot in
+            `plot_cuts`.
+        plot : bool, optional
+            If True, plot the electric-field ACF and brightness
+            distribution after they are computed, and (if `calc_sspec`
+            or `calc_acf` are True) the secondary spectrum, cuts, and/or
+            ACF.
+        contour : bool, optional
+            If True and `plot` and `calc_acf` are True, overlay contours
+            on the ACF plot.
+        figsize : tuple of float, optional
+            Figure size (width, height) in inches, used for all plots
+            made during construction.
+        calc_sspec : bool, optional
+            If True, compute the secondary spectrum (`calc_SS`) after the
+            brightness distribution.
+        calc_acf : bool, optional
+            If True, compute the ACF (`calc_acf`) from the secondary
+            spectrum after it is computed.
         """
 
         self.ar = ar
@@ -836,6 +1285,24 @@ class Brightness():
                 self.plot_acf(figsize=figsize, contour=contour)
 
     def calc_brightness(self):
+        """
+        Compute the angular brightness distribution from the ACF of the
+        electric field.
+
+        First builds the (anisotropic, power-law) ACF of the electric
+        field, `self.acf_efield`, on a grid spanning ``-nx`` to ``+nx`` in
+        steps of `dx` (distances referenced to the spatial scale in the
+        X-direction). The brightness distribution is then obtained by
+        2D Fourier transforming that ACF.
+
+        Returns
+        -------
+        None
+            Sets ``self.x`` (1D spatial axis), ``self.X``, ``self.Y`` (2D
+            coordinate grids), ``self.acf_efield`` (ACF of the electric
+            field), and ``self.B`` (angular brightness distribution) as
+            attributes.
+        """
         # first need to get the brightness distribution from the ACF of the
         # electric field. Reference distances to the spatial scale in the
         # X-direction
@@ -870,32 +1337,46 @@ class Brightness():
 
     def calc_SS(self):
         """
-        now set up the secondary spectrum defined by:
+        Compute the delay-Doppler (secondary) spectrum from the brightness
+        distribution.
 
-        delay = theta^2, i.e. 0.5 L/c = 1
-        doppler = theta, i.e. V/lambda = 1
+        The secondary spectrum is defined with ``delay = theta**2`` (i.e.
+        ``0.5*L/c = 1``) and ``doppler = theta`` (i.e. ``V/lambda = 1``).
+        The differential delay `td` and differential Doppler `fd` are
+        therefore::
 
-        therefore differential delay (td), and differential doppler (fd) are:
-            td = (thetax+thetagx)^2 +(thetay+thetagy)^2 - thetagx^2-thetagy^2
+            td = (thetax+thetagx)**2 + (thetay+thetagy)**2
+                 - thetagx**2 - thetagy**2
             fd = (thetax + thetagx) - thetagx = thetax
-            Jacobian = 1/(thetay+thetagy)
-        thetay + thetagy =
-            sqrt(td - (thetax + thetagx)^2 + thetagx^2 + thetagy^2)
+            Jacobian = 1 / (thetay+thetagy)
+            thetay + thetagy = sqrt(td - (thetax+thetagx)**2
+                                     + thetagx**2 + thetagy**2)
 
-        the arc is defined by (thetay+thetagy) == 0 where there is a half order
-        singularity.
+        Requires `calc_brightness` to have been run first (i.e. `self.X`,
+        `self.Y`, `self.B` to exist).
 
-        The singularity creates a problem in the code because the sampling in
-        fd,td is not synchronized with the arc position, so there can be some
-        very bright points if the sample happens to lie very close to the
-        singularity.
+        Returns
+        -------
+        None
+            Sets ``self.fd``, ``self.td`` (Doppler and delay axes),
+            ``self.thetax``, ``self.thetay`` (angular coordinates
+            corresponding to each `(td, fd)` pair), ``self.jacobian``,
+            ``self.SS`` (secondary spectrum, linear), and ``self.LSS``
+            (secondary spectrum, in dB) as attributes.
 
-        this is not a problem in interpreting the secondary spectrum, but it
-        causes large artifacts when Fourier transforming it to get the ACF.
-
-        So I [Bill Coles, in original Matlab code] have limited the Jacobian by
-        not allowing (thetay+thetagy) to be less than half the step size in
-        thetax and thetay.
+        Notes
+        -----
+        The arc in the secondary spectrum is defined by
+        ``(thetay+thetagy) == 0``, where there is a half-order
+        singularity. This singularity creates a problem in the code
+        because the sampling in `(fd, td)` is not synchronized with the
+        arc position, so there can be very bright points if a sample
+        happens to lie very close to the singularity. This is not a
+        problem for interpreting the secondary spectrum itself, but it
+        causes large artefacts when Fourier transforming it to get the
+        ACF. So (following Bill Coles' original MATLAB code) the Jacobian
+        is limited by not allowing ``(thetay+thetagy)`` to be smaller than
+        half the step size in `thetax`/`thetay` (`self.df`).
         """
 
         fd = np.arange(-self.nf, self.nf, self.df)
@@ -951,6 +1432,18 @@ class Brightness():
         return
 
     def calc_acf(self):
+        """
+        Compute the (normalized) ACF from the secondary spectrum.
+
+        Requires `calc_SS` to have been run first (i.e. `self.SS` to
+        exist).
+
+        Returns
+        -------
+        None
+            Sets ``self.acf`` (2D ACF vs delay and Doppler lag, normalized
+            to a peak of 1) as an attribute.
+        """
         acf = np.fft.fftshift(np.fft.fft2(np.fft.fftshift(self.SS)))
         acf = np.real(acf)
         acf /= np.max(acf)  # normalize acf
@@ -958,6 +1451,17 @@ class Brightness():
         return
 
     def plot_acf_efield(self, figsize=(6, 6)):
+        """
+        Plot the ACF of the electric field vs spatial lag.
+
+        Requires `calc_brightness` to have been run first (i.e.
+        `self.acf_efield` to exist).
+
+        Parameters
+        ----------
+        figsize : tuple of float, optional
+            Figure size (width, height) in inches.
+        """
         plt.figure(figsize=figsize)
         plt.pcolormesh(self.x, self.x, self.acf_efield)
         plt.grid(linewidth=0.2)
@@ -969,6 +1473,17 @@ class Brightness():
         plt.show()
 
     def plot_brightness(self, figsize=(6, 6)):
+        """
+        Plot the angular brightness distribution (in dB).
+
+        Requires `calc_brightness` to have been run first (i.e. `self.B`
+        to exist).
+
+        Parameters
+        ----------
+        figsize : tuple of float, optional
+            Figure size (width, height) in inches.
+        """
         plt.figure(figsize=figsize)
         plt.pcolormesh(self.x, self.x, 10*np.log10(self.B))
         plt.grid(linewidth=0.2)
@@ -980,6 +1495,19 @@ class Brightness():
         plt.show()
 
     def plot_sspec(self, figsize=(6, 6)):
+        """
+        Plot the delay-Doppler (secondary) spectrum, in dB.
+
+        Requires `calc_SS` to have been run first (i.e. `self.fd`,
+        `self.td`, `self.LSS`, `self.SS` to exist). The colour scale is
+        set to 3 dB below the median and maximum of the spectrum (over
+        pixels where ``self.SS > 1e-6``).
+
+        Parameters
+        ----------
+        figsize : tuple of float, optional
+            Figure size (width, height) in inches.
+        """
         plt.figure(figsize=figsize)
         plt.pcolormesh(self.fd, self.td, self.LSS)
         plt.colorbar()
@@ -998,6 +1526,20 @@ class Brightness():
         plt.show()
 
     def plot_acf(self, figsize=(6, 6), contour=True):
+        """
+        Plot the ACF vs delay (frequency) and Doppler (time) lag.
+
+        Requires `calc_acf` to have been run first (i.e. `self.acf` to
+        exist).
+
+        Parameters
+        ----------
+        figsize : tuple of float, optional
+            Figure size (width, height) in inches.
+        contour : bool, optional
+            If True, overlay black contours at ``[0.2, 0.4, 0.6, 0.8]``
+            and a dotted red contour at 0.
+        """
         plt.figure(figsize=figsize)
         plt.pcolormesh(self.fd, self.td, self.acf)
         plt.colorbar()
@@ -1021,13 +1563,24 @@ class Brightness():
 
     def plot_cuts(self, figsize=(6, 6)):
         """
-        plot some cuts. One might want to take some cuts through the ACF. In
-        particular the ACF cut in doppler at zero delay is invarient with phase
-        gradient and is also exp(-(time/t0)^alpha), so you can confirm that
-        the exponent is correct by examining that cut.
+        Plot 1D cuts through the secondary spectrum in Doppler at a
+        selection of delays, and a cut in delay at zero Doppler.
 
-        the cut in frequency (the bandwidth) is very sensitive to ar and its
-        orientation and to phase gradients.
+        One might want to take some cuts through the ACF. In particular,
+        the cut in Doppler at zero delay is invariant with phase gradient
+        and is also ``exp(-(time/t0)**alpha)``, so you can confirm that
+        the exponent is correct by examining that cut. The cut in
+        frequency (the bandwidth) is very sensitive to `ar`, its
+        orientation (`psi`), and to phase gradients.
+
+        Requires `calc_SS` to have been run first (i.e. `self.fd`,
+        `self.td`, `self.LSS`, `self.SS` to exist).
+
+        Parameters
+        ----------
+        figsize : tuple of float, optional
+            Figure size (width, height) in inches, used for each of the
+            two figures produced.
         """
         plt.figure(figsize=figsize)
         nt = len(self.td)
