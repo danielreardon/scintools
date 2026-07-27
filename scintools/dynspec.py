@@ -33,6 +33,7 @@ from __future__ import (absolute_import, division,
 import time
 import os
 from os.path import split
+import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.constants as sc
@@ -268,23 +269,51 @@ class Dynspec:
         self.freqs = rawdata[3]  # Observing frequency in MHz.
         fluxes = rawdata[4]  # fluxes
         self.nchan = int(np.max(rawdata[1])) + 1  # number of channels
-        self.bw = self.freqs[-1] - self.freqs[0]  # obs bw
-        self.df = round(self.bw/self.nchan, 5)  # channel bw
-        self.bw = round(self.bw + self.df, 2)  # correct bw
         self.nsub = int(np.max(rawdata[0])) + 1  # number of subints
+        # Detect the channel ordering in the file. np.unique() below sorts
+        #   the frequency axis ascending, so we record here whether the file
+        #   listed channels high->low in order to flip the flux rows to match.
+        descending = (self.nchan > 1 and
+                      self.freqs[self.nchan - 1] < self.freqs[0])
 
         # initial estimate of tobs and dt
         self.dt = np.mean(np.diff(self.times))
         self.tobs = np.max(self.times) + self.dt
 
         # Now reshape flux arrays into a 2D matrix
-        self.freqs = np.unique(self.freqs)
+        self.freqs = np.unique(self.freqs)  # ascending channel centres
         self.freq = round(np.mean(self.freqs), 2)
+
+        # Channel bandwidth from the spacing between channel centres. Using
+        #   the median difference gives the true spacing (span/(nchan-1), not
+        #   span/nchan) and is robust to the odd missing channel.
+        if len(self.freqs) > 1:
+            chan_diffs = np.diff(self.freqs)
+            self.df = round(float(np.median(chan_diffs)), 6)
+            # The ACF / secondary-spectrum FFTs assume a uniform frequency
+            #   grid; warn if that is not the case (gaps, stitched sub-bands).
+            if not np.allclose(chan_diffs, self.df, rtol=1e-3, atol=0):
+                warnings.warn(
+                    "Frequency channels are not uniformly spaced (gaps or "
+                    "stitched sub-bands?). scintools assumes a uniform grid "
+                    "when computing the ACF and secondary spectrum, so the "
+                    "delay axis may be distorted. Consider regridding onto a "
+                    "uniform axis or processing sub-bands separately.",
+                    stacklevel=2)
+        else:
+            self.df = 0.0
+        if len(self.freqs) != self.nchan:
+            warnings.warn(
+                "Number of unique frequency channels ({0}) does not match "
+                "the channel count from the file ({1}); duplicated or missing "
+                "channel centres may misalign the dynamic spectrum.".format(
+                    len(self.freqs), self.nchan), stacklevel=2)
+        self.bw = round(self.nchan * self.df, 3)  # full band, edge-to-edge
+
         fluxes = fluxes.reshape([self.nsub, self.nchan]).transpose()
-        if self.df < 0:  # flip things
-            self.df = -self.df
-            self.bw = -self.bw
-            # Flip flux matricies since self.freqs is now in ascending order
+        if descending:
+            # File listed channels high->low but self.freqs is now ascending;
+            #   flip the flux rows to keep each value matched to its channel.
             fluxes = np.flip(fluxes, 0)
         # Finished reading, now setup dynamic spectrum
         self.dyn = fluxes  # initialise dynamic spectrum
@@ -312,15 +341,23 @@ class Dynspec:
 
         """
 
-        dt0 = np.abs(np.diff(self.times))[0]  # first subint length
-        dt = np.mean(np.abs(np.diff(self.times))[1:])
-        sdt = np.std(np.abs(np.diff(self.times))[1:])
-        while dt0 - dt <= -threshold*sdt and sdt >= 0:
+        # Delete leading sub-integrations only while the first one is a
+        #   genuine short outlier: shorter than the mean spacing of the
+        #   remaining subints by more than `threshold` sigma. Stop as soon as
+        #   the first subint is no longer such an outlier. The previous
+        #   condition used `<=` (with a redundant, always-true `sdt >= 0`),
+        #   so when the remaining subints became uniformly spaced (sdt = 0,
+        #   dt0 == dt) it kept deleting them down to almost nothing; the
+        #   strict `<` below stops instead of consuming the observation.
+        while len(self.times) > 3:
+            diffs = np.abs(np.diff(self.times))
+            dt0 = diffs[0]  # first subint length
+            dt = np.mean(diffs[1:])
+            sdt = np.std(diffs[1:])
+            if (dt0 - dt) >= -threshold*sdt:
+                break
             self.dyn = np.delete(self.dyn, (0), axis=1)
             self.times = np.delete(self.times, (0))
-            dt0 = np.abs(np.diff(self.times))[0]
-            dt = np.mean(np.abs(np.diff(self.times))[1:])
-            sdt = np.std(np.abs(np.diff(self.times))[1:])
 
         self.mjd += np.min(self.times)/86400
         self.times -= np.min(self.times)  # start at 0
