@@ -16,6 +16,7 @@ build/*
 dist/
 dist/*
 .vscode/settings.json
+docs/build/
 docs/source/tutorials/*.ipynb
 docs/source/tutorials/.ipynb_checkpoints/*
 docs/source/tutorials/.ipynb_checkpoints

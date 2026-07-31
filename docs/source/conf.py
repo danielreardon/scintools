@@ -14,7 +14,20 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('.'))
+# Add the repository root (two levels up from this file) so that scintools
+#   can be imported without being installed. Resolve it relative to this
+#   file rather than the working directory, so the build works no matter
+#   where sphinx-build is invoked from.
+_repo_root = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+# ...for autodoc, which runs inside this Sphinx process:
+sys.path.insert(0, _repo_root)
+# ...and for the jupyter-execute cells in the tutorials, which run in a
+#   separate IPython kernel subprocess that does NOT inherit sys.path.
+#   Exporting PYTHONPATH is what makes `import scintools` work there.
+os.environ['PYTHONPATH'] = os.pathsep.join(
+    [_repo_root] + ([os.environ['PYTHONPATH']]
+                    if os.environ.get('PYTHONPATH') else []))
 
 
 # -- Project information -----------------------------------------------------
@@ -70,12 +83,22 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = []
+# The theta-theta tutorials use `jupyter-execute`, so their cells are run
+#   during the build. A full theta-theta analysis of the sample data takes
+#   well over 25 minutes, which exceeds the Read the Docs build limit and
+#   caused every build to time out, leaving stale documentation published.
+#   Excluding them keeps the build at a few seconds. The tutorial sources
+#   remain in the repository; to publish them again, pre-render their
+#   output (e.g. commit executed notebooks) instead of executing on build.
+exclude_patterns = [
+    'tutorials/thth_intro.rst',
+    'tutorials/dynspec_thth.rst',
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'

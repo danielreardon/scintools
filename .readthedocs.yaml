@@ -1,0 +1,26 @@
+# Read the Docs configuration file.
+# Required since September 2023: without this file builds fail and Read the
+# Docs keeps serving the last successful build.
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html
+
+version: 2
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.11"
+
+sphinx:
+  configuration: docs/source/conf.py
+  fail_on_warning: false
+
+python:
+  install:
+    # Sphinx, the extensions used by conf.py, and the subset of scintools'
+    #   runtime dependencies the docs actually need. The package itself is
+    #   deliberately not pip-installed here, to keep the docs environment
+    #   small (a full install pulls in heavy extras such as bilby that no
+    #   page uses). conf.py puts the repository root on sys.path (for
+    #   autodoc) and PYTHONPATH (for the jupyter-execute kernel), so
+    #   `import scintools` works without installing.
+    - requirements: docs/requirements.txt
