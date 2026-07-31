@@ -461,7 +461,7 @@ def arc_edges(eta, dfd, dtau, fd_max, n):
     """
     Calculate evenly spaced in arc length edges array (DEVELOPMENT ONLY)
 
-    Parameters:
+    Parameters
     ----------
     eta : `~astropy.units.Quantity`
         The curvature of the parabola

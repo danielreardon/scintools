@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to the documentation for Scintools!
-=====================================
+===========================================
 
 .. toctree::
    :maxdepth: 2
