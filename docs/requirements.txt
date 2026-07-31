@@ -8,11 +8,12 @@ sphinx_rtd_theme
 jupyter_sphinx
 ipykernel
 
-# scintools' own runtime dependencies, needed by autodoc and by the
-# jupyter-execute cells in the theta-theta tutorials. These are listed
-# explicitly rather than installing the package itself, because setup.py
-# pins numpy<1.23.0, which has no wheels for modern Python and would either
-# fail to build or silently downgrade numpy in the docs environment.
+# The subset of scintools' runtime dependencies that the documentation
+# actually needs: autodoc imports the package, and the jupyter-execute
+# cells in the theta-theta tutorials run real code. These are listed
+# explicitly, rather than pip-installing scintools itself, to keep the docs
+# environment small - a full install would also pull in heavy extras such
+# as bilby and emcee that no page needs, slowing the build for no benefit.
 # conf.py puts the repository root on sys.path/PYTHONPATH so that
 # `import scintools` works without installation.
 numpy
