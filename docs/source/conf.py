@@ -14,14 +14,20 @@
 #
 import os
 import sys
-# Add the repository root (two levels up from this file) so that autodoc and
-#   the jupyter-execute tutorial cells can import scintools when it is not
-#   already installed in the build environment. Resolve relative to this
+# Add the repository root (two levels up from this file) so that scintools
+#   can be imported without being installed. Resolve it relative to this
 #   file rather than the working directory, so the build works no matter
 #   where sphinx-build is invoked from.
 _repo_root = os.path.abspath(
     os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+# ...for autodoc, which runs inside this Sphinx process:
 sys.path.insert(0, _repo_root)
+# ...and for the jupyter-execute cells in the tutorials, which run in a
+#   separate IPython kernel subprocess that does NOT inherit sys.path.
+#   Exporting PYTHONPATH is what makes `import scintools` work there.
+os.environ['PYTHONPATH'] = os.pathsep.join(
+    [_repo_root] + ([os.environ['PYTHONPATH']]
+                    if os.environ.get('PYTHONPATH') else []))
 
 
 # -- Project information -----------------------------------------------------

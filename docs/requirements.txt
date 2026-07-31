@@ -1,9 +1,22 @@
 # Documentation build requirements (used by .readthedocs.yaml).
-# The scintools package itself, and hence its runtime dependencies, is
-# installed separately via `pip install .` - see .readthedocs.yaml.
+#
+# Sphinx and the extensions conf.py enables. jupyter_sphinx in particular is
+# required: conf.py does `extensions += ['jupyter_sphinx']`, and without it
+# the build aborts immediately with an ExtensionError.
 sphinx
 sphinx_rtd_theme
-# Required by conf.py, which does `extensions += ['jupyter_sphinx']`.
-# Without this the build fails immediately with an ExtensionError.
 jupyter_sphinx
 ipykernel
+
+# scintools' own runtime dependencies, needed by autodoc and by the
+# jupyter-execute cells in the theta-theta tutorials. These are listed
+# explicitly rather than installing the package itself, because setup.py
+# pins numpy<1.23.0, which has no wheels for modern Python and would either
+# fail to build or silently downgrade numpy in the docs environment.
+# conf.py puts the repository root on sys.path/PYTHONPATH so that
+# `import scintools` works without installation.
+numpy
+scipy
+matplotlib
+astropy
+lmfit

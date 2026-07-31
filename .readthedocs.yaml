@@ -16,9 +16,11 @@ sphinx:
 
 python:
   install:
-    # Sphinx, the theme, and the extensions used by conf.py
+    # Sphinx, the extensions used by conf.py, and scintools' runtime
+    #   dependencies. The package itself is deliberately NOT pip-installed
+    #   here: setup.py pins numpy<1.23.0, which has no wheels for modern
+    #   Python and would either fail to build or downgrade numpy in the
+    #   docs environment. conf.py instead puts the repository root on
+    #   sys.path (for autodoc) and PYTHONPATH (for the jupyter-execute
+    #   kernel), so `import scintools` works without installing.
     - requirements: docs/requirements.txt
-    # scintools itself, so that autodoc (reference.rst) and the
-    #   jupyter-execute cells in the tutorials can import the package
-    - method: pip
-      path: .
