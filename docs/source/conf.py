@@ -14,7 +14,14 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('.'))
+# Add the repository root (two levels up from this file) so that autodoc and
+#   the jupyter-execute tutorial cells can import scintools when it is not
+#   already installed in the build environment. Resolve relative to this
+#   file rather than the working directory, so the build works no matter
+#   where sphinx-build is invoked from.
+_repo_root = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), os.pardir, os.pardir))
+sys.path.insert(0, _repo_root)
 
 
 # -- Project information -----------------------------------------------------
@@ -70,7 +77,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.

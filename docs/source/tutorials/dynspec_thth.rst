@@ -44,6 +44,9 @@ dynamic spectrum and add some simple noise to.
     freq = arch["f_MHz"] * u.MHz
     wf = arch["Espec"]
     ##Create noisy dynamic spectrum
+    ##  Seeded so that the documentation build is reproducible: the arc fit
+    ##  below is sensitive to the noise realisation and can otherwise fail.
+    np.random.seed(1)
     dspec = np.abs(wf) ** 2 + np.random.normal(0, 20, wf.shape)
     dspec /= dspec.mean()
 

@@ -1,0 +1,9 @@
+# Documentation build requirements (used by .readthedocs.yaml).
+# The scintools package itself, and hence its runtime dependencies, is
+# installed separately via `pip install .` - see .readthedocs.yaml.
+sphinx
+sphinx_rtd_theme
+# Required by conf.py, which does `extensions += ['jupyter_sphinx']`.
+# Without this the build fails immediately with an ExtensionError.
+jupyter_sphinx
+ipykernel
