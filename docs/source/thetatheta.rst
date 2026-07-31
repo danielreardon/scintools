@@ -13,9 +13,15 @@ In Theta-Theta space the arcs and inverted arclets are transformed into straight
 Tutorials
 ----------------------
 
-:ref:`thth_intro`.
+Two worked tutorials are provided as source files in the repository, under
+``docs/source/tutorials``:
 
-:ref:`dynspec_thth`.
+* ``thth_intro.rst`` - an introduction to the theta-theta transform.
+* ``dynspec_thth.rst`` - theta-theta analysis via the ``Dynspec`` class.
+
+They are currently excluded from the rendered documentation because their
+code cells execute a full theta-theta analysis, which takes far longer than
+the documentation build is allowed. See ``docs/source/conf.py``.
 
 .. [Sprenger2021] Sprenger T., Wucknitz O., Main R., Baker D., Brisken W., 2021, MNRAS, 500, 1114
 .. [Baker2022]

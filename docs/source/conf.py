@@ -88,7 +88,17 @@ language = 'en'
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path .
-exclude_patterns = []
+# The theta-theta tutorials use `jupyter-execute`, so their cells are run
+#   during the build. A full theta-theta analysis of the sample data takes
+#   well over 25 minutes, which exceeds the Read the Docs build limit and
+#   caused every build to time out, leaving stale documentation published.
+#   Excluding them keeps the build at a few seconds. The tutorial sources
+#   remain in the repository; to publish them again, pre-render their
+#   output (e.g. commit executed notebooks) instead of executing on build.
+exclude_patterns = [
+    'tutorials/thth_intro.rst',
+    'tutorials/dynspec_thth.rst',
+]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
